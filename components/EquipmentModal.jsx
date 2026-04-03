@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { getSupabase } from '@/lib/supabase'
-import { X, Upload, Loader2, Trash2 } from 'lucide-react'
+import { X, Upload, Loader2, Trash2, Battery, BatteryLow, BatteryCharging, Minus } from 'lucide-react'
 import Image from 'next/image'
 
 const CATEGORIES = [
@@ -22,6 +22,20 @@ const CONDITIONS = [
   { value: 'retired', label: 'Ritirato' },
 ]
 
+const BATTERY_OPTIONS = [
+  { value: 'na', label: 'N/D', icon: Minus },
+  { value: 'charged', label: 'Carica', icon: Battery },
+  { value: 'charging', label: 'In carica', icon: BatteryCharging },
+  { value: 'low', label: 'Scarica', icon: BatteryLow },
+]
+
+const BATTERY_STYLES = {
+  na: 'bg-slate-700 text-slate-400 border-slate-600',
+  charged: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+  charging: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+  low: 'bg-red-500/20 text-red-300 border-red-500/30',
+}
+
 const EMPTY = {
   name: '',
   brand: '',
@@ -31,14 +45,78 @@ const EMPTY = {
   purchase_date: '',
   purchase_price: '',
   market_value: '',
+  insured_value: '',
   condition: 'active',
+  battery_status: 'na',
+  last_checked_at: '',
   notes: '',
   photo_url: '',
 }
 
+/** Compress image to max 800x800px, JPEG 70%, max ~200KB using Canvas API */
+async function compressImage(file) {
+  return new Promise((resolve) => {
+    const img = new window.Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const MAX = 800
+      let { width, height } = img
+      if (width > MAX || height > MAX) {
+        if (width > height) {
+          height = Math.round((height * MAX) / width)
+          width = MAX
+        } else {
+          width = Math.round((width * MAX) / height)
+          height = MAX
+        }
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(img, 0, 0, width, height)
+
+      // Start at 70% quality, reduce if still too large
+      const tryQuality = (q) => {
+        canvas.toBlob(
+          (blob) => {
+            if (blob.size > 200 * 1024 && q > 0.3) {
+              tryQuality(q - 0.1)
+            } else {
+              const compressed = new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' })
+              resolve(compressed)
+            }
+          },
+          'image/jpeg',
+          q
+        )
+      }
+      tryQuality(0.7)
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      resolve(file) // fallback: use original
+    }
+    img.src = url
+  })
+}
+
 export default function EquipmentModal({ item, onClose, onSaved }) {
   const isEdit = !!item?.id
-  const [form, setForm] = useState(item?.id ? { ...item, purchase_date: item.purchase_date?.slice(0, 10) || '', purchase_price: item.purchase_price || '', market_value: item.market_value || '' } : EMPTY)
+  const [form, setForm] = useState(
+    item?.id
+      ? {
+          ...item,
+          purchase_date: item.purchase_date?.slice(0, 10) || '',
+          purchase_price: item.purchase_price || '',
+          market_value: item.market_value || '',
+          insured_value: item.insured_value || '',
+          battery_status: item.battery_status || 'na',
+          last_checked_at: item.last_checked_at ? item.last_checked_at.slice(0, 10) : '',
+        }
+      : EMPTY
+  )
   const [loading, setLoading] = useState(false)
   const [uploadLoading, setUploadLoading] = useState(false)
   const [error, setError] = useState('')
@@ -53,13 +131,23 @@ export default function EquipmentModal({ item, onClose, onSaved }) {
     if (!file) return
 
     setUploadLoading(true)
+    setError('')
+
+    let toUpload = file
+    if (file.type.startsWith('image/')) {
+      try {
+        toUpload = await compressImage(file)
+      } catch {
+        // fallback to original
+      }
+    }
+
     const supabase = getSupabase()
-    const ext = file.name.split('.').pop()
-    const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+    const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`
 
     const { error: uploadError } = await supabase.storage
       .from('equipment-photos')
-      .upload(path, file, { upsert: true })
+      .upload(path, toUpload, { upsert: true, contentType: 'image/jpeg' })
 
     if (uploadError) {
       setError('Errore upload foto: ' + uploadError.message)
@@ -70,6 +158,8 @@ export default function EquipmentModal({ item, onClose, onSaved }) {
     const { data: { publicUrl } } = supabase.storage.from('equipment-photos').getPublicUrl(path)
     set('photo_url', publicUrl)
     setUploadLoading(false)
+    // reset input so same file can be re-selected
+    e.target.value = ''
   }
 
   async function handleSubmit(e) {
@@ -87,7 +177,10 @@ export default function EquipmentModal({ item, onClose, onSaved }) {
       purchase_date: form.purchase_date || null,
       purchase_price: form.purchase_price ? parseFloat(form.purchase_price) : null,
       market_value: form.market_value ? parseFloat(form.market_value) : null,
+      insured_value: form.insured_value ? parseFloat(form.insured_value) : null,
       condition: form.condition,
+      battery_status: form.battery_status || 'na',
+      last_checked_at: form.last_checked_at ? new Date(form.last_checked_at).toISOString() : null,
       notes: form.notes || null,
       photo_url: form.photo_url || null,
     }
@@ -152,6 +245,7 @@ export default function EquipmentModal({ item, onClose, onSaved }) {
                   {uploadLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                   {uploadLoading ? 'Caricamento…' : 'Carica foto'}
                 </button>
+                <p className="text-[10px] text-slate-500 mt-1">Max 800×800px · JPEG 70%</p>
                 {form.photo_url && (
                   <button
                     type="button"
@@ -161,13 +255,20 @@ export default function EquipmentModal({ item, onClose, onSaved }) {
                     <Trash2 className="w-3 h-3" /> Rimuovi
                   </button>
                 )}
-                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handlePhotoUpload}
+                />
               </div>
             </div>
           </div>
 
           {/* Name */}
-          <Field label="Nome *" required>
+          <Field label="Nome" required>
             <input
               type="text"
               value={form.name}
@@ -212,11 +313,18 @@ export default function EquipmentModal({ item, onClose, onSaved }) {
             </Field>
           </div>
 
-          {/* Market value + Condition */}
+          {/* Market value + Insured value */}
           <div className="grid grid-cols-2 gap-4">
             <Field label="Valore di mercato (€)">
               <input type="number" step="0.01" min="0" value={form.market_value} onChange={(e) => set('market_value', e.target.value)} placeholder="0.00" className={inputClass} />
             </Field>
+            <Field label="Valore assicurato (€)">
+              <input type="number" step="0.01" min="0" value={form.insured_value} onChange={(e) => set('insured_value', e.target.value)} placeholder="0.00" className={inputClass} />
+            </Field>
+          </div>
+
+          {/* Condition + Last checked */}
+          <div className="grid grid-cols-2 gap-4">
             <Field label="Condizione">
               <select value={form.condition} onChange={(e) => set('condition', e.target.value)} className={inputClass}>
                 {CONDITIONS.map((c) => (
@@ -224,6 +332,31 @@ export default function EquipmentModal({ item, onClose, onSaved }) {
                 ))}
               </select>
             </Field>
+            <Field label="Ultimo controllo">
+              <input type="date" value={form.last_checked_at} onChange={(e) => set('last_checked_at', e.target.value)} className={inputClass} />
+            </Field>
+          </div>
+
+          {/* Battery status */}
+          <div>
+            <label className="block text-xs font-medium text-slate-400 mb-2">Stato batteria</label>
+            <div className="flex gap-2 flex-wrap">
+              {BATTERY_OPTIONS.map(({ value, label, icon: Icon }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => set('battery_status', value)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
+                    form.battery_status === value
+                      ? BATTERY_STYLES[value]
+                      : 'bg-slate-900 text-slate-500 border-slate-700 hover:border-slate-600'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Notes */}

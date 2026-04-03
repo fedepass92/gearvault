@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getSupabase } from '@/lib/supabase'
 import { exportInsuranceReport } from '@/lib/pdf'
-import { FileDown, Filter, Loader2, ChevronDown } from 'lucide-react'
+import { FileDown, Filter, Loader2, ChevronDown, Download } from 'lucide-react'
 import { format } from 'date-fns'
 import { it } from 'date-fns/locale'
 
@@ -26,6 +26,43 @@ const CONDITION_BADGE = {
 }
 const CONDITION_LABEL = { active: 'Attivo', repair: 'Riparazione', retired: 'Ritirato' }
 
+const CATEGORY_LABELS = {
+  camera: 'Camera', lens: 'Obiettivo', drone: 'Drone', audio: 'Audio',
+  lighting: 'Illuminazione', support: 'Supporto', accessory: 'Accessorio', altro: 'Altro',
+}
+
+function exportCSV(equipment, categoryFilter) {
+  const items = categoryFilter ? equipment.filter((e) => e.category === categoryFilter) : equipment
+  const headers = [
+    'Nome', 'Marca', 'Modello', 'Seriale', 'Categoria', 'Data Acquisto',
+    'Valore Acquisto (€)', 'Valore Mercato (€)', 'Valore Assicurato (€)', 'Condizione',
+  ]
+  const rows = items.map((e) => [
+    e.name || '',
+    e.brand || '',
+    e.model || '',
+    e.serial_number || '',
+    CATEGORY_LABELS[e.category] || e.category || '',
+    e.purchase_date ? format(new Date(e.purchase_date), 'dd/MM/yyyy') : '',
+    e.purchase_price != null ? parseFloat(e.purchase_price).toFixed(2) : '',
+    e.market_value != null ? parseFloat(e.market_value).toFixed(2) : '',
+    e.insured_value != null ? parseFloat(e.insured_value).toFixed(2) : '',
+    CONDITION_LABEL[e.condition] || e.condition || '',
+  ])
+
+  const csv = [headers, ...rows]
+    .map((r) => r.map((v) => `"${v}"`).join(','))
+    .join('\n')
+
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `BrainDigital_Report_${format(new Date(), 'yyyyMMdd')}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export default function ReportPage() {
   const [equipment, setEquipment] = useState([])
   const [allEquipment, setAllEquipment] = useState([])
@@ -47,8 +84,7 @@ export default function ReportPage() {
 
   const fetchEquipment = useCallback(async () => {
     const supabase = getSupabase()
-    let q = supabase.from('equipment').select('*').order('name')
-    const { data } = await q
+    const { data } = await supabase.from('equipment').select('*').order('name')
     setAllEquipment(data || [])
     setLoading(false)
   }, [])
@@ -56,11 +92,7 @@ export default function ReportPage() {
   useEffect(() => { fetchEquipment() }, [fetchEquipment])
 
   useEffect(() => {
-    if (categoryFilter) {
-      setEquipment(allEquipment.filter((e) => e.category === categoryFilter))
-    } else {
-      setEquipment(allEquipment)
-    }
+    setEquipment(categoryFilter ? allEquipment.filter((e) => e.category === categoryFilter) : allEquipment)
   }, [allEquipment, categoryFilter])
 
   async function handleExport() {
@@ -74,6 +106,7 @@ export default function ReportPage() {
 
   const totalPurchase = equipment.reduce((s, e) => s + (parseFloat(e.purchase_price) || 0), 0)
   const totalMarket = equipment.reduce((s, e) => s + (parseFloat(e.market_value) || 0), 0)
+  const totalInsured = equipment.reduce((s, e) => s + (parseFloat(e.insured_value) || 0), 0)
 
   return (
     <div className="space-y-5">
@@ -83,20 +116,30 @@ export default function ReportPage() {
           <h1 className="text-2xl font-bold text-white">Report Assicurativo</h1>
           <p className="text-slate-400 text-sm mt-0.5">Elenco attrezzature Brain Digital</p>
         </div>
-        {isAdmin && (
+        <div className="flex items-center gap-2">
           <button
-            onClick={handleExport}
-            disabled={exportLoading || equipment.length === 0}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white rounded-lg text-sm font-medium transition shadow-lg shadow-blue-600/20"
+            onClick={() => exportCSV(allEquipment, categoryFilter)}
+            disabled={equipment.length === 0}
+            className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-40 text-slate-300 rounded-lg text-sm font-medium transition"
           >
-            {exportLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
-            Esporta PDF
+            <Download className="w-4 h-4" />
+            <span className="hidden sm:inline">Scarica CSV</span>
           </button>
-        )}
+          {isAdmin && (
+            <button
+              onClick={handleExport}
+              disabled={exportLoading || equipment.length === 0}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white rounded-lg text-sm font-medium transition shadow-lg shadow-blue-600/20"
+            >
+              {exportLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+              Esporta PDF
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-slate-800 rounded-xl border border-slate-700/50 p-4">
           <div className="text-xs text-slate-500 mb-1">Totale item</div>
           <div className="text-2xl font-bold text-white">{equipment.length}</div>
@@ -111,6 +154,12 @@ export default function ReportPage() {
           <div className="text-xs text-slate-500 mb-1">Valore di mercato</div>
           <div className="text-xl font-bold text-white">
             € {totalMarket.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+          </div>
+        </div>
+        <div className="bg-slate-800 rounded-xl border border-slate-700/50 p-4">
+          <div className="text-xs text-slate-500 mb-1">Valore assicurato</div>
+          <div className="text-xl font-bold text-white">
+            € {totalInsured.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
           </div>
         </div>
       </div>
@@ -128,7 +177,9 @@ export default function ReportPage() {
           </select>
           <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
         </div>
-        <span className="text-xs text-slate-500">{equipment.length} item{categoryFilter ? ` in ${CATEGORIES.find(c=>c.value===categoryFilter)?.label}` : ''}</span>
+        <span className="text-xs text-slate-500">
+          {equipment.length} item{categoryFilter ? ` in ${CATEGORIES.find(c => c.value === categoryFilter)?.label}` : ''}
+        </span>
       </div>
 
       {/* Table */}
@@ -142,7 +193,7 @@ export default function ReportPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-700/50">
-                  {['Nome', 'Marca', 'Modello', 'Seriale', 'Data Acquisto', 'Val. Acquisto', 'Val. Mercato', 'Condizione'].map((h) => (
+                  {['Nome', 'Marca', 'Modello', 'Seriale', 'Data Acquisto', 'Val. Acquisto', 'Val. Mercato', 'Val. Assicurato', 'Condizione'].map((h) => (
                     <th key={h} className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
                       {h}
                     </th>
@@ -165,6 +216,9 @@ export default function ReportPage() {
                     <td className="px-4 py-3 text-slate-300 text-right whitespace-nowrap">
                       {item.market_value ? `€ ${parseFloat(item.market_value).toLocaleString('it-IT', { minimumFractionDigits: 2 })}` : '—'}
                     </td>
+                    <td className="px-4 py-3 text-blue-300 text-right whitespace-nowrap font-medium">
+                      {item.insured_value ? `€ ${parseFloat(item.insured_value).toLocaleString('it-IT', { minimumFractionDigits: 2 })}` : '—'}
+                    </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${CONDITION_BADGE[item.condition] || 'bg-slate-700 text-slate-400'}`}>
                         {CONDITION_LABEL[item.condition] || item.condition}
@@ -182,6 +236,9 @@ export default function ReportPage() {
                     </td>
                     <td className="px-4 py-3 text-right text-white whitespace-nowrap">
                       € {totalMarket.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-4 py-3 text-right text-blue-300 whitespace-nowrap">
+                      € {totalInsured.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
                     </td>
                     <td />
                   </tr>

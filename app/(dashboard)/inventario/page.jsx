@@ -4,7 +4,12 @@ import { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
 import { getSupabase } from '@/lib/supabase'
 import EquipmentModal from '@/components/EquipmentModal'
-import { Plus, Search, Filter, Pencil, Trash2, Loader2, ImageOff, ChevronDown } from 'lucide-react'
+import {
+  Plus, Search, Pencil, Trash2, Loader2, ImageOff,
+  ChevronDown, Download, Battery, BatteryLow, BatteryCharging,
+  Minus, AlertTriangle,
+} from 'lucide-react'
+import { format, differenceInDays } from 'date-fns'
 
 const CATEGORIES = [
   { value: '', label: 'Tutte le categorie' },
@@ -32,13 +37,62 @@ const CONDITION_BADGE = {
 }
 const CONDITION_LABEL = { active: 'Attivo', repair: 'Riparazione', retired: 'Ritirato' }
 
+const BATTERY_ICON = { charged: Battery, charging: BatteryCharging, low: BatteryLow, na: Minus }
+const BATTERY_COLOR = { charged: 'text-emerald-400', charging: 'text-blue-400', low: 'text-red-400', na: 'text-slate-600' }
+const BATTERY_LABEL = { charged: 'Carica', charging: 'In carica', low: 'Scarica', na: '—' }
+
+const CATEGORY_LABELS = {
+  camera: 'Camera', lens: 'Obiettivo', drone: 'Drone', audio: 'Audio',
+  lighting: 'Illuminazione', support: 'Supporto', accessory: 'Accessorio', altro: 'Altro',
+}
+
+function needsMaintenance(item) {
+  if (!item.last_checked_at) return true
+  return differenceInDays(new Date(), new Date(item.last_checked_at)) > 90
+}
+
+function exportCSV(equipment) {
+  const headers = [
+    'Nome', 'Marca', 'Modello', 'Seriale', 'Categoria', 'Condizione',
+    'Data Acquisto', 'Valore Acquisto (€)', 'Valore Mercato (€)', 'Valore Assicurato (€)',
+    'Stato Batteria', 'Ultimo Controllo', 'Note',
+  ]
+  const rows = equipment.map((e) => [
+    e.name || '',
+    e.brand || '',
+    e.model || '',
+    e.serial_number || '',
+    CATEGORY_LABELS[e.category] || e.category || '',
+    CONDITION_LABEL[e.condition] || e.condition || '',
+    e.purchase_date ? format(new Date(e.purchase_date), 'dd/MM/yyyy') : '',
+    e.purchase_price != null ? parseFloat(e.purchase_price).toFixed(2) : '',
+    e.market_value != null ? parseFloat(e.market_value).toFixed(2) : '',
+    e.insured_value != null ? parseFloat(e.insured_value).toFixed(2) : '',
+    BATTERY_LABEL[e.battery_status] || '',
+    e.last_checked_at ? format(new Date(e.last_checked_at), 'dd/MM/yyyy') : '',
+    (e.notes || '').replace(/"/g, '""'),
+  ])
+
+  const csv = [headers, ...rows]
+    .map((r) => r.map((v) => `"${v}"`).join(','))
+    .join('\n')
+
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `GearVault_Inventario_${format(new Date(), 'yyyyMMdd')}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export default function InventarioPage() {
   const [equipment, setEquipment] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [conditionFilter, setConditionFilter] = useState('')
-  const [modal, setModal] = useState(null) // null | 'new' | item
+  const [modal, setModal] = useState(null)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -54,9 +108,7 @@ export default function InventarioPage() {
     setLoading(false)
   }, [search, categoryFilter, conditionFilter])
 
-  useEffect(() => {
-    fetchEquipment()
-  }, [fetchEquipment])
+  useEffect(() => { fetchEquipment() }, [fetchEquipment])
 
   useEffect(() => {
     async function checkRole() {
@@ -78,24 +130,44 @@ export default function InventarioPage() {
     fetchEquipment()
   }
 
+  const maintenanceCount = equipment.filter(needsMaintenance).length
+
   return (
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Inventario</h1>
-          <p className="text-slate-400 text-sm mt-0.5">{equipment.length} attrezzature</p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <p className="text-slate-400 text-sm">{equipment.length} attrezzature</p>
+            {maintenanceCount > 0 && (
+              <span className="flex items-center gap-1 text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-full">
+                <AlertTriangle className="w-3 h-3" />
+                {maintenanceCount} da controllare
+              </span>
+            )}
+          </div>
         </div>
-        {isAdmin && (
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => setModal('new')}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition shadow-lg shadow-blue-600/20"
+            onClick={() => exportCSV(equipment)}
+            disabled={equipment.length === 0}
+            className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-40 text-slate-300 rounded-lg text-sm font-medium transition"
           >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Nuova attrezzatura</span>
-            <span className="sm:hidden">Nuova</span>
+            <Download className="w-4 h-4" />
+            <span className="hidden sm:inline">Scarica CSV</span>
           </button>
-        )}
+          {isAdmin && (
+            <button
+              onClick={() => setModal('new')}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition shadow-lg shadow-blue-600/20"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Nuova attrezzatura</span>
+              <span className="sm:hidden">Nuova</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
@@ -140,7 +212,7 @@ export default function InventarioPage() {
           </div>
         ) : equipment.length === 0 ? (
           <div className="text-center py-20 text-slate-500">
-            <Package className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <PackageIcon className="w-10 h-10 mx-auto mb-3 opacity-30" />
             <p className="text-sm">Nessuna attrezzatura trovata</p>
           </div>
         ) : (
@@ -152,75 +224,91 @@ export default function InventarioPage() {
                   <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Nome</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider hidden md:table-cell">Marca / Modello</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider hidden lg:table-cell">Seriale</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider hidden xl:table-cell">Categoria</th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider hidden lg:table-cell">Val. Acquisto</th>
+                  <th className="text-center px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider hidden xl:table-cell">Batteria</th>
                   <th className="text-right px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider hidden lg:table-cell">Val. Mercato</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider hidden xl:table-cell">Val. Assicurato</th>
                   <th className="text-center px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Stato</th>
                   {isAdmin && <th className="w-20" />}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/30">
-                {equipment.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-700/20 transition">
-                    <td className="px-4 py-3">
-                      <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-700 flex items-center justify-center">
-                        {item.photo_url ? (
-                          <Image src={item.photo_url} alt={item.name} width={40} height={40} className="object-cover w-full h-full" />
-                        ) : (
-                          <ImageOff className="w-4 h-4 text-slate-600" />
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-white">{item.name}</div>
-                    </td>
-                    <td className="px-4 py-3 hidden md:table-cell text-slate-400">
-                      {[item.brand, item.model].filter(Boolean).join(' · ') || '—'}
-                    </td>
-                    <td className="px-4 py-3 hidden lg:table-cell text-slate-400 font-mono text-xs">
-                      {item.serial_number || '—'}
-                    </td>
-                    <td className="px-4 py-3 hidden xl:table-cell text-slate-400">
-                      {CATEGORIES.find((c) => c.value === item.category)?.label || item.category || '—'}
-                    </td>
-                    <td className="px-4 py-3 hidden lg:table-cell text-slate-300 text-right">
-                      {item.purchase_price ? `€ ${parseFloat(item.purchase_price).toLocaleString('it-IT', { minimumFractionDigits: 2 })}` : '—'}
-                    </td>
-                    <td className="px-4 py-3 hidden lg:table-cell text-slate-300 text-right">
-                      {item.market_value ? `€ ${parseFloat(item.market_value).toLocaleString('it-IT', { minimumFractionDigits: 2 })}` : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium border ${CONDITION_BADGE[item.condition] || 'bg-slate-700 text-slate-400'}`}>
-                        {CONDITION_LABEL[item.condition] || item.condition}
-                      </span>
-                    </td>
-                    {isAdmin && (
+                {equipment.map((item) => {
+                  const BattIcon = BATTERY_ICON[item.battery_status] || Minus
+                  const maintenance = needsMaintenance(item)
+                  return (
+                    <tr key={item.id} className="hover:bg-slate-700/20 transition">
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1 justify-end">
-                          <button
-                            onClick={() => setModal(item)}
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-blue-400 hover:bg-slate-700 transition"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => setDeleteConfirm(item)}
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-slate-700 transition"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                        <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-slate-700 flex items-center justify-center">
+                          {item.photo_url ? (
+                            <Image src={item.photo_url} alt={item.name} width={40} height={40} className="object-cover w-full h-full" />
+                          ) : (
+                            <ImageOff className="w-4 h-4 text-slate-600" />
+                          )}
+                          {maintenance && (
+                            <div className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border border-slate-800" title="Manutenzione richiesta" />
+                          )}
                         </div>
                       </td>
-                    )}
-                  </tr>
-                ))}
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-white">{item.name}</div>
+                        {maintenance && (
+                          <div className="text-[10px] text-red-400 flex items-center gap-0.5 mt-0.5">
+                            <AlertTriangle className="w-2.5 h-2.5" />
+                            {item.last_checked_at
+                              ? `Controllo ${differenceInDays(new Date(), new Date(item.last_checked_at))}gg fa`
+                              : 'Mai controllato'}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 hidden md:table-cell text-slate-400">
+                        {[item.brand, item.model].filter(Boolean).join(' · ') || '—'}
+                      </td>
+                      <td className="px-4 py-3 hidden lg:table-cell text-slate-400 font-mono text-xs">
+                        {item.serial_number || '—'}
+                      </td>
+                      <td className="px-4 py-3 hidden xl:table-cell text-center">
+                        <span title={BATTERY_LABEL[item.battery_status]}>
+                          <BattIcon className={`w-4 h-4 mx-auto ${BATTERY_COLOR[item.battery_status] || 'text-slate-600'}`} />
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 hidden lg:table-cell text-slate-300 text-right">
+                        {item.market_value ? `€ ${parseFloat(item.market_value).toLocaleString('it-IT', { minimumFractionDigits: 2 })}` : '—'}
+                      </td>
+                      <td className="px-4 py-3 hidden xl:table-cell text-slate-300 text-right">
+                        {item.insured_value ? `€ ${parseFloat(item.insured_value).toLocaleString('it-IT', { minimumFractionDigits: 2 })}` : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium border ${CONDITION_BADGE[item.condition] || 'bg-slate-700 text-slate-400'}`}>
+                          {CONDITION_LABEL[item.condition] || item.condition}
+                        </span>
+                      </td>
+                      {isAdmin && (
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1 justify-end">
+                            <button
+                              onClick={() => setModal(item)}
+                              className="p-1.5 rounded-lg text-slate-500 hover:text-blue-400 hover:bg-slate-700 transition"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirm(item)}
+                              className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-slate-700 transition"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
         )}
       </div>
 
-      {/* Equipment modal */}
       {modal && (
         <EquipmentModal
           item={modal === 'new' ? null : modal}
@@ -229,7 +317,6 @@ export default function InventarioPage() {
         />
       )}
 
-      {/* Delete confirm */}
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-slate-800 rounded-2xl border border-slate-700 p-6 w-full max-w-sm shadow-2xl">
@@ -255,7 +342,7 @@ export default function InventarioPage() {
   )
 }
 
-function Package({ className }) {
+function PackageIcon({ className }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 10V11" />

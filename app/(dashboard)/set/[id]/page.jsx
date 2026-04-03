@@ -1,12 +1,16 @@
 'use client'
 
-import { useState, useEffect, useCallback, use } from 'react'
+import { useState, useEffect, useCallback, use, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { getSupabase } from '@/lib/supabase'
+import { exportSetInsurancePDF } from '@/lib/pdf'
 import { useScannerListener } from '@/components/ScannerContext'
 import {
   ArrowLeft, Plus, Scan, CheckCircle2, XCircle, AlertTriangle,
   Loader2, Search, X, Trash2, Package, ArrowUpRight, RotateCcw,
+  FileDown, ImageOff, Upload, MessageSquare, ChevronDown, ChevronUp,
+  Battery, BatteryLow, BatteryCharging, Minus,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { it } from 'date-fns/locale'
@@ -26,26 +30,66 @@ const ITEM_STATUS_STYLES = {
 }
 const ITEM_STATUS_LABELS = { planned: 'Pianificato', out: 'Fuori', returned: 'Rientrato' }
 
+const BATTERY_ICON = { charged: Battery, charging: BatteryCharging, low: BatteryLow, na: Minus }
+const BATTERY_COLOR = { charged: 'text-emerald-400', charging: 'text-blue-400', low: 'text-red-400', na: 'text-slate-600' }
+
+/** Compress image via Canvas API before upload */
+async function compressImage(file) {
+  return new Promise((resolve) => {
+    const img = new window.Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const MAX = 800
+      let { width, height } = img
+      if (width > MAX || height > MAX) {
+        if (width > height) { height = Math.round((height * MAX) / width); width = MAX }
+        else { width = Math.round((width * MAX) / height); height = MAX }
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = width; canvas.height = height
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height)
+      const tryQ = (q) => canvas.toBlob((blob) => {
+        if (blob.size > 200 * 1024 && q > 0.3) tryQ(q - 0.1)
+        else resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }))
+      }, 'image/jpeg', q)
+      tryQ(0.7)
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file) }
+    img.src = url
+  })
+}
+
 export default function SetDetailPage({ params }) {
   const { id } = use(params)
   const router = useRouter()
   const [set, setSet] = useState(null)
-  const [items, setItems] = useState([]) // set_items joined with equipment
+  const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
-  const [scanMode, setScanMode] = useState(null) // null | 'out' | 'in'
+  const [scanMode, setScanMode] = useState(null)
   const [scannedIds, setScannedIds] = useState(new Set())
-  const [lastScanResult, setLastScanResult] = useState(null) // {status: 'ok'|'unknown', item}
+  const [lastScanResult, setLastScanResult] = useState(null)
   const [showAddPicker, setShowAddPicker] = useState(false)
   const [pickerSearch, setPickerSearch] = useState('')
   const [availableEquipment, setAvailableEquipment] = useState([])
   const [confirmScan, setConfirmScan] = useState(false)
+  const [pdfLoading, setPdfLoading] = useState(false)
+
+  // Notes
+  const [notes, setNotes] = useState([])
+  const [showNoteForm, setShowNoteForm] = useState(null) // 'pre' | 'post' | null
+  const [noteBody, setNoteBody] = useState('')
+  const [notePhotoUrl, setNotePhotoUrl] = useState('')
+  const [noteUploading, setNoteUploading] = useState(false)
+  const [noteSaving, setNoteSaving] = useState(false)
+  const [notesExpanded, setNotesExpanded] = useState(true)
+  const notePhotoRef = useRef(null)
 
   const fetchSet = useCallback(async () => {
     const supabase = getSupabase()
     const { data: setData } = await supabase.from('sets').select('*').eq('id', id).single()
     if (!setData) { router.push('/set'); return }
     setSet(setData)
-
     const { data: itemsData } = await supabase
       .from('set_items')
       .select('*, equipment(*)')
@@ -54,16 +98,26 @@ export default function SetDetailPage({ params }) {
     setLoading(false)
   }, [id, router])
 
+  const fetchNotes = useCallback(async () => {
+    const supabase = getSupabase()
+    const { data } = await supabase
+      .from('set_notes')
+      .select('*, profiles(full_name)')
+      .eq('set_id', id)
+      .order('created_at', { ascending: true })
+    setNotes(data || [])
+  }, [id])
+
   useEffect(() => { fetchSet() }, [fetchSet])
+  useEffect(() => { fetchNotes() }, [fetchNotes])
 
   useEffect(() => {
     if (!showAddPicker) return
     async function fetchEquipment() {
       const supabase = getSupabase()
-      let q = supabase.from('equipment').select('id, name, brand, model, serial_number').order('name')
+      let q = supabase.from('equipment').select('id, name, brand, model, serial_number, battery_status').order('name')
       if (pickerSearch) q = q.or(`name.ilike.%${pickerSearch}%,serial_number.ilike.%${pickerSearch}%,brand.ilike.%${pickerSearch}%`)
       const { data } = await q
-      // Exclude already-added items
       const addedIds = new Set(items.map((i) => i.equipment_id))
       setAvailableEquipment((data || []).filter((e) => !addedIds.has(e.id)))
     }
@@ -83,11 +137,9 @@ export default function SetDetailPage({ params }) {
     fetchSet()
   }
 
-  // Scanner listener
   useScannerListener(
     useCallback((result) => {
       if (!scanMode) return
-      // Try to match by ID or serial
       const matched = items.find(
         (i) =>
           (result.id && i.equipment_id === result.id) ||
@@ -104,19 +156,29 @@ export default function SetDetailPage({ params }) {
     scanMode !== null
   )
 
+  async function logMovements(action, equipmentIds) {
+    const supabase = getSupabase()
+    const { data: { user } } = await supabase.auth.getUser()
+    const now = new Date().toISOString()
+    const logs = equipmentIds.map((eqId) => {
+      const si = items.find((i) => i.equipment_id === eqId)
+      return { set_id: id, equipment_id: eqId, set_item_id: si?.id || null, action, user_id: user?.id || null, created_at: now }
+    })
+    if (logs.length > 0) await supabase.from('movement_log').insert(logs)
+  }
+
   async function confirmOut() {
     const supabase = getSupabase()
     const now = new Date().toISOString()
-    // Update all scanned items → out
+    const scannedList = [...scannedIds]
     for (const item of items) {
       if (scannedIds.has(item.equipment_id)) {
         await supabase.from('set_items').update({ status: 'out', checked_out_at: now }).eq('id', item.id)
       }
     }
     await supabase.from('sets').update({ status: 'out' }).eq('id', id)
-    setScanMode(null)
-    setScannedIds(new Set())
-    setConfirmScan(false)
+    await logMovements('checkout', scannedList)
+    setScanMode(null); setScannedIds(new Set()); setConfirmScan(false)
     fetchSet()
   }
 
@@ -124,20 +186,71 @@ export default function SetDetailPage({ params }) {
     const supabase = getSupabase()
     const now = new Date().toISOString()
     let anyMissing = false
+    const returnedIds = []
     for (const item of items) {
       if (item.status === 'out') {
         if (scannedIds.has(item.equipment_id)) {
           await supabase.from('set_items').update({ status: 'returned', checked_in_at: now }).eq('id', item.id)
+          returnedIds.push(item.equipment_id)
         } else {
           anyMissing = true
         }
       }
     }
     await supabase.from('sets').update({ status: anyMissing ? 'incomplete' : 'returned' }).eq('id', id)
-    setScanMode(null)
-    setScannedIds(new Set())
-    setConfirmScan(false)
+    await logMovements('checkin', returnedIds)
+    setScanMode(null); setScannedIds(new Set()); setConfirmScan(false)
     fetchSet()
+  }
+
+  async function handleNotePhotoUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setNoteUploading(true)
+    let toUpload = file
+    if (file.type.startsWith('image/')) {
+      try { toUpload = await compressImage(file) } catch { /* fallback */ }
+    }
+    const supabase = getSupabase()
+    const path = `set-notes/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`
+    const { error } = await supabase.storage.from('equipment-photos').upload(path, toUpload, { upsert: true, contentType: 'image/jpeg' })
+    if (!error) {
+      const { data: { publicUrl } } = supabase.storage.from('equipment-photos').getPublicUrl(path)
+      setNotePhotoUrl(publicUrl)
+    }
+    setNoteUploading(false)
+    e.target.value = ''
+  }
+
+  async function saveNote() {
+    if (!noteBody && !notePhotoUrl) return
+    setNoteSaving(true)
+    const supabase = getSupabase()
+    const { data: { user } } = await supabase.auth.getUser()
+    await supabase.from('set_notes').insert({
+      set_id: id,
+      type: showNoteForm,
+      body: noteBody || null,
+      photo_url: notePhotoUrl || null,
+      user_id: user?.id || null,
+    })
+    setNoteBody(''); setNotePhotoUrl(''); setShowNoteForm(null); setNoteSaving(false)
+    fetchNotes()
+  }
+
+  async function deleteNote(noteId) {
+    const supabase = getSupabase()
+    await supabase.from('set_notes').delete().eq('id', noteId)
+    fetchNotes()
+  }
+
+  async function handleExportPDF() {
+    setPdfLoading(true)
+    try {
+      await exportSetInsurancePDF(set, items)
+    } finally {
+      setPdfLoading(false)
+    }
   }
 
   if (loading) {
@@ -147,11 +260,11 @@ export default function SetDetailPage({ params }) {
       </div>
     )
   }
-
   if (!set) return null
 
   const outItems = items.filter((i) => i.status === 'out')
-  const allOutScanned = outItems.length > 0 && outItems.every((i) => scannedIds.has(i.equipment_id))
+  const preNotes = notes.filter((n) => n.type === 'pre')
+  const postNotes = notes.filter((n) => n.type === 'post')
 
   return (
     <div className="space-y-5">
@@ -176,6 +289,15 @@ export default function SetDetailPage({ params }) {
             <span>{items.length} item nel set</span>
           </div>
         </div>
+        {/* Export PDF */}
+        <button
+          onClick={handleExportPDF}
+          disabled={pdfLoading || items.length === 0}
+          className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-40 text-slate-300 rounded-lg text-sm font-medium transition flex-shrink-0"
+        >
+          {pdfLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+          <span className="hidden sm:inline">PDF Assicurazione</span>
+        </button>
       </div>
 
       {/* Notes */}
@@ -205,8 +327,6 @@ export default function SetDetailPage({ params }) {
           <p className="text-xs text-slate-400 mb-3">
             Scansiona i codici QR o barcode degli item. {scannedIds.size}/{scanMode === 'out' ? items.length : outItems.length} scansionati.
           </p>
-
-          {/* Last scan result */}
           {lastScanResult && (
             <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm mb-3 ${lastScanResult.status === 'ok' ? 'bg-emerald-500/10 text-emerald-300' : 'bg-red-500/10 text-red-300'}`}>
               {lastScanResult.status === 'ok' ? (
@@ -216,16 +336,13 @@ export default function SetDetailPage({ params }) {
               )}
             </div>
           )}
-
-          <div className="flex gap-2">
-            <button
-              onClick={() => setConfirmScan(true)}
-              disabled={scannedIds.size === 0}
-              className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white rounded-lg text-xs font-medium transition"
-            >
-              {scanMode === 'out' ? 'Conferma uscita' : 'Conferma rientro'}
-            </button>
-          </div>
+          <button
+            onClick={() => setConfirmScan(true)}
+            disabled={scannedIds.size === 0}
+            className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white rounded-lg text-xs font-medium transition"
+          >
+            {scanMode === 'out' ? 'Conferma uscita' : 'Conferma rientro'}
+          </button>
         </div>
       )}
 
@@ -275,6 +392,7 @@ export default function SetDetailPage({ params }) {
             {items.map((item) => {
               const isScanned = scannedIds.has(item.equipment_id)
               const isMissing = scanMode === 'in' && item.status === 'out' && !isScanned
+              const BattIcon = BATTERY_ICON[item.equipment?.battery_status] || Minus
               return (
                 <div
                   key={item.id}
@@ -300,6 +418,9 @@ export default function SetDetailPage({ params }) {
                       {item.equipment?.serial_number ? ` · S/N: ${item.equipment.serial_number}` : ''}
                     </div>
                   </div>
+                  {!scanMode && item.equipment?.battery_status && (
+                    <BattIcon className={`w-4 h-4 flex-shrink-0 ${BATTERY_COLOR[item.equipment.battery_status] || 'text-slate-600'}`} />
+                  )}
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${ITEM_STATUS_STYLES[item.status] || 'bg-slate-700 text-slate-400'}`}>
                     {ITEM_STATUS_LABELS[item.status] || item.status}
                   </span>
@@ -318,6 +439,133 @@ export default function SetDetailPage({ params }) {
         )}
       </div>
 
+      {/* Pre/Post Notes */}
+      <div className="bg-slate-800 rounded-xl border border-slate-700/50 overflow-hidden">
+        <button
+          className="w-full flex items-center justify-between px-4 py-3 border-b border-slate-700/50 hover:bg-slate-700/20 transition"
+          onClick={() => setNotesExpanded((v) => !v)}
+        >
+          <div className="flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-slate-400" />
+            <h2 className="text-sm font-semibold text-white">Note pre/post set</h2>
+            {notes.length > 0 && (
+              <span className="text-xs bg-slate-700 text-slate-400 px-1.5 py-0.5 rounded-full">{notes.length}</span>
+            )}
+          </div>
+          {notesExpanded ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
+        </button>
+
+        {notesExpanded && (
+          <div className="p-4 space-y-4">
+            {/* Add note buttons */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setShowNoteForm('pre'); setNoteBody(''); setNotePhotoUrl('') }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-xs font-medium transition"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Nota pre-set
+              </button>
+              <button
+                onClick={() => { setShowNoteForm('post'); setNoteBody(''); setNotePhotoUrl('') }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-xs font-medium transition"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Nota post-set
+              </button>
+            </div>
+
+            {/* Note form */}
+            {showNoteForm && (
+              <div className="bg-slate-900 rounded-xl border border-slate-700 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    {showNoteForm === 'pre' ? 'Nota pre-set' : 'Nota post-set'}
+                  </span>
+                  <button onClick={() => setShowNoteForm(null)} className="p-1 text-slate-500 hover:text-white transition">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <textarea
+                  value={noteBody}
+                  onChange={(e) => setNoteBody(e.target.value)}
+                  rows={3}
+                  placeholder="Scrivi una nota…"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none transition"
+                />
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => notePhotoRef.current?.click()}
+                    disabled={noteUploading}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-xs font-medium transition disabled:opacity-50"
+                  >
+                    {noteUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                    {noteUploading ? 'Caricamento…' : 'Foto'}
+                  </button>
+                  {notePhotoUrl && (
+                    <div className="relative w-12 h-12 rounded-lg overflow-hidden border border-slate-700">
+                      <Image src={notePhotoUrl} alt="nota" fill className="object-cover" />
+                      <button
+                        onClick={() => setNotePhotoUrl('')}
+                        className="absolute top-0 right-0 w-4 h-4 bg-black/60 flex items-center justify-center rounded-bl"
+                      >
+                        <X className="w-2.5 h-2.5 text-white" />
+                      </button>
+                    </div>
+                  )}
+                  <input ref={notePhotoRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleNotePhotoUpload} />
+                  <button
+                    onClick={saveNote}
+                    disabled={noteSaving || (!noteBody && !notePhotoUrl)}
+                    className="ml-auto flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white rounded-lg text-xs font-medium transition"
+                  >
+                    {noteSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    Salva nota
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Notes list */}
+            {notes.length === 0 && !showNoteForm && (
+              <p className="text-xs text-slate-500 text-center py-2">Nessuna nota aggiunta</p>
+            )}
+            {[{ label: 'Pre-set', items: preNotes, color: 'text-amber-400' }, { label: 'Post-set', items: postNotes, color: 'text-blue-400' }].map(({ label, items: noteList, color }) =>
+              noteList.length > 0 ? (
+                <div key={label}>
+                  <div className={`text-xs font-semibold uppercase tracking-wider mb-2 ${color}`}>{label}</div>
+                  <div className="space-y-2">
+                    {noteList.map((note) => (
+                      <div key={note.id} className="bg-slate-900 rounded-lg border border-slate-700/50 p-3">
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <span className="text-[10px] text-slate-500">
+                            {format(new Date(note.created_at), 'd MMM yyyy HH:mm', { locale: it })}
+                            {note.profiles?.full_name ? ` · ${note.profiles.full_name}` : ''}
+                          </span>
+                          <button
+                            onClick={() => deleteNote(note.id)}
+                            className="text-slate-600 hover:text-red-400 transition flex-shrink-0"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                        {note.body && <p className="text-sm text-slate-300">{note.body}</p>}
+                        {note.photo_url && (
+                          <div className="mt-2 rounded-lg overflow-hidden border border-slate-700" style={{ maxWidth: 200 }}>
+                            <Image src={note.photo_url} alt="nota" width={200} height={150} className="object-cover w-full" />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Confirm scan dialog */}
       {confirmScan && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -325,9 +573,7 @@ export default function SetDetailPage({ params }) {
             <h3 className="text-base font-semibold text-white mb-2">
               {scanMode === 'out' ? 'Conferma uscita' : 'Conferma rientro'}
             </h3>
-            <p className="text-sm text-slate-400 mb-1">
-              Item scansionati: <span className="text-white font-medium">{scannedIds.size}</span>
-            </p>
+            <p className="text-sm text-slate-400 mb-1">Item scansionati: <span className="text-white font-medium">{scannedIds.size}</span></p>
             {scanMode === 'in' && (
               <p className="text-sm text-slate-400 mb-4">
                 Item mancanti: <span className={outItems.length - scannedIds.size > 0 ? 'text-red-400 font-medium' : 'text-emerald-400 font-medium'}>
@@ -337,19 +583,12 @@ export default function SetDetailPage({ params }) {
             )}
             {scanMode === 'out' && (
               <p className="text-sm text-slate-400 mb-4">
-                Non scansionati: <span className="text-slate-300 font-medium">{items.length - scannedIds.size}</span> (rimarranno in stato pianificato)
+                Non scansionati: <span className="text-slate-300 font-medium">{items.length - scannedIds.size}</span> (rimarranno pianificati)
               </p>
             )}
             <div className="flex gap-3">
-              <button onClick={() => setConfirmScan(false)} className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm font-medium transition">
-                Annulla
-              </button>
-              <button
-                onClick={scanMode === 'out' ? confirmOut : confirmIn}
-                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition"
-              >
-                Conferma
-              </button>
+              <button onClick={() => setConfirmScan(false)} className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm font-medium transition">Annulla</button>
+              <button onClick={scanMode === 'out' ? confirmOut : confirmIn} className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition">Conferma</button>
             </div>
           </div>
         </div>
@@ -383,22 +622,26 @@ export default function SetDetailPage({ params }) {
                 <div className="text-center py-10 text-slate-500 text-sm">Nessuna attrezzatura disponibile</div>
               ) : (
                 <div className="divide-y divide-slate-700/30">
-                  {availableEquipment.map((eq) => (
-                    <button
-                      key={eq.id}
-                      onClick={() => addItem(eq)}
-                      className="w-full flex items-center gap-3 px-5 py-3 hover:bg-slate-700/50 transition text-left"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-white truncate">{eq.name}</div>
-                        <div className="text-xs text-slate-500">
-                          {[eq.brand, eq.model].filter(Boolean).join(' · ')}
-                          {eq.serial_number ? ` · S/N: ${eq.serial_number}` : ''}
+                  {availableEquipment.map((eq) => {
+                    const BattIcon = BATTERY_ICON[eq.battery_status] || Minus
+                    return (
+                      <button
+                        key={eq.id}
+                        onClick={() => addItem(eq)}
+                        className="w-full flex items-center gap-3 px-5 py-3 hover:bg-slate-700/50 transition text-left"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-white truncate">{eq.name}</div>
+                          <div className="text-xs text-slate-500">
+                            {[eq.brand, eq.model].filter(Boolean).join(' · ')}
+                            {eq.serial_number ? ` · S/N: ${eq.serial_number}` : ''}
+                          </div>
                         </div>
-                      </div>
-                      <Plus className="w-4 h-4 text-slate-500" />
-                    </button>
-                  ))}
+                        <BattIcon className={`w-4 h-4 flex-shrink-0 ${BATTERY_COLOR[eq.battery_status] || 'text-slate-600'}`} />
+                        <Plus className="w-4 h-4 text-slate-500" />
+                      </button>
+                    )
+                  })}
                 </div>
               )}
             </div>

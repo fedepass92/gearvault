@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createServerSupabase } from '@/lib/supabase-server'
-import { Package, TrendingUp, ArrowUpRight, Briefcase, Plus, Tag, FileText } from 'lucide-react'
-import { format } from 'date-fns'
+import { Package, TrendingUp, ArrowUpRight, Briefcase, Plus, Tag, FileText, AlertTriangle } from 'lucide-react'
+import { format, differenceInDays } from 'date-fns'
 import { it } from 'date-fns/locale'
 
 const CATEGORY_LABELS = {
@@ -39,14 +39,22 @@ export default async function DashboardPage() {
     { data: equipment },
     { data: sets },
     { data: setItemsOut },
+    { count: setsTotal },
   ] = await Promise.all([
     supabase.from('equipment').select('*'),
     supabase.from('sets').select('*').order('created_at', { ascending: false }).limit(5),
     supabase.from('set_items').select('*').eq('status', 'out'),
+    supabase.from('sets').select('*', { count: 'exact', head: true }),
   ])
 
   const totalValue = equipment?.reduce((s, e) => s + (parseFloat(e.market_value) || 0), 0) ?? 0
   const outCount = setItemsOut?.length ?? 0
+
+  const now = new Date()
+  const maintenanceItems = equipment?.filter((e) => {
+    if (!e.last_checked_at) return true
+    return differenceInDays(now, new Date(e.last_checked_at)) > 90
+  }) ?? []
 
   const categoryCounts = equipment?.reduce((acc, e) => {
     acc[e.category] = (acc[e.category] || 0) + 1
@@ -54,30 +62,10 @@ export default async function DashboardPage() {
   }, {}) ?? {}
 
   const stats = [
-    {
-      label: 'Attrezzature totali',
-      value: equipment?.length ?? 0,
-      icon: Package,
-      color: 'blue',
-    },
-    {
-      label: 'Valore di mercato',
-      value: `€ ${totalValue.toLocaleString('it-IT', { minimumFractionDigits: 0 })}`,
-      icon: TrendingUp,
-      color: 'emerald',
-    },
-    {
-      label: 'Item attualmente fuori',
-      value: outCount,
-      icon: ArrowUpRight,
-      color: 'amber',
-    },
-    {
-      label: 'Set creati',
-      value: sets ? await (async () => { const { count } = await supabase.from('sets').select('*', { count: 'exact', head: true }); return count ?? 0 })() : 0,
-      icon: Briefcase,
-      color: 'purple',
-    },
+    { label: 'Attrezzature totali', value: equipment?.length ?? 0, icon: Package, color: 'blue' },
+    { label: 'Valore di mercato', value: `€ ${totalValue.toLocaleString('it-IT', { minimumFractionDigits: 0 })}`, icon: TrendingUp, color: 'emerald' },
+    { label: 'Item attualmente fuori', value: outCount, icon: ArrowUpRight, color: 'amber' },
+    { label: 'Set creati', value: setsTotal ?? 0, icon: Briefcase, color: 'purple' },
   ]
 
   const colorMap = {
@@ -97,13 +85,30 @@ export default async function DashboardPage() {
         </p>
       </div>
 
+      {/* Maintenance alert */}
+      {maintenanceItems.length > 0 && (
+        <Link
+          href="/inventario"
+          className="flex items-center gap-3 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 hover:bg-red-500/15 transition"
+        >
+          <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-red-300">
+              {maintenanceItems.length} attrezzatur{maintenanceItems.length === 1 ? 'a' : 'e'} da controllare
+            </p>
+            <p className="text-xs text-red-400/70 mt-0.5 truncate">
+              {maintenanceItems.slice(0, 3).map((e) => e.name).join(', ')}
+              {maintenanceItems.length > 3 ? ` e altre ${maintenanceItems.length - 3}…` : ''}
+            </p>
+          </div>
+          <span className="text-xs text-red-400 flex-shrink-0">Vedi →</span>
+        </Link>
+      )}
+
       {/* Stats cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat) => (
-          <div
-            key={stat.label}
-            className="bg-slate-800 rounded-xl border border-slate-700/50 p-4"
-          >
+          <div key={stat.label} className="bg-slate-800 rounded-xl border border-slate-700/50 p-4">
             <div className={`inline-flex p-2 rounded-lg border ${colorMap[stat.color]} mb-3`}>
               <stat.icon className="w-4 h-4" />
             </div>
@@ -118,9 +123,7 @@ export default async function DashboardPage() {
         <div className="bg-slate-800 rounded-xl border border-slate-700/50">
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700/50">
             <h2 className="text-sm font-semibold text-white">Ultimi set</h2>
-            <Link href="/set" className="text-xs text-blue-400 hover:text-blue-300 transition">
-              Vedi tutti →
-            </Link>
+            <Link href="/set" className="text-xs text-blue-400 hover:text-blue-300 transition">Vedi tutti →</Link>
           </div>
           <div className="divide-y divide-slate-700/50">
             {sets?.length === 0 && (
@@ -153,9 +156,7 @@ export default async function DashboardPage() {
         <div className="bg-slate-800 rounded-xl border border-slate-700/50">
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700/50">
             <h2 className="text-sm font-semibold text-white">Categorie</h2>
-            <Link href="/inventario" className="text-xs text-blue-400 hover:text-blue-300 transition">
-              Inventario →
-            </Link>
+            <Link href="/inventario" className="text-xs text-blue-400 hover:text-blue-300 transition">Inventario →</Link>
           </div>
           <div className="p-5 space-y-3">
             {Object.entries(categoryCounts).length === 0 && (
@@ -181,32 +182,21 @@ export default async function DashboardPage() {
       <div>
         <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Azioni rapide</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <Link
-            href="/inventario"
-            className="flex items-center gap-3 bg-slate-800 hover:bg-slate-700 border border-slate-700/50 rounded-xl p-4 transition group"
-          >
-            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
-              <Plus className="w-4 h-4" />
-            </div>
+          <Link href="/inventario" className="flex items-center gap-3 bg-slate-800 hover:bg-slate-700 border border-slate-700/50 rounded-xl p-4 transition group">
+            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400"><Plus className="w-4 h-4" /></div>
             <span className="text-sm font-medium text-slate-300 group-hover:text-white transition">Nuova attrezzatura</span>
           </Link>
-          <Link
-            href="/set"
-            className="flex items-center gap-3 bg-slate-800 hover:bg-slate-700 border border-slate-700/50 rounded-xl p-4 transition group"
-          >
-            <div className="p-2 rounded-lg bg-purple-500/10 text-purple-400">
-              <Briefcase className="w-4 h-4" />
-            </div>
+          <Link href="/set" className="flex items-center gap-3 bg-slate-800 hover:bg-slate-700 border border-slate-700/50 rounded-xl p-4 transition group">
+            <div className="p-2 rounded-lg bg-purple-500/10 text-purple-400"><Briefcase className="w-4 h-4" /></div>
             <span className="text-sm font-medium text-slate-300 group-hover:text-white transition">Nuovo set</span>
           </Link>
-          <Link
-            href="/etichette"
-            className="flex items-center gap-3 bg-slate-800 hover:bg-slate-700 border border-slate-700/50 rounded-xl p-4 transition group"
-          >
-            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
-              <Tag className="w-4 h-4" />
-            </div>
+          <Link href="/etichette" className="flex items-center gap-3 bg-slate-800 hover:bg-slate-700 border border-slate-700/50 rounded-xl p-4 transition group">
+            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400"><Tag className="w-4 h-4" /></div>
             <span className="text-sm font-medium text-slate-300 group-hover:text-white transition">Stampa etichette</span>
+          </Link>
+          <Link href="/report" className="flex items-center gap-3 bg-slate-800 hover:bg-slate-700 border border-slate-700/50 rounded-xl p-4 transition group">
+            <div className="p-2 rounded-lg bg-slate-700 text-slate-400"><FileText className="w-4 h-4" /></div>
+            <span className="text-sm font-medium text-slate-300 group-hover:text-white transition">Report assicurativo</span>
           </Link>
         </div>
       </div>
