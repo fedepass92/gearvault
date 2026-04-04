@@ -4,7 +4,12 @@
       "Bash(node /tmp/gen_icons.js)",
       "Bash(sips -s format png /Users/federicopassaro/Documents/gearvault/public/icons/icon-192.svg --out /Users/federicopassaro/Documents/gearvault/public/icons/icon-192.png)",
       "Bash(sips -s format png /Users/federicopassaro/Documents/gearvault/public/icons/icon-512.svg --out /Users/federicopassaro/Documents/gearvault/public/icons/icon-512.png)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(npm install:*)",
+      "Bash(npx shadcn@latest:*)"
     ]
   }
 }
