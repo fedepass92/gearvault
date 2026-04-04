@@ -7,12 +7,12 @@ import JsBarcode from 'jsbarcode'
 export default function LabelCard({ item, type = 'qr', isCase = false, isKit = false }) {
   const barcodeRef = useRef()
 
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://gear.braindigital.it'
+  const base = 'https://gear.braindigital.it'
   const qrValue = isCase
-    ? `${origin}/scan/case/${item.id}`
+    ? base + '/scan/case/' + item.id
     : isKit
-    ? `${origin}/scan/kit/${item.id}`
-    : `${origin}/scan/${item.id}`
+    ? base + '/scan/kit/' + item.id
+    : base + '/scan/' + item.id
 
   useEffect(() => {
     if (type === 'barcode' && barcodeRef.current && item.serial_number) {
