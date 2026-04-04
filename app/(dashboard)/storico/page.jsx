@@ -2,25 +2,29 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { getSupabase } from '@/lib/supabase'
-import { History, Search, ChevronDown, Loader2, ArrowUpRight, RotateCcw } from 'lucide-react'
+import { History, Search, Loader2, ArrowUpRight, RotateCcw } from 'lucide-react'
 import { format } from 'date-fns'
 import { it } from 'date-fns/locale'
 import Link from 'next/link'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
 
-const ACTION_STYLES = {
-  checkout: 'bg-amber-500/20 text-amber-300 border-amber-500/20',
-  checkin: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/20',
+const ACTION_BADGE = {
+  checkout: 'bg-amber-500/15 text-amber-300 border-amber-500/20',
+  checkin: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/20',
 }
 const ACTION_LABELS = { checkout: 'Uscita', checkin: 'Rientro' }
-const ACTION_ICONS = { checkout: ArrowUpRight, checkin: RotateCcw }
 
 export default function StoricoPage() {
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(true)
-  const [equipment, setEquipment] = useState([])
-  const [sets, setSets] = useState([])
-  const [equipmentFilter, setEquipmentFilter] = useState('')
-  const [setFilter, setSetFilter] = useState('')
+  const [equipmentList, setEquipmentList] = useState([])
+  const [setsList, setSetsList] = useState([])
+  const [equipmentFilter, setEquipmentFilter] = useState('all')
+  const [setFilter, setSetFilter] = useState('all')
   const [search, setSearch] = useState('')
 
   useEffect(() => {
@@ -30,8 +34,8 @@ export default function StoricoPage() {
         supabase.from('equipment').select('id, name').order('name'),
         supabase.from('sets').select('id, name').order('created_at', { ascending: false }),
       ])
-      setEquipment(eq || [])
-      setSets(st || [])
+      setEquipmentList(eq || [])
+      setSetsList(st || [])
     }
     fetchFilters()
   }, [])
@@ -44,8 +48,8 @@ export default function StoricoPage() {
       .order('created_at', { ascending: false })
       .limit(200)
 
-    if (equipmentFilter) q = q.eq('equipment_id', equipmentFilter)
-    if (setFilter) q = q.eq('set_id', setFilter)
+    if (equipmentFilter !== 'all') q = q.eq('equipment_id', equipmentFilter)
+    if (setFilter !== 'all') q = q.eq('set_id', setFilter)
 
     const { data } = await q
     let results = data || []
@@ -68,117 +72,100 @@ export default function StoricoPage() {
 
   return (
     <div className="space-y-5">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Storico movimenti</h1>
-          <p className="text-slate-400 text-sm mt-0.5">{logs.length} movimenti</p>
+          <h1 className="text-xl font-bold">Storico movimenti</h1>
+          <p className="text-muted-foreground text-sm mt-0.5">{logs.length} movimenti</p>
         </div>
-        <History className="w-6 h-6 text-slate-600" />
+        <History className="w-5 h-5 text-muted-foreground" />
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-          <input
-            type="text"
+      <div className="flex flex-col sm:flex-row gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+          <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Cerca per attrezzatura, set, utente…"
-            className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+            className="pl-8 h-8"
           />
         </div>
-        <div className="relative">
-          <select
-            value={equipmentFilter}
-            onChange={(e) => setEquipmentFilter(e.target.value)}
-            className="appearance-none bg-slate-800 border border-slate-700 rounded-lg pl-3 pr-8 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition max-w-[200px]"
-          >
-            <option value="">Tutte le attrezzature</option>
-            {equipment.map((e) => (
-              <option key={e.id} value={e.id}>{e.name}</option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-        </div>
-        <div className="relative">
-          <select
-            value={setFilter}
-            onChange={(e) => setSetFilter(e.target.value)}
-            className="appearance-none bg-slate-800 border border-slate-700 rounded-lg pl-3 pr-8 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition max-w-[200px]"
-          >
-            <option value="">Tutti i set</option>
-            {sets.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-        </div>
+        <Select value={equipmentFilter} onValueChange={setEquipmentFilter}>
+          <SelectTrigger className="w-auto min-w-[160px] h-8 text-sm">
+            <SelectValue placeholder="Tutte le attrezzature" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tutte le attrezzature</SelectItem>
+            {equipmentList.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={setFilter} onValueChange={setSetFilter}>
+          <SelectTrigger className="w-auto min-w-[140px] h-8 text-sm">
+            <SelectValue placeholder="Tutti i set" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tutti i set</SelectItem>
+            {setsList.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Table */}
-      <div className="bg-slate-800 rounded-xl border border-slate-700/50 overflow-hidden">
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-6 h-6 animate-spin text-blue-400" />
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
           </div>
         ) : logs.length === 0 ? (
-          <div className="text-center py-16 text-slate-500">
+          <div className="text-center py-16 text-muted-foreground">
             <History className="w-10 h-10 mx-auto mb-3 opacity-30" />
             <p className="text-sm">Nessun movimento registrato</p>
-            <p className="text-xs mt-1 text-slate-600">I movimenti vengono registrati automaticamente al check-in/out dei set</p>
+            <p className="text-xs mt-1 text-muted-foreground/60">I movimenti vengono registrati automaticamente al check-in/out dei set</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-700/50">
-                  <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Data / Ora</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Azione</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Attrezzatura</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider hidden md:table-cell">Set</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider hidden lg:table-cell">Utente</th>
+                <tr className="border-b border-border">
+                  {['Data / Ora', 'Azione', 'Attrezzatura', 'Set', 'Utente'].map((h, i) => (
+                    <th key={h} className={`text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider ${i >= 3 ? 'hidden md:table-cell' : ''} ${i === 4 ? 'hidden lg:table-cell' : ''}`}>{h}</th>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/30">
+              <tbody className="divide-y divide-border/50">
                 {logs.map((log) => {
-                  const ActionIcon = ACTION_ICONS[log.action] || ArrowUpRight
+                  const ActionIcon = log.action === 'checkout' ? ArrowUpRight : RotateCcw
                   return (
-                    <tr key={log.id} className="hover:bg-slate-700/20 transition">
-                      <td className="px-4 py-3 text-slate-400 whitespace-nowrap text-xs">
-                        {format(new Date(log.created_at), 'd MMM yyyy', { locale: it })}
-                        <div className="text-slate-600">
-                          {format(new Date(log.created_at), 'HH:mm')}
-                        </div>
+                    <tr key={log.id} className="hover:bg-muted/30 transition">
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="text-xs text-foreground">{format(new Date(log.created_at), 'd MMM yyyy', { locale: it })}</div>
+                        <div className="text-xs text-muted-foreground">{format(new Date(log.created_at), 'HH:mm')}</div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${ACTION_STYLES[log.action] || 'bg-slate-700 text-slate-400'}`}>
-                          <ActionIcon className="w-3 h-3" />
+                        <Badge variant="outline" className={`text-xs border ${ACTION_BADGE[log.action] || 'bg-muted text-muted-foreground'}`}>
+                          <ActionIcon className="w-3 h-3 mr-1" />
                           {ACTION_LABELS[log.action] || log.action}
-                        </span>
+                        </Badge>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="font-medium text-white text-sm">
-                          {log.equipment?.name || <span className="text-slate-600 italic">Eliminata</span>}
+                        <div className="font-medium text-sm">
+                          {log.equipment?.name || <span className="text-muted-foreground italic">Eliminata</span>}
                         </div>
                         {log.equipment?.serial_number && (
-                          <div className="text-xs text-slate-500 font-mono">S/N {log.equipment.serial_number}</div>
+                          <div className="text-xs text-muted-foreground font-mono">S/N {log.equipment.serial_number}</div>
                         )}
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell">
                         {log.sets ? (
-                          <Link
-                            href={`/set/${log.set_id}`}
-                            className="text-sm text-blue-400 hover:text-blue-300 transition"
-                          >
+                          <Link href={`/set/${log.set_id}`} className="text-sm text-primary hover:underline">
                             {log.sets.name}
                           </Link>
                         ) : (
-                          <span className="text-slate-600 text-sm italic">—</span>
+                          <span className="text-muted-foreground text-sm italic">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 hidden lg:table-cell text-slate-400 text-sm">
+                      <td className="px-4 py-3 hidden lg:table-cell text-muted-foreground text-sm">
                         {log.profiles?.full_name || '—'}
                       </td>
                     </tr>

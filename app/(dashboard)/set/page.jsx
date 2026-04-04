@@ -3,22 +3,25 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { getSupabase } from '@/lib/supabase'
-import { Plus, Briefcase, MapPin, Calendar, Loader2, ChevronRight, X } from 'lucide-react'
+import { Plus, Briefcase, MapPin, Calendar, Loader2, ChevronRight } from 'lucide-react'
 import { format } from 'date-fns'
 import { it } from 'date-fns/locale'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Badge } from '@/components/ui/badge'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from '@/components/ui/dialog'
 
-const STATUS_STYLES = {
-  planned: 'bg-slate-700 text-slate-300',
-  out: 'bg-amber-500/20 text-amber-300',
-  returned: 'bg-emerald-500/20 text-emerald-300',
-  incomplete: 'bg-red-500/20 text-red-300',
+const STATUS_BADGE = {
+  planned: 'bg-muted text-muted-foreground border-border',
+  out: 'bg-amber-500/15 text-amber-300 border-amber-500/20',
+  returned: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/20',
+  incomplete: 'bg-red-500/15 text-red-300 border-red-500/20',
 }
-const STATUS_LABELS = {
-  planned: 'Pianificato',
-  out: 'In uscita',
-  returned: 'Rientrato',
-  incomplete: 'Incompleto',
-}
+const STATUS_LABELS = { planned: 'Pianificato', out: 'In uscita', returned: 'Rientrato', incomplete: 'Incompleto' }
 
 const EMPTY_SET = { name: '', job_date: '', location: '', notes: '', status: 'planned' }
 
@@ -30,9 +33,7 @@ export default function SetPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    fetchSets()
-  }, [])
+  useEffect(() => { fetchSets() }, [])
 
   async function fetchSets() {
     const supabase = getSupabase()
@@ -58,45 +59,36 @@ export default function SetPage() {
     })
     if (err) {
       setError(err.message)
-      setSaving(false)
     } else {
       setShowModal(false)
       setForm(EMPTY_SET)
       fetchSets()
-      setSaving(false)
     }
+    setSaving(false)
   }
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Set Manager</h1>
-          <p className="text-slate-400 text-sm mt-0.5">{sets.length} set creati</p>
+          <h1 className="text-xl font-bold">Set Manager</h1>
+          <p className="text-muted-foreground text-sm mt-0.5">{sets.length} set creati</p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition shadow-lg shadow-blue-600/20"
-        >
+        <Button size="sm" onClick={() => setShowModal(true)}>
           <Plus className="w-4 h-4" />
           <span className="hidden sm:inline">Nuovo set</span>
-        </button>
+        </Button>
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-6 h-6 animate-spin text-blue-400" />
+          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
         </div>
       ) : sets.length === 0 ? (
-        <div className="bg-slate-800 rounded-xl border border-slate-700/50 p-12 text-center">
-          <Briefcase className="w-10 h-10 mx-auto mb-3 text-slate-600" />
-          <p className="text-slate-400 text-sm">Nessun set creato ancora</p>
-          <button
-            onClick={() => setShowModal(true)}
-            className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition"
-          >
-            Crea il primo set
-          </button>
+        <div className="bg-card rounded-xl border border-border p-12 text-center">
+          <Briefcase className="w-10 h-10 mx-auto mb-3 text-muted-foreground opacity-40" />
+          <p className="text-muted-foreground text-sm mb-4">Nessun set creato ancora</p>
+          <Button size="sm" onClick={() => setShowModal(true)}>Crea il primo set</Button>
         </div>
       ) : (
         <div className="grid gap-3">
@@ -104,21 +96,19 @@ export default function SetPage() {
             <Link
               key={set.id}
               href={`/set/${set.id}`}
-              className="flex items-center gap-4 bg-slate-800 rounded-xl border border-slate-700/50 px-5 py-4 hover:bg-slate-700/50 transition group"
+              className="flex items-center gap-4 bg-card rounded-xl border border-border px-5 py-4 hover:bg-muted/30 transition group"
             >
-              <div className="p-2.5 rounded-xl bg-slate-700/50">
-                <Briefcase className="w-5 h-5 text-slate-400" />
+              <div className="p-2.5 rounded-xl bg-primary/10">
+                <Briefcase className="w-5 h-5 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-semibold text-white group-hover:text-blue-300 transition truncate">
-                    {set.name}
-                  </span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_STYLES[set.status] || 'bg-slate-700 text-slate-300'}`}>
+                  <span className="text-sm font-semibold group-hover:text-primary transition truncate">{set.name}</span>
+                  <Badge variant="outline" className={`text-xs border ${STATUS_BADGE[set.status] || 'bg-muted text-muted-foreground'}`}>
                     {STATUS_LABELS[set.status] || set.status}
-                  </span>
+                  </Badge>
                 </div>
-                <div className="flex items-center gap-3 mt-1 text-xs text-slate-500 flex-wrap">
+                <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
                   {set.job_date && (
                     <span className="flex items-center gap-1">
                       <Calendar className="w-3 h-3" />
@@ -134,79 +124,51 @@ export default function SetPage() {
                   <span>{set.set_items?.[0]?.count ?? 0} item</span>
                 </div>
               </div>
-              <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-slate-400 transition flex-shrink-0" />
+              <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition flex-shrink-0" />
             </Link>
           ))}
         </div>
       )}
 
-      {/* New Set Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-md shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/50">
-              <h2 className="text-base font-semibold text-white">Nuovo set</h2>
-              <button onClick={() => setShowModal(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition">
-                <X className="w-5 h-5" />
-              </button>
+      <Dialog open={showModal} onOpenChange={(o) => { if (!o) { setShowModal(false); setForm(EMPTY_SET); setError('') } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Nuovo set</DialogTitle></DialogHeader>
+          <form onSubmit={handleCreate} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="set-name">Nome set *</Label>
+              <Input
+                id="set-name"
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                required
+                placeholder="Es. Shooting Milano 2024"
+              />
             </div>
-            <form onSubmit={handleCreate} className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5">Nome set *</label>
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  required
-                  placeholder="Es. Shooting Milano 2024"
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Data lavoro</Label>
+                <Input type="date" value={form.job_date} onChange={(e) => setForm((f) => ({ ...f, job_date: e.target.value }))} />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Data lavoro</label>
-                  <input
-                    type="date"
-                    value={form.job_date}
-                    onChange={(e) => setForm((f) => ({ ...f, job_date: e.target.value }))}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Location</label>
-                  <input
-                    type="text"
-                    value={form.location}
-                    onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
-                    placeholder="Es. Studio Roma"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                  />
-                </div>
+              <div className="space-y-1.5">
+                <Label>Location</Label>
+                <Input value={form.location} onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))} placeholder="Es. Studio Roma" />
               </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5">Note</label>
-                <textarea
-                  value={form.notes}
-                  onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                  rows={3}
-                  placeholder="Note sul set…"
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition resize-none"
-                />
-              </div>
-              {error && <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 text-sm text-red-400">{error}</div>}
-              <div className="flex gap-3">
-                <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm font-medium transition">
-                  Annulla
-                </button>
-                <button type="submit" disabled={saving} className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white rounded-lg text-sm font-medium transition flex items-center justify-center gap-2">
-                  {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Crea set
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Note</Label>
+              <Textarea value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} rows={3} placeholder="Note sul set…" className="resize-none" />
+            </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <DialogFooter className="gap-2">
+              <Button type="button" variant="outline" onClick={() => setShowModal(false)}>Annulla</Button>
+              <Button type="submit" disabled={saving}>
+                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                Crea set
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

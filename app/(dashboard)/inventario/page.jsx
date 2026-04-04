@@ -354,6 +354,11 @@ function ItemDetailModal({ item, onClose, onEdit, onDelete }) {
                     </div>
                   )}
 
+                  <AddPriceForm itemId={item.id} onAdded={() => {
+                    getSupabase().from('price_history').select('*').eq('equipment_id', item.id).order('date')
+                      .then(({ data }) => { if (data) setPriceHistory(data) })
+                  }} />
+
                   <div>
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
                       <Clock className="w-3.5 h-3.5" /> Movimenti recenti
@@ -457,6 +462,82 @@ function MembershipSection({ title, icon, items, emptyLabel }) {
         </div>
       )}
     </div>
+  )
+}
+
+// ─── Add Price Form ───────────────────────────────────────────────────────────
+
+function AddPriceForm({ itemId, onAdded }) {
+  const [open, setOpen] = useState(false)
+  const [value, setValue] = useState('')
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [note, setNote] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  async function handleSave(e) {
+    e.preventDefault()
+    if (!value) return
+    setSaving(true)
+    const supabase = getSupabase()
+    await supabase.from('price_history').insert({
+      equipment_id: itemId,
+      value: parseFloat(value),
+      date,
+      note: note || null,
+    })
+    setValue(''); setNote('')
+    setDate(new Date().toISOString().slice(0, 10))
+    setOpen(false)
+    setSaving(false)
+    onAdded()
+  }
+
+  if (!open) {
+    return (
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+          <Plus className="w-3.5 h-3.5" />
+          Aggiungi valore
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <form onSubmit={handleSave} className="bg-card border border-border rounded-lg p-3 space-y-2">
+      <p className="text-xs font-medium text-muted-foreground">Nuovo valore di mercato</p>
+      <div className="flex gap-2">
+        <Input
+          type="number"
+          min="0"
+          step="0.01"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="€ 0,00"
+          required
+          className="h-8 text-sm"
+        />
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="h-8 px-2.5 rounded-lg border border-input bg-transparent text-sm focus-visible:ring-2 focus-visible:ring-ring/50 outline-none"
+        />
+      </div>
+      <Input
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder="Nota (opzionale)"
+        className="h-8 text-sm"
+      />
+      <div className="flex gap-2 justify-end">
+        <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>Annulla</Button>
+        <Button type="submit" size="sm" disabled={saving || !value}>
+          {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+          Salva
+        </Button>
+      </div>
+    </form>
   )
 }
 

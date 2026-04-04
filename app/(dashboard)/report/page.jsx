@@ -3,12 +3,16 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getSupabase } from '@/lib/supabase'
 import { exportInsuranceReport } from '@/lib/pdf'
-import { FileDown, Filter, Loader2, ChevronDown, Download } from 'lucide-react'
+import { FileDown, Filter, Loader2, Download } from 'lucide-react'
 import { format } from 'date-fns'
-import { it } from 'date-fns/locale'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
 
 const CATEGORIES = [
-  { value: '', label: 'Tutte le categorie' },
+  { value: 'all', label: 'Tutte le categorie' },
   { value: 'camera', label: 'Camera' },
   { value: 'lens', label: 'Obiettivo' },
   { value: 'drone', label: 'Drone' },
@@ -20,9 +24,9 @@ const CATEGORIES = [
 ]
 
 const CONDITION_BADGE = {
-  active: 'bg-emerald-500/20 text-emerald-300',
-  repair: 'bg-amber-500/20 text-amber-300',
-  retired: 'bg-slate-700 text-slate-400',
+  active: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/20',
+  repair: 'bg-amber-500/15 text-amber-300 border-amber-500/20',
+  retired: 'bg-muted text-muted-foreground border-border',
 }
 const CONDITION_LABEL = { active: 'Attivo', repair: 'Riparazione', retired: 'Ritirato' }
 
@@ -31,17 +35,16 @@ const CATEGORY_LABELS = {
   lighting: 'Illuminazione', support: 'Supporto', accessory: 'Accessorio', altro: 'Altro',
 }
 
+function fmtEur(v) {
+  if (v == null || v === '' || isNaN(parseFloat(v))) return '—'
+  return `€ ${parseFloat(v).toLocaleString('it-IT', { minimumFractionDigits: 2 })}`
+}
+
 function exportCSV(equipment, categoryFilter) {
-  const items = categoryFilter ? equipment.filter((e) => e.category === categoryFilter) : equipment
-  const headers = [
-    'Nome', 'Marca', 'Modello', 'Seriale', 'Categoria', 'Data Acquisto',
-    'Valore Acquisto (€)', 'Valore Mercato (€)', 'Valore Assicurato (€)', 'Condizione',
-  ]
+  const items = categoryFilter !== 'all' ? equipment.filter((e) => e.category === categoryFilter) : equipment
+  const headers = ['Nome', 'Marca', 'Modello', 'Seriale', 'Categoria', 'Data Acquisto', 'Valore Acquisto (€)', 'Valore Mercato (€)', 'Valore Assicurato (€)', 'Condizione']
   const rows = items.map((e) => [
-    e.name || '',
-    e.brand || '',
-    e.model || '',
-    e.serial_number || '',
+    e.name || '', e.brand || '', e.model || '', e.serial_number || '',
     CATEGORY_LABELS[e.category] || e.category || '',
     e.purchase_date ? format(new Date(e.purchase_date), 'dd/MM/yyyy') : '',
     e.purchase_price != null ? parseFloat(e.purchase_price).toFixed(2) : '',
@@ -49,11 +52,7 @@ function exportCSV(equipment, categoryFilter) {
     e.insured_value != null ? parseFloat(e.insured_value).toFixed(2) : '',
     CONDITION_LABEL[e.condition] || e.condition || '',
   ])
-
-  const csv = [headers, ...rows]
-    .map((r) => r.map((v) => `"${v}"`).join(','))
-    .join('\n')
-
+  const csv = [headers, ...rows].map((r) => r.map((v) => `"${v}"`).join(',')).join('\n')
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -67,7 +66,7 @@ export default function ReportPage() {
   const [equipment, setEquipment] = useState([])
   const [allEquipment, setAllEquipment] = useState([])
   const [loading, setLoading] = useState(true)
-  const [categoryFilter, setCategoryFilter] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('all')
   const [exportLoading, setExportLoading] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
 
@@ -92,13 +91,13 @@ export default function ReportPage() {
   useEffect(() => { fetchEquipment() }, [fetchEquipment])
 
   useEffect(() => {
-    setEquipment(categoryFilter ? allEquipment.filter((e) => e.category === categoryFilter) : allEquipment)
+    setEquipment(categoryFilter !== 'all' ? allEquipment.filter((e) => e.category === categoryFilter) : allEquipment)
   }, [allEquipment, categoryFilter])
 
   async function handleExport() {
     setExportLoading(true)
     try {
-      await exportInsuranceReport(allEquipment, categoryFilter || null)
+      await exportInsuranceReport(allEquipment, categoryFilter !== 'all' ? categoryFilter : null)
     } finally {
       setExportLoading(false)
     }
@@ -110,143 +109,105 @@ export default function ReportPage() {
 
   return (
     <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-white">Report Assicurativo</h1>
-          <p className="text-slate-400 text-sm mt-0.5">Elenco attrezzature Brain Digital</p>
+          <h1 className="text-xl font-bold">Report Assicurativo</h1>
+          <p className="text-muted-foreground text-sm mt-0.5">Elenco attrezzature Brain Digital</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => exportCSV(allEquipment, categoryFilter)}
-            disabled={equipment.length === 0}
-            className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-40 text-slate-300 rounded-lg text-sm font-medium transition"
-          >
+          <Button variant="outline" size="sm" onClick={() => exportCSV(allEquipment, categoryFilter)} disabled={equipment.length === 0}>
             <Download className="w-4 h-4" />
-            <span className="hidden sm:inline">Scarica CSV</span>
-          </button>
+            <span className="hidden sm:inline">CSV</span>
+          </Button>
           {isAdmin && (
-            <button
-              onClick={handleExport}
-              disabled={exportLoading || equipment.length === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white rounded-lg text-sm font-medium transition shadow-lg shadow-blue-600/20"
-            >
+            <Button size="sm" onClick={handleExport} disabled={exportLoading || equipment.length === 0}>
               {exportLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
               Esporta PDF
-            </button>
+            </Button>
           )}
         </div>
       </div>
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-slate-800 rounded-xl border border-slate-700/50 p-4">
-          <div className="text-xs text-slate-500 mb-1">Totale item</div>
-          <div className="text-2xl font-bold text-white">{equipment.length}</div>
-        </div>
-        <div className="bg-slate-800 rounded-xl border border-slate-700/50 p-4">
-          <div className="text-xs text-slate-500 mb-1">Valore acquisto</div>
-          <div className="text-xl font-bold text-white">
-            € {totalPurchase.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+        {[
+          { label: 'Totale item', value: equipment.length, mono: false },
+          { label: 'Valore acquisto', value: `€ ${totalPurchase.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` },
+          { label: 'Valore di mercato', value: `€ ${totalMarket.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` },
+          { label: 'Valore assicurato', value: `€ ${totalInsured.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`, accent: true },
+        ].map((card) => (
+          <div key={card.label} className="bg-card rounded-xl border border-border p-4">
+            <div className="text-xs text-muted-foreground mb-1">{card.label}</div>
+            <div className={`text-xl font-bold ${card.accent ? 'text-primary' : 'text-foreground'}`}>{card.value}</div>
           </div>
-        </div>
-        <div className="bg-slate-800 rounded-xl border border-slate-700/50 p-4">
-          <div className="text-xs text-slate-500 mb-1">Valore di mercato</div>
-          <div className="text-xl font-bold text-white">
-            € {totalMarket.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
-          </div>
-        </div>
-        <div className="bg-slate-800 rounded-xl border border-slate-700/50 p-4">
-          <div className="text-xs text-slate-500 mb-1">Valore assicurato</div>
-          <div className="text-xl font-bold text-white">
-            € {totalInsured.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
-          </div>
-        </div>
+        ))}
       </div>
 
       {/* Filter */}
       <div className="flex items-center gap-3">
-        <Filter className="w-4 h-4 text-slate-500" />
-        <div className="relative">
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="appearance-none bg-slate-800 border border-slate-700 rounded-lg pl-3 pr-8 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-          >
-            {CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-          </select>
-          <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-        </div>
-        <span className="text-xs text-slate-500">
-          {equipment.length} item{categoryFilter ? ` in ${CATEGORIES.find(c => c.value === categoryFilter)?.label}` : ''}
+        <Filter className="w-4 h-4 text-muted-foreground" />
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="w-auto min-w-[180px] h-8 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <span className="text-xs text-muted-foreground">
+          {equipment.length} item{categoryFilter !== 'all' ? ` in ${CATEGORIES.find((c) => c.value === categoryFilter)?.label}` : ''}
         </span>
       </div>
 
       {/* Table */}
-      <div className="bg-slate-800 rounded-xl border border-slate-700/50 overflow-hidden">
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-6 h-6 animate-spin text-blue-400" />
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-700/50">
+                <tr className="border-b border-border">
                   {['Nome', 'Marca', 'Modello', 'Seriale', 'Data Acquisto', 'Val. Acquisto', 'Val. Mercato', 'Val. Assicurato', 'Condizione'].map((h) => (
-                    <th key={h} className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                      {h}
-                    </th>
+                    <th key={h} className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/30">
+              <tbody className="divide-y divide-border/50">
                 {equipment.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-700/20 transition">
-                    <td className="px-4 py-3 font-medium text-white">{item.name}</td>
-                    <td className="px-4 py-3 text-slate-400">{item.brand || '—'}</td>
-                    <td className="px-4 py-3 text-slate-400">{item.model || '—'}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-400">{item.serial_number || '—'}</td>
-                    <td className="px-4 py-3 text-slate-400 whitespace-nowrap">
+                  <tr key={item.id} className="hover:bg-muted/30 transition">
+                    <td className="px-4 py-3 font-medium">{item.name}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{item.brand || '—'}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{item.model || '—'}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{item.serial_number || '—'}</td>
+                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap text-xs">
                       {item.purchase_date ? format(new Date(item.purchase_date), 'dd/MM/yyyy') : '—'}
                     </td>
-                    <td className="px-4 py-3 text-slate-300 text-right whitespace-nowrap">
-                      {item.purchase_price ? `€ ${parseFloat(item.purchase_price).toLocaleString('it-IT', { minimumFractionDigits: 2 })}` : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-slate-300 text-right whitespace-nowrap">
-                      {item.market_value ? `€ ${parseFloat(item.market_value).toLocaleString('it-IT', { minimumFractionDigits: 2 })}` : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-blue-300 text-right whitespace-nowrap font-medium">
-                      {item.insured_value ? `€ ${parseFloat(item.insured_value).toLocaleString('it-IT', { minimumFractionDigits: 2 })}` : '—'}
-                    </td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap text-xs">{fmtEur(item.purchase_price)}</td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap text-xs">{fmtEur(item.market_value)}</td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap text-xs text-primary font-medium">{fmtEur(item.insured_value)}</td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${CONDITION_BADGE[item.condition] || 'bg-slate-700 text-slate-400'}`}>
+                      <Badge variant="outline" className={`text-xs border ${CONDITION_BADGE[item.condition] || 'bg-muted text-muted-foreground'}`}>
                         {CONDITION_LABEL[item.condition] || item.condition}
-                      </span>
+                      </Badge>
                     </td>
                   </tr>
                 ))}
                 {equipment.length > 0 && (
-                  <tr className="bg-slate-700/30 font-semibold">
-                    <td colSpan={5} className="px-4 py-3 text-sm text-slate-300">
-                      Totale ({equipment.length} item)
-                    </td>
-                    <td className="px-4 py-3 text-right text-white whitespace-nowrap">
-                      € {totalPurchase.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-4 py-3 text-right text-white whitespace-nowrap">
-                      € {totalMarket.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-4 py-3 text-right text-blue-300 whitespace-nowrap">
-                      € {totalInsured.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
-                    </td>
+                  <tr className="bg-muted/30 font-semibold border-t border-border">
+                    <td colSpan={5} className="px-4 py-3 text-sm text-muted-foreground">Totale ({equipment.length} item)</td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap text-xs">{fmtEur(totalPurchase)}</td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap text-xs">{fmtEur(totalMarket)}</td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap text-xs text-primary font-semibold">{fmtEur(totalInsured)}</td>
                     <td />
                   </tr>
                 )}
               </tbody>
             </table>
             {equipment.length === 0 && (
-              <div className="text-center py-12 text-slate-500 text-sm">Nessuna attrezzatura trovata</div>
+              <div className="text-center py-12 text-muted-foreground text-sm">Nessuna attrezzatura trovata</div>
             )}
           </div>
         )}
