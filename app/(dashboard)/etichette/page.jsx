@@ -4,13 +4,15 @@ import { useState, useEffect } from 'react'
 import { getSupabase } from '@/lib/supabase'
 import LabelCard from '@/components/LabelCard'
 import { Search, Printer, QrCode, Barcode, CheckSquare, Square, Loader2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 export default function EtichettePage() {
   const [equipment, setEquipment] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(new Set())
-  const [labelTypes, setLabelTypes] = useState({}) // id → 'qr' | 'barcode'
+  const [labelTypes, setLabelTypes] = useState({})
   const [showPreview, setShowPreview] = useState(false)
 
   useEffect(() => {
@@ -35,11 +37,7 @@ export default function EtichettePage() {
   }
 
   function toggleAll() {
-    if (selected.size === equipment.length) {
-      setSelected(new Set())
-    } else {
-      setSelected(new Set(equipment.map((e) => e.id)))
-    }
+    setSelected(selected.size === equipment.length ? new Set() : new Set(equipment.map((e) => e.id)))
   }
 
   function setLabelType(id, type) {
@@ -55,86 +53,77 @@ export default function EtichettePage() {
 
   return (
     <div className="space-y-5">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Etichette</h1>
-          <p className="text-slate-400 text-sm mt-0.5">
+          <h1 className="text-xl font-bold">Etichette</h1>
+          <p className="text-muted-foreground text-sm mt-0.5">
             {selected.size > 0 ? `${selected.size} selezionati` : 'Seleziona le attrezzature da etichettare'}
           </p>
         </div>
-        <button
-          onClick={handlePrint}
-          disabled={selected.size === 0}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition shadow-lg shadow-blue-600/20"
-        >
+        <Button size="sm" onClick={handlePrint} disabled={selected.size === 0}>
           <Printer className="w-4 h-4" />
           Stampa {selected.size > 0 ? `(${selected.size})` : ''}
-        </button>
+        </Button>
       </div>
 
-      {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-        <input
-          type="text"
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+        <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Cerca attrezzatura…"
-          className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+          className="pl-8"
         />
       </div>
 
-      {/* Equipment list */}
-      <div className="bg-slate-800 rounded-xl border border-slate-700/50 overflow-hidden">
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-700/50">
-          <button onClick={toggleAll} className="text-slate-400 hover:text-white transition">
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
+          <button onClick={toggleAll} className="text-muted-foreground hover:text-foreground transition">
             {selected.size === equipment.length && equipment.length > 0
-              ? <CheckSquare className="w-4 h-4 text-blue-400" />
+              ? <CheckSquare className="w-4 h-4 text-primary" />
               : <Square className="w-4 h-4" />}
           </button>
-          <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Seleziona tutto ({equipment.length})
           </span>
         </div>
 
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-5 h-5 animate-spin text-blue-400" />
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <div className="divide-y divide-slate-700/30">
+          <div className="divide-y divide-border/50">
             {equipment.map((item) => {
               const isSelected = selected.has(item.id)
               const labelType = labelTypes[item.id] || 'qr'
               return (
                 <div
                   key={item.id}
-                  className={`flex items-center gap-4 px-4 py-3 transition ${isSelected ? 'bg-blue-600/5' : 'hover:bg-slate-700/20'}`}
+                  className={`flex items-center gap-4 px-4 py-3 transition ${isSelected ? 'bg-primary/5' : 'hover:bg-muted/30'}`}
                 >
-                  <button onClick={() => toggleSelect(item.id)} className="text-slate-400 hover:text-white transition flex-shrink-0">
-                    {isSelected ? <CheckSquare className="w-4 h-4 text-blue-400" /> : <Square className="w-4 h-4" />}
+                  <button onClick={() => toggleSelect(item.id)} className="text-muted-foreground hover:text-foreground transition flex-shrink-0">
+                    {isSelected ? <CheckSquare className="w-4 h-4 text-primary" /> : <Square className="w-4 h-4" />}
                   </button>
-                  <div className="flex-1 min-w-0" onClick={() => toggleSelect(item.id)} role="button" tabIndex={0}>
-                    <div className="text-sm font-medium text-white truncate">{item.name}</div>
-                    <div className="text-xs text-slate-500">
+                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => toggleSelect(item.id)}>
+                    <div className="text-sm font-medium truncate">{item.name}</div>
+                    <div className="text-xs text-muted-foreground">
                       {[item.brand, item.model].filter(Boolean).join(' · ')}
                       {item.serial_number ? ` · S/N: ${item.serial_number}` : ''}
                     </div>
                   </div>
-                  {/* Label type toggle */}
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <button
                       onClick={() => setLabelType(item.id, 'qr')}
                       title="QR Code"
-                      className={`p-1.5 rounded-lg transition ${labelType === 'qr' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-700'}`}
+                      className={`p-1.5 rounded-lg transition ${labelType === 'qr' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
                     >
                       <QrCode className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => setLabelType(item.id, 'barcode')}
                       title="Barcode"
-                      className={`p-1.5 rounded-lg transition ${labelType === 'barcode' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-700'}`}
+                      className={`p-1.5 rounded-lg transition ${labelType === 'barcode' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
                     >
                       <Barcode className="w-3.5 h-3.5" />
                     </button>
@@ -146,10 +135,9 @@ export default function EtichettePage() {
         )}
       </div>
 
-      {/* Print area (visible on screen as preview + for print) */}
       {selectedItems.length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
             Anteprima etichette
           </h2>
           <div id="print-area">

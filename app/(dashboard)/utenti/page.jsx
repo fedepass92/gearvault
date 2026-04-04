@@ -2,9 +2,18 @@
 
 import { useState, useEffect } from 'react'
 import { getSupabase } from '@/lib/supabase'
-import { Users, Mail, Loader2, ShieldCheck, Shield, Send, X, ChevronDown } from 'lucide-react'
+import { Users, Mail, Loader2, ShieldCheck, Send } from 'lucide-react'
 import { format } from 'date-fns'
 import { it } from 'date-fns/locale'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from '@/components/ui/dialog'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
 
 export default function UtentiPage() {
   const [profiles, setProfiles] = useState([])
@@ -28,12 +37,7 @@ export default function UtentiPage() {
       if (profile?.role !== 'admin') { setLoading(false); return }
       setIsAdmin(true)
 
-      // Fetch all profiles — join with auth.users via admin API not available client-side
-      // We fetch profiles and use email from auth session for current user
-      const { data: allProfiles } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at')
+      const { data: allProfiles } = await supabase.from('profiles').select('*').order('created_at')
       setProfiles(allProfiles || [])
       setLoading(false)
     }
@@ -41,7 +45,7 @@ export default function UtentiPage() {
   }, [])
 
   async function changeRole(profileId, newRole) {
-    if (profileId === currentUserId) return // Can't change own role
+    if (profileId === currentUserId) return
     const supabase = getSupabase()
     await supabase.from('profiles').update({ role: newRole }).eq('id', profileId)
     setProfiles((prev) => prev.map((p) => p.id === profileId ? { ...p, role: newRole } : p))
@@ -54,15 +58,10 @@ export default function UtentiPage() {
     setInviteSuccess('')
 
     const supabase = getSupabase()
-    // Note: inviteUserByEmail requires admin key, not available client-side.
-    // We use signUp with a magic link approach or show instructions.
-    // For production, this should be a server action.
     const { error } = await supabase.auth.signUp({
       email: inviteEmail,
-      password: Math.random().toString(36).slice(-12) + 'Aa1!', // temp password
-      options: {
-        emailRedirectTo: `${window.location.origin}/login`,
-      },
+      password: Math.random().toString(36).slice(-12) + 'Aa1!',
+      options: { emailRedirectTo: `${window.location.origin}/login` },
     })
 
     if (error) {
@@ -79,8 +78,8 @@ export default function UtentiPage() {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="text-center">
-          <ShieldCheck className="w-10 h-10 mx-auto mb-3 text-slate-600" />
-          <p className="text-slate-400 text-sm">Accesso riservato agli amministratori</p>
+          <ShieldCheck className="w-10 h-10 mx-auto mb-3 text-muted-foreground opacity-40" />
+          <p className="text-muted-foreground text-sm">Accesso riservato agli amministratori</p>
         </div>
       </div>
     )
@@ -90,16 +89,13 @@ export default function UtentiPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Utenti</h1>
-          <p className="text-slate-400 text-sm mt-0.5">{profiles.length} utenti registrati</p>
+          <h1 className="text-xl font-bold">Utenti</h1>
+          <p className="text-muted-foreground text-sm mt-0.5">{profiles.length} utenti registrati</p>
         </div>
-        <button
-          onClick={() => setShowInvite(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition shadow-lg shadow-blue-600/20"
-        >
+        <Button size="sm" onClick={() => setShowInvite(true)}>
           <Send className="w-4 h-4" />
           Invita utente
-        </button>
+        </Button>
       </div>
 
       {inviteSuccess && (
@@ -108,60 +104,58 @@ export default function UtentiPage() {
         </div>
       )}
 
-      <div className="bg-slate-800 rounded-xl border border-slate-700/50 overflow-hidden">
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-5 h-5 animate-spin text-blue-400" />
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-700/50">
-                <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Utente</th>
-                <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider hidden md:table-cell">Registrato il</th>
-                <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Ruolo</th>
+              <tr className="border-b border-border">
+                <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Utente</th>
+                <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell">Registrato il</th>
+                <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Ruolo</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/30">
+            <tbody className="divide-y divide-border/50">
               {profiles.map((profile) => (
-                <tr key={profile.id} className="hover:bg-slate-700/20 transition">
+                <tr key={profile.id} className="hover:bg-muted/30 transition">
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0">
-                        <span className="text-xs font-semibold text-slate-300">
+                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                        <span className="text-xs font-semibold text-muted-foreground">
                           {(profile.full_name || 'U')[0].toUpperCase()}
                         </span>
                       </div>
                       <div>
-                        <div className="font-medium text-white">{profile.full_name || 'Utente'}</div>
-                        <div className="text-xs text-slate-500">{profile.id}</div>
+                        <div className="font-medium">
+                          {profile.full_name || 'Utente'}
+                          {profile.id === currentUserId && <span className="text-[10px] text-primary ml-2">(tu)</span>}
+                        </div>
+                        <div className="text-xs text-muted-foreground font-mono truncate max-w-[200px]">{profile.id}</div>
                       </div>
                     </div>
-                    {profile.id === currentUserId && (
-                      <span className="text-[10px] text-blue-400 ml-11">(tu)</span>
-                    )}
                   </td>
-                  <td className="px-5 py-4 hidden md:table-cell text-slate-400 text-xs">
+                  <td className="px-5 py-4 hidden md:table-cell text-muted-foreground text-xs">
                     {profile.created_at ? format(new Date(profile.created_at), 'd MMM yyyy', { locale: it }) : '—'}
                   </td>
                   <td className="px-5 py-4">
                     {profile.id === currentUserId ? (
                       <span className="flex items-center gap-1.5 text-sm">
-                        <ShieldCheck className="w-4 h-4 text-blue-400" />
-                        <span className="text-blue-300 font-medium">Admin</span>
+                        <ShieldCheck className="w-4 h-4 text-primary" />
+                        <span className="text-primary font-medium">Admin</span>
                       </span>
                     ) : (
-                      <div className="relative inline-block">
-                        <select
-                          value={profile.role}
-                          onChange={(e) => changeRole(profile.id, e.target.value)}
-                          className="appearance-none bg-slate-700 border border-slate-600 rounded-lg pl-3 pr-8 py-1.5 text-xs text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition cursor-pointer"
-                        >
-                          <option value="admin">Admin</option>
-                          <option value="operator">Operatore</option>
-                        </select>
-                        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500 pointer-events-none" />
-                      </div>
+                      <Select value={profile.role} onValueChange={(v) => changeRole(profile.id, v)}>
+                        <SelectTrigger className="w-[130px] h-7 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="operator">Operatore</SelectItem>
+                        </SelectContent>
+                      </Select>
                     )}
                   </td>
                 </tr>
@@ -171,47 +165,36 @@ export default function UtentiPage() {
         )}
       </div>
 
-      {/* Invite modal */}
-      {showInvite && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-sm shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/50">
-              <h2 className="text-base font-semibold text-white">Invita nuovo utente</h2>
-              <button onClick={() => setShowInvite(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition">
-                <X className="w-5 h-5" />
-              </button>
+      <Dialog open={showInvite} onOpenChange={(o) => { if (!o) { setShowInvite(false); setInviteError('') } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Invita nuovo utente</DialogTitle></DialogHeader>
+          <form onSubmit={handleInvite} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="invite-email">Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                <Input
+                  id="invite-email"
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  required
+                  placeholder="utente@braindigital.it"
+                  className="pl-8"
+                />
+              </div>
             </div>
-            <form onSubmit={handleInvite} className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5">Email</label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                  <input
-                    type="email"
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
-                    required
-                    placeholder="utente@braindigital.it"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                  />
-                </div>
-              </div>
-              {inviteError && (
-                <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 text-sm text-red-400">{inviteError}</div>
-              )}
-              <div className="flex gap-3">
-                <button type="button" onClick={() => setShowInvite(false)} className="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm font-medium transition">
-                  Annulla
-                </button>
-                <button type="submit" disabled={inviting} className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white rounded-lg text-sm font-medium transition flex items-center justify-center gap-2">
-                  {inviting && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Invita
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+            {inviteError && <p className="text-sm text-destructive">{inviteError}</p>}
+            <DialogFooter className="gap-2">
+              <Button type="button" variant="outline" onClick={() => setShowInvite(false)}>Annulla</Button>
+              <Button type="submit" disabled={inviting}>
+                {inviting && <Loader2 className="w-4 h-4 animate-spin" />}
+                Invita
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
