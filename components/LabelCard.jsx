@@ -7,9 +7,10 @@ import JsBarcode from 'jsbarcode'
 export default function LabelCard({ item, type = 'qr', isCase = false }) {
   const barcodeRef = useRef()
 
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://gear.braindigital.it'
   const qrValue = isCase
-    ? `GEARVAULT-CASE:${item.id}:${item.name}`
-    : `GEARVAULT:${item.id}:${item.serial_number || ''}:${item.name}`
+    ? `${origin}/scan/case/${item.id}`
+    : `${origin}/scan/${item.id}`
 
   useEffect(() => {
     if (type === 'barcode' && barcodeRef.current && item.serial_number) {

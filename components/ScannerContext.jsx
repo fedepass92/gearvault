@@ -8,15 +8,20 @@ const SCANNER_SPEED_THRESHOLD_MS = 50
 const MIN_SCAN_LENGTH = 6
 
 function parseScanResult(raw) {
+  // Legacy format: GEARVAULT:id:serial:name
   if (raw.startsWith('GEARVAULT:')) {
     const parts = raw.split(':')
-    return {
-      type: 'gearvault',
-      id: parts[1] || null,
-      serial: parts[2] || null,
-      name: parts.slice(3).join(':') || null,
-      raw,
-    }
+    return { type: 'gearvault', id: parts[1] || null, serial: parts[2] || null, name: parts.slice(3).join(':') || null, raw }
+  }
+  // URL format: https://host/scan/{id} or /scan/{id}
+  const urlMatch = raw.match(/\/scan\/([0-9a-f-]{36})$/)
+  if (urlMatch) {
+    return { type: 'gearvault', id: urlMatch[1], serial: null, name: null, raw }
+  }
+  // URL format case: /scan/case/{id}
+  const caseMatch = raw.match(/\/scan\/case\/([0-9a-f-]{36})$/)
+  if (caseMatch) {
+    return { type: 'gearvault-case', id: caseMatch[1], serial: null, name: null, raw }
   }
   return { type: 'serial', serial: raw, raw }
 }
