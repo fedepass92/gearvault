@@ -86,8 +86,8 @@ export default function CasePage() {
               href={`/case/${c.id}`}
               className="flex items-center gap-4 bg-card rounded-xl border border-border px-5 py-4 hover:bg-muted/30 transition group"
             >
-              <div className="p-2.5 rounded-xl bg-blue-500/10">
-                <Box className="w-5 h-5 text-blue-400" />
+              <div className="p-2.5 rounded-xl bg-primary/10">
+                <Box className="w-5 h-5 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-semibold group-hover:text-primary transition truncate">{c.name}</div>

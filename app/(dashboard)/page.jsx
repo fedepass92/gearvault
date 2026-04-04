@@ -17,7 +17,7 @@ const CATEGORY_LABELS = {
 }
 
 const STATUS_STYLES = {
-  planned: 'bg-slate-700 text-slate-300',
+  planned: 'bg-muted text-muted-foreground',
   out: 'bg-amber-500/20 text-amber-300',
   returned: 'bg-emerald-500/20 text-emerald-300',
   incomplete: 'bg-red-500/20 text-red-300',
