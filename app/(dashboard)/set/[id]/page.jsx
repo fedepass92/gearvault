@@ -12,9 +12,24 @@ import {
   Loader2, Search, X, Trash2, Package, ArrowUpRight, RotateCcw,
   FileDown, ImageOff, Upload, MessageSquare, ChevronDown, ChevronUp,
   Battery, BatteryLow, BatteryCharging, Minus, Box, Layers, Camera,
+  Pencil,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { it } from 'date-fns/locale'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from '@/components/ui/dialog'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
 
 const STATUS_STYLES = {
   planned: 'bg-muted text-muted-foreground',
@@ -79,6 +94,11 @@ export default function SetDetailPage({ params }) {
   const [confirmScan, setConfirmScan] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(false)
   const [showCamera, setShowCamera] = useState(false)
+  const [showEdit, setShowEdit] = useState(false)
+  const [editForm, setEditForm] = useState({})
+  const [editSaving, setEditSaving] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   // Notes
   const [notes, setNotes] = useState([])
@@ -314,6 +334,36 @@ export default function SetDetailPage({ params }) {
     }
   }
 
+  async function handleEditSave(e) {
+    e.preventDefault()
+    setEditSaving(true)
+    const supabase = getSupabase()
+    const { data: updated } = await supabase
+      .from('sets')
+      .update({
+        name: editForm.name,
+        job_date: editForm.job_date || null,
+        location: editForm.location || null,
+        notes: editForm.notes || null,
+        status: editForm.status,
+      })
+      .eq('id', id)
+      .select()
+      .single()
+    if (updated) setSet(updated)
+    setEditSaving(false)
+    setShowEdit(false)
+  }
+
+  async function handleDelete() {
+    setDeleting(true)
+    const supabase = getSupabase()
+    await supabase.from('set_notes').delete().eq('set_id', id)
+    await supabase.from('set_items').delete().eq('set_id', id)
+    await supabase.from('sets').delete().eq('id', id)
+    router.push('/set')
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -350,14 +400,23 @@ export default function SetDetailPage({ params }) {
             <span>{items.length} item nel set</span>
           </div>
         </div>
-        <button
-          onClick={handleExportPDF}
-          disabled={pdfLoading || items.length === 0}
-          className="flex items-center gap-2 px-3 py-2 bg-muted hover:bg-muted/70 disabled:opacity-40 text-muted-foreground rounded-lg text-sm font-medium transition flex-shrink-0"
-        >
-          {pdfLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
-          <span className="hidden sm:inline">PDF Assicurazione</span>
-        </button>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button
+            onClick={() => { setEditForm({ name: set.name, job_date: set.job_date?.slice(0, 10) || '', location: set.location || '', notes: set.notes || '', status: set.status }); setShowEdit(true) }}
+            className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition"
+            title="Modifica set"
+          >
+            <Pencil className="w-4 h-4" />
+          </button>
+          <button
+            onClick={handleExportPDF}
+            disabled={pdfLoading || items.length === 0}
+            className="flex items-center gap-2 px-3 py-2 bg-muted hover:bg-muted/70 disabled:opacity-40 text-muted-foreground rounded-lg text-sm font-medium transition"
+          >
+            {pdfLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+            <span className="hidden sm:inline">PDF</span>
+          </button>
+        </div>
       </div>
 
       {set.notes && (
@@ -805,6 +864,78 @@ export default function SetDetailPage({ params }) {
           onClose={() => setShowCamera(false)}
         />
       )}
+
+      {/* Edit set dialog */}
+      <Dialog open={showEdit} onOpenChange={(o) => { if (!o) setShowEdit(false) }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Modifica set</DialogTitle></DialogHeader>
+          <form onSubmit={handleEditSave} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Nome set *</Label>
+              <Input value={editForm.name || ''} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} required />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Data lavoro</Label>
+                <Input type="date" value={editForm.job_date || ''} onChange={(e) => setEditForm((f) => ({ ...f, job_date: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Location</Label>
+                <Input value={editForm.location || ''} onChange={(e) => setEditForm((f) => ({ ...f, location: e.target.value }))} placeholder="Es. Studio Roma" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Stato</Label>
+              <Select value={editForm.status || 'planned'} onValueChange={(v) => setEditForm((f) => ({ ...f, status: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="planned">Pianificato</SelectItem>
+                  <SelectItem value="out">In uscita</SelectItem>
+                  <SelectItem value="returned">Rientrato</SelectItem>
+                  <SelectItem value="incomplete">Incompleto</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Note</Label>
+              <Textarea value={editForm.notes || ''} onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))} rows={3} className="resize-none" />
+            </div>
+            <DialogFooter className="gap-2 pt-2">
+              <Button type="button" variant="ghost" size="sm" className="text-destructive hover:text-destructive mr-auto" onClick={() => { setShowEdit(false); setShowDeleteConfirm(true) }}>
+                Elimina set
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setShowEdit(false)}>Annulla</Button>
+              <Button type="submit" disabled={editSaving}>
+                {editSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                Salva
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirm */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Elimina set</AlertDialogTitle>
+            <AlertDialogDescription>
+              Sei sicuro di voler eliminare <strong className="text-foreground">{set.name}</strong>? Verranno eliminati anche tutti gli item e le note associate. L&apos;operazione è irreversibile.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting && <Loader2 className="w-4 h-4 animate-spin" />}
+              Elimina
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
