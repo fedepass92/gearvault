@@ -16,7 +16,7 @@ import { format } from 'date-fns'
 import { it } from 'date-fns/locale'
 
 const STATUS_STYLES = {
-  planned: 'bg-slate-700 text-slate-300',
+  planned: 'bg-muted text-muted-foreground',
   out: 'bg-amber-500/20 text-amber-300',
   returned: 'bg-emerald-500/20 text-emerald-300',
   incomplete: 'bg-red-500/20 text-red-300',
@@ -24,14 +24,14 @@ const STATUS_STYLES = {
 const STATUS_LABELS = { planned: 'Pianificato', out: 'In uscita', returned: 'Rientrato', incomplete: 'Incompleto' }
 
 const ITEM_STATUS_STYLES = {
-  planned: 'bg-slate-700/50 text-slate-400',
+  planned: 'bg-muted/50 text-muted-foreground',
   out: 'bg-amber-500/20 text-amber-300',
   returned: 'bg-emerald-500/20 text-emerald-300',
 }
 const ITEM_STATUS_LABELS = { planned: 'Pianificato', out: 'Fuori', returned: 'Rientrato' }
 
 const BATTERY_ICON = { charged: Battery, charging: BatteryCharging, low: BatteryLow, na: Minus }
-const BATTERY_COLOR = { charged: 'text-emerald-400', charging: 'text-blue-400', low: 'text-red-400', na: 'text-slate-600' }
+const BATTERY_COLOR = { charged: 'text-emerald-400', charging: 'text-primary', low: 'text-red-400', na: 'text-muted-foreground' }
 
 /** Compress image via Canvas API before upload */
 async function compressImage(file) {
@@ -300,7 +300,7 @@ export default function SetDetailPage({ params }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-6 h-6 animate-spin text-blue-400" />
+        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
       </div>
     )
   }
@@ -316,63 +316,61 @@ export default function SetDetailPage({ params }) {
       <div className="flex items-start gap-3">
         <button
           onClick={() => router.back()}
-          className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition mt-0.5"
+          className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition mt-0.5"
         >
           <ArrowLeft className="w-4 h-4" />
         </button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-xl font-bold text-white truncate">{set.name}</h1>
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_STYLES[set.status] || 'bg-slate-700 text-slate-300'}`}>
+            <h1 className="text-xl font-bold truncate">{set.name}</h1>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_STYLES[set.status] || 'bg-muted text-muted-foreground'}`}>
               {STATUS_LABELS[set.status] || set.status}
             </span>
           </div>
-          <div className="text-xs text-slate-500 mt-1 flex items-center gap-3 flex-wrap">
+          <div className="text-xs text-muted-foreground mt-1 flex items-center gap-3 flex-wrap">
             {set.job_date && <span>{format(new Date(set.job_date), 'd MMMM yyyy', { locale: it })}</span>}
             {set.location && <span>{set.location}</span>}
             <span>{items.length} item nel set</span>
           </div>
         </div>
-        {/* Export PDF */}
         <button
           onClick={handleExportPDF}
           disabled={pdfLoading || items.length === 0}
-          className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-40 text-slate-300 rounded-lg text-sm font-medium transition flex-shrink-0"
+          className="flex items-center gap-2 px-3 py-2 bg-muted hover:bg-muted/70 disabled:opacity-40 text-muted-foreground rounded-lg text-sm font-medium transition flex-shrink-0"
         >
           {pdfLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
           <span className="hidden sm:inline">PDF Assicurazione</span>
         </button>
       </div>
 
-      {/* Notes */}
       {set.notes && (
-        <div className="bg-slate-800 rounded-xl border border-slate-700/50 px-4 py-3 text-sm text-slate-400">
+        <div className="bg-card rounded-xl border border-border px-4 py-3 text-sm text-muted-foreground">
           {set.notes}
         </div>
       )}
 
       {/* Scanner mode banner */}
       {scanMode && (
-        <div className={`rounded-xl border p-4 ${scanMode === 'out' ? 'bg-amber-500/10 border-amber-500/30' : 'bg-blue-500/10 border-blue-500/30'}`}>
+        <div className={`rounded-xl border p-4 ${scanMode === 'out' ? 'bg-amber-500/10 border-amber-500/30' : 'bg-primary/10 border-primary/30'}`}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <Scan className={`w-4 h-4 scanner-active ${scanMode === 'out' ? 'text-amber-400' : 'text-blue-400'}`} />
-              <span className="text-sm font-semibold text-white">
+              <Scan className={`w-4 h-4 scanner-active ${scanMode === 'out' ? 'text-amber-400' : 'text-primary'}`} />
+              <span className="text-sm font-semibold">
                 {scanMode === 'out' ? 'Modalità uscita attiva' : 'Modalità rientro attiva'}
               </span>
             </div>
             <button
               onClick={() => { setScanMode(null); setScannedIds(new Set()); setLastScanResult(null) }}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition"
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
-          <p className="text-xs text-slate-400 mb-3">
+          <p className="text-xs text-muted-foreground mb-3">
             Scansiona i codici QR o barcode degli item. {scannedIds.size}/{scanMode === 'out' ? items.length : outItems.length} scansionati.
           </p>
           {lastScanResult && (
-            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm mb-3 ${lastScanResult.status === 'ok' ? 'bg-emerald-500/10 text-emerald-300' : 'bg-red-500/10 text-red-300'}`}>
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm mb-3 ${lastScanResult.status === 'ok' ? 'bg-emerald-500/10 text-emerald-300' : 'bg-destructive/10 text-destructive'}`}>
               {lastScanResult.status === 'ok' ? (
                 <><CheckCircle2 className="w-4 h-4 flex-shrink-0" /> {lastScanResult.item?.name} scansionato</>
               ) : (
@@ -383,7 +381,7 @@ export default function SetDetailPage({ params }) {
           <button
             onClick={() => setConfirmScan(true)}
             disabled={scannedIds.size === 0}
-            className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white rounded-lg text-xs font-medium transition"
+            className="w-full px-3 py-2 bg-primary hover:bg-primary/90 disabled:opacity-40 text-primary-foreground rounded-lg text-xs font-medium transition"
           >
             {scanMode === 'out' ? 'Conferma uscita' : 'Conferma rientro'}
           </button>
@@ -395,7 +393,7 @@ export default function SetDetailPage({ params }) {
         <div className="flex gap-3 flex-wrap">
           <button
             onClick={() => setShowAddPicker(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm font-medium transition"
+            className="flex items-center gap-2 px-4 py-2 bg-muted hover:bg-muted/70 text-muted-foreground rounded-lg text-sm font-medium transition"
           >
             <Plus className="w-4 h-4" />
             Aggiungi item
@@ -412,7 +410,7 @@ export default function SetDetailPage({ params }) {
           {items.some((i) => i.status === 'out') && (
             <button
               onClick={() => { setScanMode('in'); setScannedIds(new Set()); setLastScanResult(null) }}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition"
+              className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm font-medium transition"
             >
               <RotateCcw className="w-4 h-4" />
               Rientro
@@ -422,17 +420,17 @@ export default function SetDetailPage({ params }) {
       )}
 
       {/* Items list */}
-      <div className="bg-slate-800 rounded-xl border border-slate-700/50 overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-700/50">
-          <h2 className="text-sm font-semibold text-white">Attrezzatura nel set</h2>
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <div className="px-4 py-3 border-b border-border">
+          <h2 className="text-sm font-semibold">Attrezzatura nel set</h2>
         </div>
         {items.length === 0 ? (
-          <div className="text-center py-12 text-slate-500">
+          <div className="text-center py-12 text-muted-foreground">
             <Package className="w-8 h-8 mx-auto mb-2 opacity-40" />
             <p className="text-sm">Nessun item aggiunto al set</p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-700/30">
+          <div className="divide-y divide-border/50">
             {items.map((item) => {
               const isScanned = scannedIds.has(item.equipment_id)
               const isMissing = scanMode === 'in' && item.status === 'out' && !isScanned
@@ -451,27 +449,27 @@ export default function SetDetailPage({ params }) {
                       ) : isMissing ? (
                         <AlertTriangle className="w-5 h-5 text-red-400" />
                       ) : (
-                        <div className="w-5 h-5 rounded-full border-2 border-slate-600" />
+                        <div className="w-5 h-5 rounded-full border-2 border-border" />
                       )}
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-white truncate">{item.equipment?.name || 'Item eliminato'}</div>
-                    <div className="text-xs text-slate-500">
+                    <div className="text-sm font-medium truncate">{item.equipment?.name || 'Item eliminato'}</div>
+                    <div className="text-xs text-muted-foreground">
                       {[item.equipment?.brand, item.equipment?.model].filter(Boolean).join(' · ')}
                       {item.equipment?.serial_number ? ` · S/N: ${item.equipment.serial_number}` : ''}
                     </div>
                   </div>
                   {!scanMode && item.equipment?.battery_status && (
-                    <BattIcon className={`w-4 h-4 flex-shrink-0 ${BATTERY_COLOR[item.equipment.battery_status] || 'text-slate-600'}`} />
+                    <BattIcon className={`w-4 h-4 flex-shrink-0 ${BATTERY_COLOR[item.equipment.battery_status]}`} />
                   )}
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${ITEM_STATUS_STYLES[item.status] || 'bg-slate-700 text-slate-400'}`}>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${ITEM_STATUS_STYLES[item.status] || 'bg-muted text-muted-foreground'}`}>
                     {ITEM_STATUS_LABELS[item.status] || item.status}
                   </span>
                   {!scanMode && (
                     <button
                       onClick={() => removeItem(item.id)}
-                      className="p-1.5 rounded-lg text-slate-600 hover:text-red-400 hover:bg-slate-700 transition flex-shrink-0"
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition flex-shrink-0"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -484,19 +482,19 @@ export default function SetDetailPage({ params }) {
       </div>
 
       {/* Pre/Post Notes */}
-      <div className="bg-slate-800 rounded-xl border border-slate-700/50 overflow-hidden">
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
         <button
-          className="w-full flex items-center justify-between px-4 py-3 border-b border-slate-700/50 hover:bg-slate-700/20 transition"
+          className="w-full flex items-center justify-between px-4 py-3 border-b border-border hover:bg-muted/20 transition"
           onClick={() => setNotesExpanded((v) => !v)}
         >
           <div className="flex items-center gap-2">
-            <MessageSquare className="w-4 h-4 text-slate-400" />
-            <h2 className="text-sm font-semibold text-white">Note pre/post set</h2>
+            <MessageSquare className="w-4 h-4 text-muted-foreground" />
+            <h2 className="text-sm font-semibold">Note pre/post set</h2>
             {notes.length > 0 && (
-              <span className="text-xs bg-slate-700 text-slate-400 px-1.5 py-0.5 rounded-full">{notes.length}</span>
+              <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">{notes.length}</span>
             )}
           </div>
-          {notesExpanded ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
+          {notesExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
         </button>
 
         {notesExpanded && (
@@ -505,14 +503,14 @@ export default function SetDetailPage({ params }) {
             <div className="flex gap-2">
               <button
                 onClick={() => { setShowNoteForm('pre'); setNoteBody(''); setNotePhotoUrl('') }}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-xs font-medium transition"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-muted hover:bg-muted/70 text-muted-foreground rounded-lg text-xs font-medium transition"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Nota pre-set
               </button>
               <button
                 onClick={() => { setShowNoteForm('post'); setNoteBody(''); setNotePhotoUrl('') }}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-xs font-medium transition"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-muted hover:bg-muted/70 text-muted-foreground rounded-lg text-xs font-medium transition"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Nota post-set
@@ -521,12 +519,12 @@ export default function SetDetailPage({ params }) {
 
             {/* Note form */}
             {showNoteForm && (
-              <div className="bg-slate-900 rounded-xl border border-slate-700 p-4 space-y-3">
+              <div className="bg-background rounded-xl border border-border p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     {showNoteForm === 'pre' ? 'Nota pre-set' : 'Nota post-set'}
                   </span>
-                  <button onClick={() => setShowNoteForm(null)} className="p-1 text-slate-500 hover:text-white transition">
+                  <button onClick={() => setShowNoteForm(null)} className="p-1 text-muted-foreground hover:text-foreground transition">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
@@ -535,20 +533,20 @@ export default function SetDetailPage({ params }) {
                   onChange={(e) => setNoteBody(e.target.value)}
                   rows={3}
                   placeholder="Scrivi una nota…"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none transition"
+                  className="w-full bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none transition"
                 />
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
                     onClick={() => notePhotoRef.current?.click()}
                     disabled={noteUploading}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-xs font-medium transition disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-muted hover:bg-muted/70 text-muted-foreground rounded-lg text-xs font-medium transition disabled:opacity-50"
                   >
                     {noteUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
                     {noteUploading ? 'Caricamento…' : 'Foto'}
                   </button>
                   {notePhotoUrl && (
-                    <div className="relative w-12 h-12 rounded-lg overflow-hidden border border-slate-700">
+                    <div className="relative w-12 h-12 rounded-lg overflow-hidden border border-border">
                       <Image src={notePhotoUrl} alt="nota" fill className="object-cover" />
                       <button
                         onClick={() => setNotePhotoUrl('')}
@@ -562,7 +560,7 @@ export default function SetDetailPage({ params }) {
                   <button
                     onClick={saveNote}
                     disabled={noteSaving || (!noteBody && !notePhotoUrl)}
-                    className="ml-auto flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white rounded-lg text-xs font-medium transition"
+                    className="ml-auto flex items-center gap-1.5 px-4 py-1.5 bg-primary hover:bg-primary/90 disabled:opacity-40 text-primary-foreground rounded-lg text-xs font-medium transition"
                   >
                     {noteSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                     Salva nota
@@ -573,30 +571,30 @@ export default function SetDetailPage({ params }) {
 
             {/* Notes list */}
             {notes.length === 0 && !showNoteForm && (
-              <p className="text-xs text-slate-500 text-center py-2">Nessuna nota aggiunta</p>
+              <p className="text-xs text-muted-foreground text-center py-2">Nessuna nota aggiunta</p>
             )}
-            {[{ label: 'Pre-set', items: preNotes, color: 'text-amber-400' }, { label: 'Post-set', items: postNotes, color: 'text-blue-400' }].map(({ label, items: noteList, color }) =>
+            {[{ label: 'Pre-set', items: preNotes, color: 'text-amber-400' }, { label: 'Post-set', items: postNotes, color: 'text-primary' }].map(({ label, items: noteList, color }) =>
               noteList.length > 0 ? (
                 <div key={label}>
                   <div className={`text-xs font-semibold uppercase tracking-wider mb-2 ${color}`}>{label}</div>
                   <div className="space-y-2">
                     {noteList.map((note) => (
-                      <div key={note.id} className="bg-slate-900 rounded-lg border border-slate-700/50 p-3">
+                      <div key={note.id} className="bg-background rounded-lg border border-border p-3">
                         <div className="flex items-start justify-between gap-2 mb-2">
-                          <span className="text-[10px] text-slate-500">
+                          <span className="text-[10px] text-muted-foreground">
                             {format(new Date(note.created_at), 'd MMM yyyy HH:mm', { locale: it })}
                             {note.profiles?.full_name ? ` · ${note.profiles.full_name}` : ''}
                           </span>
                           <button
                             onClick={() => deleteNote(note.id)}
-                            className="text-slate-600 hover:text-red-400 transition flex-shrink-0"
+                            className="text-muted-foreground hover:text-destructive transition flex-shrink-0"
                           >
                             <Trash2 className="w-3 h-3" />
                           </button>
                         </div>
-                        {note.body && <p className="text-sm text-slate-300">{note.body}</p>}
+                        {note.body && <p className="text-sm text-foreground">{note.body}</p>}
                         {note.photo_url && (
-                          <div className="mt-2 rounded-lg overflow-hidden border border-slate-700" style={{ maxWidth: 200 }}>
+                          <div className="mt-2 rounded-lg overflow-hidden border border-border" style={{ maxWidth: 200 }}>
                             <Image src={note.photo_url} alt="nota" width={200} height={150} className="object-cover w-full" />
                           </div>
                         )}
@@ -613,26 +611,26 @@ export default function SetDetailPage({ params }) {
       {/* Confirm scan dialog */}
       {confirmScan && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-slate-800 rounded-2xl border border-slate-700 p-6 w-full max-w-sm shadow-2xl">
-            <h3 className="text-base font-semibold text-white mb-2">
+          <div className="bg-popover rounded-2xl border border-border p-6 w-full max-w-sm shadow-2xl">
+            <h3 className="text-base font-semibold mb-2">
               {scanMode === 'out' ? 'Conferma uscita' : 'Conferma rientro'}
             </h3>
-            <p className="text-sm text-slate-400 mb-1">Item scansionati: <span className="text-white font-medium">{scannedIds.size}</span></p>
+            <p className="text-sm text-muted-foreground mb-1">Item scansionati: <span className="text-foreground font-medium">{scannedIds.size}</span></p>
             {scanMode === 'in' && (
-              <p className="text-sm text-slate-400 mb-4">
+              <p className="text-sm text-muted-foreground mb-4">
                 Item mancanti: <span className={outItems.length - scannedIds.size > 0 ? 'text-red-400 font-medium' : 'text-emerald-400 font-medium'}>
                   {outItems.length - scannedIds.size}
                 </span>
               </p>
             )}
             {scanMode === 'out' && (
-              <p className="text-sm text-slate-400 mb-4">
-                Non scansionati: <span className="text-slate-300 font-medium">{items.length - scannedIds.size}</span> (rimarranno pianificati)
+              <p className="text-sm text-muted-foreground mb-4">
+                Non scansionati: <span className="text-foreground font-medium">{items.length - scannedIds.size}</span> (rimarranno pianificati)
               </p>
             )}
             <div className="flex gap-3">
-              <button onClick={() => setConfirmScan(false)} className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm font-medium transition">Annulla</button>
-              <button onClick={scanMode === 'out' ? confirmOut : confirmIn} className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition">Conferma</button>
+              <button onClick={() => setConfirmScan(false)} className="flex-1 px-4 py-2 bg-muted hover:bg-muted/70 text-muted-foreground rounded-lg text-sm font-medium transition">Annulla</button>
+              <button onClick={scanMode === 'out' ? confirmOut : confirmIn} className="flex-1 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm font-medium transition">Conferma</button>
             </div>
           </div>
         </div>
@@ -641,28 +639,28 @@ export default function SetDetailPage({ params }) {
       {/* Add item picker */}
       {showAddPicker && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-lg shadow-2xl flex flex-col max-h-[80vh]">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700/50">
-              <h2 className="text-base font-semibold text-white">Aggiungi al set</h2>
-              <button onClick={() => { setShowAddPicker(false); setPickerSearch(''); setPickerTab('attrezzatura') }} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition">
+          <div className="bg-card rounded-2xl border border-border w-full max-w-lg shadow-2xl flex flex-col max-h-[80vh]">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+              <h2 className="text-base font-semibold">Aggiungi al set</h2>
+              <button onClick={() => { setShowAddPicker(false); setPickerSearch(''); setPickerTab('attrezzatura') }} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="px-4 py-3 border-b border-slate-700/50">
+            <div className="px-4 py-3 border-b border-border">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
                   type="text"
                   value={pickerSearch}
                   onChange={(e) => setPickerSearch(e.target.value)}
                   placeholder="Cerca…"
                   autoFocus
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                  className="w-full bg-background border border-border rounded-lg pl-9 pr-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
                 />
               </div>
             </div>
             {/* Tabs */}
-            <div className="flex border-b border-slate-700/50">
+            <div className="flex border-b border-border">
               {[
                 { id: 'attrezzatura', label: 'Attrezzatura', icon: Package },
                 { id: 'case', label: 'Case', icon: Box },
@@ -673,8 +671,8 @@ export default function SetDetailPage({ params }) {
                   onClick={() => setPickerTab(tabId)}
                   className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-medium transition border-b-2 -mb-px ${
                     pickerTab === tabId
-                      ? 'border-blue-500 text-blue-400'
-                      : 'border-transparent text-slate-400 hover:text-white'
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   <Icon className="w-3.5 h-3.5" />
@@ -685,26 +683,26 @@ export default function SetDetailPage({ params }) {
             <div className="overflow-y-auto flex-1">
               {pickerTab === 'attrezzatura' && (
                 availableEquipment.length === 0 ? (
-                  <div className="text-center py-10 text-slate-500 text-sm">Nessuna attrezzatura disponibile</div>
+                  <div className="text-center py-10 text-muted-foreground text-sm">Nessuna attrezzatura disponibile</div>
                 ) : (
-                  <div className="divide-y divide-slate-700/30">
+                  <div className="divide-y divide-border/50">
                     {availableEquipment.map((eq) => {
                       const BattIcon = BATTERY_ICON[eq.battery_status] || Minus
                       return (
                         <button
                           key={eq.id}
                           onClick={() => addItem(eq)}
-                          className="w-full flex items-center gap-3 px-5 py-3 hover:bg-slate-700/50 transition text-left"
+                          className="w-full flex items-center gap-3 px-5 py-3 hover:bg-muted/30 transition text-left"
                         >
                           <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium text-white truncate">{eq.name}</div>
-                            <div className="text-xs text-slate-500">
+                            <div className="text-sm font-medium truncate">{eq.name}</div>
+                            <div className="text-xs text-muted-foreground">
                               {[eq.brand, eq.model].filter(Boolean).join(' · ')}
                               {eq.serial_number ? ` · S/N: ${eq.serial_number}` : ''}
                             </div>
                           </div>
-                          <BattIcon className={`w-4 h-4 flex-shrink-0 ${BATTERY_COLOR[eq.battery_status] || 'text-slate-600'}`} />
-                          <Plus className="w-4 h-4 text-slate-500" />
+                          <BattIcon className={`w-4 h-4 flex-shrink-0 ${BATTERY_COLOR[eq.battery_status] || 'text-muted-foreground'}`} />
+                          <Plus className="w-4 h-4 text-muted-foreground" />
                         </button>
                       )
                     })}
@@ -713,9 +711,9 @@ export default function SetDetailPage({ params }) {
               )}
               {pickerTab === 'case' && (
                 availableCases.length === 0 ? (
-                  <div className="text-center py-10 text-slate-500 text-sm">Nessun case disponibile</div>
+                  <div className="text-center py-10 text-muted-foreground text-sm">Nessun case disponibile</div>
                 ) : (
-                  <div className="divide-y divide-slate-700/30">
+                  <div className="divide-y divide-border/50">
                     {availableCases.map((c) => {
                       const addedIds = new Set(items.map((i) => i.equipment_id))
                       const newCount = (c.case_items || []).filter((ci) => ci.equipment && !addedIds.has(ci.equipment.id)).length
@@ -723,17 +721,17 @@ export default function SetDetailPage({ params }) {
                         <button
                           key={c.id}
                           onClick={() => addCase(c)}
-                          className="w-full flex items-center gap-3 px-5 py-3 hover:bg-slate-700/50 transition text-left"
+                          className="w-full flex items-center gap-3 px-5 py-3 hover:bg-muted/30 transition text-left"
                         >
-                          <Box className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                          <Box className="w-4 h-4 text-primary flex-shrink-0" />
                           <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium text-white truncate">{c.name}</div>
-                            <div className="text-xs text-slate-500">
+                            <div className="text-sm font-medium truncate">{c.name}</div>
+                            <div className="text-xs text-muted-foreground">
                               {newCount} item da aggiungere
                               {c.description ? ` · ${c.description}` : ''}
                             </div>
                           </div>
-                          <Plus className="w-4 h-4 text-slate-500" />
+                          <Plus className="w-4 h-4 text-muted-foreground" />
                         </button>
                       )
                     })}
@@ -742,9 +740,9 @@ export default function SetDetailPage({ params }) {
               )}
               {pickerTab === 'kit' && (
                 availableKits.length === 0 ? (
-                  <div className="text-center py-10 text-slate-500 text-sm">Nessun kit disponibile</div>
+                  <div className="text-center py-10 text-muted-foreground text-sm">Nessun kit disponibile</div>
                 ) : (
-                  <div className="divide-y divide-slate-700/30">
+                  <div className="divide-y divide-border/50">
                     {availableKits.map((k) => {
                       const addedIds = new Set(items.map((i) => i.equipment_id))
                       const newCount = (k.kit_items || []).filter((ki) => ki.equipment && !addedIds.has(ki.equipment.id)).length
@@ -752,17 +750,17 @@ export default function SetDetailPage({ params }) {
                         <button
                           key={k.id}
                           onClick={() => addKit(k)}
-                          className="w-full flex items-center gap-3 px-5 py-3 hover:bg-slate-700/50 transition text-left"
+                          className="w-full flex items-center gap-3 px-5 py-3 hover:bg-muted/30 transition text-left"
                         >
                           <Layers className="w-4 h-4 text-violet-400 flex-shrink-0" />
                           <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium text-white truncate">{k.name}</div>
-                            <div className="text-xs text-slate-500">
+                            <div className="text-sm font-medium truncate">{k.name}</div>
+                            <div className="text-xs text-muted-foreground">
                               {newCount} item da aggiungere
                               {k.description ? ` · ${k.description}` : ''}
                             </div>
                           </div>
-                          <Plus className="w-4 h-4 text-slate-500" />
+                          <Plus className="w-4 h-4 text-muted-foreground" />
                         </button>
                       )
                     })}
