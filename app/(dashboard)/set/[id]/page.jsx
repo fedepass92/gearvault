@@ -10,7 +10,7 @@ import {
   ArrowLeft, Plus, Scan, CheckCircle2, XCircle, AlertTriangle,
   Loader2, Search, X, Trash2, Package, ArrowUpRight, RotateCcw,
   FileDown, ImageOff, Upload, MessageSquare, ChevronDown, ChevronUp,
-  Battery, BatteryLow, BatteryCharging, Minus,
+  Battery, BatteryLow, BatteryCharging, Minus, Box, Layers,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { it } from 'date-fns/locale'
@@ -71,7 +71,10 @@ export default function SetDetailPage({ params }) {
   const [lastScanResult, setLastScanResult] = useState(null)
   const [showAddPicker, setShowAddPicker] = useState(false)
   const [pickerSearch, setPickerSearch] = useState('')
+  const [pickerTab, setPickerTab] = useState('attrezzatura')
   const [availableEquipment, setAvailableEquipment] = useState([])
+  const [availableCases, setAvailableCases] = useState([])
+  const [availableKits, setAvailableKits] = useState([])
   const [confirmScan, setConfirmScan] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(false)
 
@@ -113,20 +116,61 @@ export default function SetDetailPage({ params }) {
 
   useEffect(() => {
     if (!showAddPicker) return
-    async function fetchEquipment() {
+    async function fetchAvailable() {
       const supabase = getSupabase()
-      let q = supabase.from('equipment').select('id, name, brand, model, serial_number, battery_status').order('name')
-      if (pickerSearch) q = q.or(`name.ilike.%${pickerSearch}%,serial_number.ilike.%${pickerSearch}%,brand.ilike.%${pickerSearch}%`)
-      const { data } = await q
       const addedIds = new Set(items.map((i) => i.equipment_id))
-      setAvailableEquipment((data || []).filter((e) => !addedIds.has(e.id)))
+      const searchLower = pickerSearch.toLowerCase()
+
+      const [eqRes, casesRes, kitsRes] = await Promise.all([
+        (() => {
+          let q = supabase.from('equipment').select('id, name, brand, model, serial_number, battery_status').order('name')
+          if (pickerSearch) q = q.or(`name.ilike.%${pickerSearch}%,serial_number.ilike.%${pickerSearch}%,brand.ilike.%${pickerSearch}%`)
+          return q
+        })(),
+        supabase.from('cases').select('id, name, description, case_items(equipment_id, equipment(id, name, brand, model, serial_number, battery_status))').order('name'),
+        supabase.from('kits').select('id, name, description, kit_items(equipment_id, equipment(id, name, brand, model, serial_number, battery_status))').order('name'),
+      ])
+
+      setAvailableEquipment((eqRes.data || []).filter((e) => !addedIds.has(e.id)))
+      setAvailableCases(
+        (casesRes.data || [])
+          .filter((c) => !pickerSearch || c.name.toLowerCase().includes(searchLower))
+      )
+      setAvailableKits(
+        (kitsRes.data || [])
+          .filter((k) => !pickerSearch || k.name.toLowerCase().includes(searchLower))
+      )
     }
-    fetchEquipment()
+    fetchAvailable()
   }, [showAddPicker, pickerSearch, items])
 
   async function addItem(equipment) {
     const supabase = getSupabase()
     await supabase.from('set_items').insert({ set_id: id, equipment_id: equipment.id, status: 'planned' })
+    setShowAddPicker(false)
+    fetchSet()
+  }
+
+  async function addCase(caseItem) {
+    const supabase = getSupabase()
+    const addedIds = new Set(items.map((i) => i.equipment_id))
+    const toAdd = (caseItem.case_items || [])
+      .map((ci) => ci.equipment)
+      .filter((eq) => eq && !addedIds.has(eq.id))
+      .map((eq) => ({ set_id: id, equipment_id: eq.id, status: 'planned' }))
+    if (toAdd.length > 0) await supabase.from('set_items').insert(toAdd)
+    setShowAddPicker(false)
+    fetchSet()
+  }
+
+  async function addKit(kitItem) {
+    const supabase = getSupabase()
+    const addedIds = new Set(items.map((i) => i.equipment_id))
+    const toAdd = (kitItem.kit_items || [])
+      .map((ki) => ki.equipment)
+      .filter((eq) => eq && !addedIds.has(eq.id))
+      .map((eq) => ({ set_id: id, equipment_id: eq.id, status: 'planned' }))
+    if (toAdd.length > 0) await supabase.from('set_items').insert(toAdd)
     setShowAddPicker(false)
     fetchSet()
   }
@@ -599,8 +643,8 @@ export default function SetDetailPage({ params }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-lg shadow-2xl flex flex-col max-h-[80vh]">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700/50">
-              <h2 className="text-base font-semibold text-white">Aggiungi attrezzatura al set</h2>
-              <button onClick={() => { setShowAddPicker(false); setPickerSearch('') }} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition">
+              <h2 className="text-base font-semibold text-white">Aggiungi al set</h2>
+              <button onClick={() => { setShowAddPicker(false); setPickerSearch(''); setPickerTab('attrezzatura') }} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -611,38 +655,119 @@ export default function SetDetailPage({ params }) {
                   type="text"
                   value={pickerSearch}
                   onChange={(e) => setPickerSearch(e.target.value)}
-                  placeholder="Cerca attrezzatura…"
+                  placeholder="Cerca…"
                   autoFocus
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                 />
               </div>
             </div>
+            {/* Tabs */}
+            <div className="flex border-b border-slate-700/50">
+              {[
+                { id: 'attrezzatura', label: 'Attrezzatura', icon: Package },
+                { id: 'case', label: 'Case', icon: Box },
+                { id: 'kit', label: 'Kit', icon: Layers },
+              ].map(({ id: tabId, label, icon: Icon }) => (
+                <button
+                  key={tabId}
+                  onClick={() => setPickerTab(tabId)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-medium transition border-b-2 -mb-px ${
+                    pickerTab === tabId
+                      ? 'border-blue-500 text-blue-400'
+                      : 'border-transparent text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {label}
+                </button>
+              ))}
+            </div>
             <div className="overflow-y-auto flex-1">
-              {availableEquipment.length === 0 ? (
-                <div className="text-center py-10 text-slate-500 text-sm">Nessuna attrezzatura disponibile</div>
-              ) : (
-                <div className="divide-y divide-slate-700/30">
-                  {availableEquipment.map((eq) => {
-                    const BattIcon = BATTERY_ICON[eq.battery_status] || Minus
-                    return (
-                      <button
-                        key={eq.id}
-                        onClick={() => addItem(eq)}
-                        className="w-full flex items-center gap-3 px-5 py-3 hover:bg-slate-700/50 transition text-left"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-white truncate">{eq.name}</div>
-                          <div className="text-xs text-slate-500">
-                            {[eq.brand, eq.model].filter(Boolean).join(' · ')}
-                            {eq.serial_number ? ` · S/N: ${eq.serial_number}` : ''}
+              {pickerTab === 'attrezzatura' && (
+                availableEquipment.length === 0 ? (
+                  <div className="text-center py-10 text-slate-500 text-sm">Nessuna attrezzatura disponibile</div>
+                ) : (
+                  <div className="divide-y divide-slate-700/30">
+                    {availableEquipment.map((eq) => {
+                      const BattIcon = BATTERY_ICON[eq.battery_status] || Minus
+                      return (
+                        <button
+                          key={eq.id}
+                          onClick={() => addItem(eq)}
+                          className="w-full flex items-center gap-3 px-5 py-3 hover:bg-slate-700/50 transition text-left"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-white truncate">{eq.name}</div>
+                            <div className="text-xs text-slate-500">
+                              {[eq.brand, eq.model].filter(Boolean).join(' · ')}
+                              {eq.serial_number ? ` · S/N: ${eq.serial_number}` : ''}
+                            </div>
                           </div>
-                        </div>
-                        <BattIcon className={`w-4 h-4 flex-shrink-0 ${BATTERY_COLOR[eq.battery_status] || 'text-slate-600'}`} />
-                        <Plus className="w-4 h-4 text-slate-500" />
-                      </button>
-                    )
-                  })}
-                </div>
+                          <BattIcon className={`w-4 h-4 flex-shrink-0 ${BATTERY_COLOR[eq.battery_status] || 'text-slate-600'}`} />
+                          <Plus className="w-4 h-4 text-slate-500" />
+                        </button>
+                      )
+                    })}
+                  </div>
+                )
+              )}
+              {pickerTab === 'case' && (
+                availableCases.length === 0 ? (
+                  <div className="text-center py-10 text-slate-500 text-sm">Nessun case disponibile</div>
+                ) : (
+                  <div className="divide-y divide-slate-700/30">
+                    {availableCases.map((c) => {
+                      const addedIds = new Set(items.map((i) => i.equipment_id))
+                      const newCount = (c.case_items || []).filter((ci) => ci.equipment && !addedIds.has(ci.equipment.id)).length
+                      return (
+                        <button
+                          key={c.id}
+                          onClick={() => addCase(c)}
+                          className="w-full flex items-center gap-3 px-5 py-3 hover:bg-slate-700/50 transition text-left"
+                        >
+                          <Box className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-white truncate">{c.name}</div>
+                            <div className="text-xs text-slate-500">
+                              {newCount} item da aggiungere
+                              {c.description ? ` · ${c.description}` : ''}
+                            </div>
+                          </div>
+                          <Plus className="w-4 h-4 text-slate-500" />
+                        </button>
+                      )
+                    })}
+                  </div>
+                )
+              )}
+              {pickerTab === 'kit' && (
+                availableKits.length === 0 ? (
+                  <div className="text-center py-10 text-slate-500 text-sm">Nessun kit disponibile</div>
+                ) : (
+                  <div className="divide-y divide-slate-700/30">
+                    {availableKits.map((k) => {
+                      const addedIds = new Set(items.map((i) => i.equipment_id))
+                      const newCount = (k.kit_items || []).filter((ki) => ki.equipment && !addedIds.has(ki.equipment.id)).length
+                      return (
+                        <button
+                          key={k.id}
+                          onClick={() => addKit(k)}
+                          className="w-full flex items-center gap-3 px-5 py-3 hover:bg-slate-700/50 transition text-left"
+                        >
+                          <Layers className="w-4 h-4 text-violet-400 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-white truncate">{k.name}</div>
+                            <div className="text-xs text-slate-500">
+                              {newCount} item da aggiungere
+                              {k.description ? ` · ${k.description}` : ''}
+                            </div>
+                          </div>
+                          <Plus className="w-4 h-4 text-slate-500" />
+                        </button>
+                      )
+                    })}
+                  </div>
+                )
               )}
             </div>
           </div>

@@ -18,13 +18,15 @@ import {
   ChevronRight,
   Box,
   History,
+  Layers,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
   { href: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/inventario', icon: Package, label: 'Inventario' },
   { href: '/set', icon: Briefcase, label: 'Set Manager' },
-  { href: '/case', icon: Box, label: 'Case / Kit' },
+  { href: '/case', icon: Box, label: 'Case' },
+  { href: '/kit', icon: Layers, label: 'Kit' },
   { href: '/etichette', icon: Tag, label: 'Etichette' },
   { href: '/report', icon: FileText, label: 'Report Assicurativo' },
   { href: '/storico', icon: History, label: 'Storico movimenti' },

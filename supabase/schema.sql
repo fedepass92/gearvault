@@ -17,6 +17,8 @@ CREATE TABLE equipment (
   condition TEXT DEFAULT 'active', -- 'active' | 'repair' | 'retired'
   battery_status TEXT DEFAULT 'na', -- 'charged' | 'low' | 'charging' | 'na'
   last_checked_at TIMESTAMPTZ,
+  location TEXT DEFAULT 'studio', -- 'campo' | 'studio' | 'prestito'
+  useful_life_years INTEGER,
   notes TEXT,
   photo_url TEXT,
   created_at TIMESTAMPTZ DEFAULT now(),
@@ -42,6 +44,22 @@ CREATE TABLE set_items (
   status TEXT DEFAULT 'planned' -- 'planned' | 'out' | 'returned'
 );
 
+CREATE TABLE kits (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE kit_items (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  kit_id UUID REFERENCES kits(id) ON DELETE CASCADE,
+  equipment_id UUID REFERENCES equipment(id) ON DELETE CASCADE,
+  added_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (kit_id, equipment_id)
+);
+
 CREATE TABLE cases (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT NOT NULL,
@@ -56,6 +74,15 @@ CREATE TABLE case_items (
   equipment_id UUID REFERENCES equipment(id) ON DELETE CASCADE,
   added_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE (case_id, equipment_id)
+);
+
+-- A case can contain one or more kits
+CREATE TABLE case_kits (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  case_id UUID REFERENCES cases(id) ON DELETE CASCADE,
+  kit_id UUID REFERENCES kits(id) ON DELETE CASCADE,
+  added_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (case_id, kit_id)
 );
 
 CREATE TABLE movement_log (
@@ -76,6 +103,15 @@ CREATE TABLE set_notes (
   body TEXT,
   photo_url TEXT,
   user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE price_history (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  equipment_id UUID REFERENCES equipment(id) ON DELETE CASCADE,
+  value DECIMAL(10,2) NOT NULL,
+  date DATE NOT NULL DEFAULT CURRENT_DATE,
+  note TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -123,6 +159,10 @@ CREATE TRIGGER update_cases_updated_at
   BEFORE UPDATE ON cases
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TRIGGER update_kits_updated_at
+  BEFORE UPDATE ON kits
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- ─── ROW LEVEL SECURITY ───────────────────────────────────────────────────────
 
 ALTER TABLE equipment ENABLE ROW LEVEL SECURITY;
@@ -131,127 +171,89 @@ ALTER TABLE set_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cases ENABLE ROW LEVEL SECURITY;
 ALTER TABLE case_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE case_kits ENABLE ROW LEVEL SECURITY;
+ALTER TABLE kits ENABLE ROW LEVEL SECURITY;
+ALTER TABLE kit_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE movement_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE set_notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE price_history ENABLE ROW LEVEL SECURITY;
 
--- equipment: all authenticated can SELECT; only admin can INSERT/UPDATE/DELETE
-CREATE POLICY "Authenticated can view equipment"
-  ON equipment FOR SELECT
-  TO authenticated
-  USING (true);
+CREATE POLICY "Authenticated can view equipment" ON equipment FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Admin can insert equipment" ON equipment FOR INSERT TO authenticated WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
+CREATE POLICY "Admin can update equipment" ON equipment FOR UPDATE TO authenticated USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
+CREATE POLICY "Admin can delete equipment" ON equipment FOR DELETE TO authenticated USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
 
-CREATE POLICY "Admin can insert equipment"
-  ON equipment FOR INSERT
-  TO authenticated
-  WITH CHECK (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-  );
+CREATE POLICY "Authenticated can manage sets" ON sets FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Authenticated can manage set_items" ON set_items FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Authenticated can manage cases" ON cases FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Authenticated can manage case_items" ON case_items FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Authenticated can manage case_kits" ON case_kits FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Authenticated can manage kits" ON kits FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Authenticated can manage kit_items" ON kit_items FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Authenticated can view movement_log" ON movement_log FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Authenticated can insert movement_log" ON movement_log FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Authenticated can manage set_notes" ON set_notes FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Authenticated can manage price_history" ON price_history FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
-CREATE POLICY "Admin can update equipment"
-  ON equipment FOR UPDATE
-  TO authenticated
-  USING (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-  );
-
-CREATE POLICY "Admin can delete equipment"
-  ON equipment FOR DELETE
-  TO authenticated
-  USING (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-  );
-
--- sets: all authenticated can CRUD
-CREATE POLICY "Authenticated can manage sets"
-  ON sets FOR ALL
-  TO authenticated
-  USING (true)
-  WITH CHECK (true);
-
--- set_items: all authenticated can CRUD
-CREATE POLICY "Authenticated can manage set_items"
-  ON set_items FOR ALL
-  TO authenticated
-  USING (true)
-  WITH CHECK (true);
-
--- cases: all authenticated can CRUD
-CREATE POLICY "Authenticated can manage cases"
-  ON cases FOR ALL
-  TO authenticated
-  USING (true)
-  WITH CHECK (true);
-
--- case_items: all authenticated can CRUD
-CREATE POLICY "Authenticated can manage case_items"
-  ON case_items FOR ALL
-  TO authenticated
-  USING (true)
-  WITH CHECK (true);
-
--- movement_log: all authenticated can read; insert on action
-CREATE POLICY "Authenticated can view movement_log"
-  ON movement_log FOR SELECT
-  TO authenticated
-  USING (true);
-
-CREATE POLICY "Authenticated can insert movement_log"
-  ON movement_log FOR INSERT
-  TO authenticated
-  WITH CHECK (true);
-
--- set_notes: all authenticated can CRUD
-CREATE POLICY "Authenticated can manage set_notes"
-  ON set_notes FOR ALL
-  TO authenticated
-  USING (true)
-  WITH CHECK (true);
-
--- profiles: authenticated can view all; each user can update their own
-CREATE POLICY "Authenticated can view profiles"
-  ON profiles FOR SELECT
-  TO authenticated
-  USING (true);
-
-CREATE POLICY "Users can update their own profile"
-  ON profiles FOR UPDATE
-  TO authenticated
-  USING (id = auth.uid());
-
-CREATE POLICY "Admin can update any profile"
-  ON profiles FOR UPDATE
-  TO authenticated
-  USING (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-  );
+CREATE POLICY "Authenticated can view profiles" ON profiles FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Users can update their own profile" ON profiles FOR UPDATE TO authenticated USING (id = auth.uid());
+CREATE POLICY "Admin can update any profile" ON profiles FOR UPDATE TO authenticated USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
 
 -- ─── STORAGE BUCKET ──────────────────────────────────────────────────────────
--- Run in Supabase Dashboard > Storage, or via SQL:
 
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('equipment-photos', 'equipment-photos', true)
 ON CONFLICT DO NOTHING;
 
-CREATE POLICY "Public read access for equipment photos"
-  ON storage.objects FOR SELECT
-  USING (bucket_id = 'equipment-photos');
+CREATE POLICY "Public read access for equipment photos" ON storage.objects FOR SELECT USING (bucket_id = 'equipment-photos');
+CREATE POLICY "Authenticated can upload equipment photos" ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id = 'equipment-photos');
+CREATE POLICY "Authenticated can update equipment photos" ON storage.objects FOR UPDATE TO authenticated USING (bucket_id = 'equipment-photos');
+CREATE POLICY "Authenticated can delete equipment photos" ON storage.objects FOR DELETE TO authenticated USING (bucket_id = 'equipment-photos');
 
-CREATE POLICY "Authenticated can upload equipment photos"
-  ON storage.objects FOR INSERT
-  TO authenticated
-  WITH CHECK (bucket_id = 'equipment-photos');
-
-CREATE POLICY "Authenticated can update equipment photos"
-  ON storage.objects FOR UPDATE
-  TO authenticated
-  USING (bucket_id = 'equipment-photos');
-
-CREATE POLICY "Authenticated can delete equipment photos"
-  ON storage.objects FOR DELETE
-  TO authenticated
-  USING (bucket_id = 'equipment-photos');
-
--- ─── MIGRATION (run on existing DB) ─────────────────────────────────────────
+-- ─── MIGRATION (run on existing DB) ──────────────────────────────────────────
+-- Run these ALTER statements on your existing Supabase database:
+--
 -- ALTER TABLE equipment ADD COLUMN IF NOT EXISTS insured_value DECIMAL(10,2);
 -- ALTER TABLE equipment ADD COLUMN IF NOT EXISTS battery_status TEXT DEFAULT 'na';
 -- ALTER TABLE equipment ADD COLUMN IF NOT EXISTS last_checked_at TIMESTAMPTZ;
+-- ALTER TABLE equipment ADD COLUMN IF NOT EXISTS location TEXT DEFAULT 'studio';
+-- ALTER TABLE equipment ADD COLUMN IF NOT EXISTS useful_life_years INTEGER;
+--
+-- CREATE TABLE IF NOT EXISTS kits (
+--   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+--   name TEXT NOT NULL,
+--   description TEXT,
+--   created_at TIMESTAMPTZ DEFAULT now(),
+--   updated_at TIMESTAMPTZ DEFAULT now()
+-- );
+-- CREATE TABLE IF NOT EXISTS kit_items (
+--   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+--   kit_id UUID REFERENCES kits(id) ON DELETE CASCADE,
+--   equipment_id UUID REFERENCES equipment(id) ON DELETE CASCADE,
+--   added_at TIMESTAMPTZ DEFAULT now(),
+--   UNIQUE (kit_id, equipment_id)
+-- );
+-- CREATE TABLE IF NOT EXISTS case_kits (
+--   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+--   case_id UUID REFERENCES cases(id) ON DELETE CASCADE,
+--   kit_id UUID REFERENCES kits(id) ON DELETE CASCADE,
+--   added_at TIMESTAMPTZ DEFAULT now(),
+--   UNIQUE (case_id, kit_id)
+-- );
+-- CREATE TABLE IF NOT EXISTS price_history (
+--   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+--   equipment_id UUID REFERENCES equipment(id) ON DELETE CASCADE,
+--   value DECIMAL(10,2) NOT NULL,
+--   date DATE NOT NULL DEFAULT CURRENT_DATE,
+--   note TEXT,
+--   created_at TIMESTAMPTZ DEFAULT now()
+-- );
+-- ALTER TABLE kits ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE kit_items ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE case_kits ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE price_history ENABLE ROW LEVEL SECURITY;
+-- CREATE POLICY "Authenticated can manage kits" ON kits FOR ALL TO authenticated USING (true) WITH CHECK (true);
+-- CREATE POLICY "Authenticated can manage kit_items" ON kit_items FOR ALL TO authenticated USING (true) WITH CHECK (true);
+-- CREATE POLICY "Authenticated can manage case_kits" ON case_kits FOR ALL TO authenticated USING (true) WITH CHECK (true);
+-- CREATE POLICY "Authenticated can manage price_history" ON price_history FOR ALL TO authenticated USING (true) WITH CHECK (true);
+-- CREATE TRIGGER update_kits_updated_at BEFORE UPDATE ON kits FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

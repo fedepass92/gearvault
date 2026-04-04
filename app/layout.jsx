@@ -18,12 +18,12 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="it" className="h-full">
+    <html lang="it" className="h-full dark">
       <head>
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
-      <body className="h-full bg-slate-900 text-slate-100 antialiased">
+      <body className="h-full bg-background text-foreground antialiased">
         <ScannerProvider>{children}</ScannerProvider>
       </body>
     </html>
