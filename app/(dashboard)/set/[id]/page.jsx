@@ -6,11 +6,12 @@ import Image from 'next/image'
 import { getSupabase } from '@/lib/supabase'
 import { exportSetInsurancePDF } from '@/lib/pdf'
 import { useScannerListener } from '@/components/ScannerContext'
+import CameraScanner from '@/components/CameraScanner'
 import {
   ArrowLeft, Plus, Scan, CheckCircle2, XCircle, AlertTriangle,
   Loader2, Search, X, Trash2, Package, ArrowUpRight, RotateCcw,
   FileDown, ImageOff, Upload, MessageSquare, ChevronDown, ChevronUp,
-  Battery, BatteryLow, BatteryCharging, Minus, Box, Layers,
+  Battery, BatteryLow, BatteryCharging, Minus, Box, Layers, Camera,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { it } from 'date-fns/locale'
@@ -77,6 +78,7 @@ export default function SetDetailPage({ params }) {
   const [availableKits, setAvailableKits] = useState([])
   const [confirmScan, setConfirmScan] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(false)
+  const [showCamera, setShowCamera] = useState(false)
 
   // Notes
   const [notes, setNotes] = useState([])
@@ -181,24 +183,39 @@ export default function SetDetailPage({ params }) {
     fetchSet()
   }
 
-  useScannerListener(
-    useCallback((result) => {
-      if (!scanMode) return
-      const matched = items.find(
-        (i) =>
-          (result.id && i.equipment_id === result.id) ||
-          (result.serial && i.equipment?.serial_number === result.serial) ||
-          (result.type === 'serial' && i.equipment?.serial_number === result.raw)
-      )
-      if (matched) {
-        setScannedIds((prev) => new Set(prev).add(matched.equipment_id))
-        setLastScanResult({ status: 'ok', item: matched.equipment })
-      } else {
-        setLastScanResult({ status: 'unknown', raw: result.raw })
-      }
-    }, [scanMode, items]),
-    scanMode !== null
-  )
+  const handleScanResult = useCallback((result) => {
+    if (!scanMode) return
+    const matched = items.find(
+      (i) =>
+        (result.id && i.equipment_id === result.id) ||
+        (result.serial && i.equipment?.serial_number === result.serial) ||
+        (result.type === 'serial' && i.equipment?.serial_number === result.raw)
+    )
+    if (matched) {
+      setScannedIds((prev) => new Set(prev).add(matched.equipment_id))
+      setLastScanResult({ status: 'ok', item: matched.equipment })
+    } else {
+      setLastScanResult({ status: 'unknown', raw: result.raw })
+    }
+  }, [scanMode, items])
+
+  useScannerListener(handleScanResult, scanMode !== null)
+
+  const handleCameraDetected = useCallback((raw) => {
+    if (!scanMode) return
+    // Parse same formats as ScannerContext
+    let result
+    const urlMatch = raw.match(/\/scan\/([0-9a-f-]{36})$/)
+    if (urlMatch) {
+      result = { type: 'gearvault', id: urlMatch[1], serial: null, raw }
+    } else if (raw.startsWith('GEARVAULT:')) {
+      const parts = raw.split(':')
+      result = { type: 'gearvault', id: parts[1] || null, serial: parts[2] || null, raw }
+    } else {
+      result = { type: 'serial', serial: raw, raw }
+    }
+    handleScanResult(result)
+  }, [scanMode, handleScanResult])
 
   async function logMovements(action, equipmentIds) {
     const supabase = getSupabase()
@@ -378,13 +395,22 @@ export default function SetDetailPage({ params }) {
               )}
             </div>
           )}
-          <button
-            onClick={() => setConfirmScan(true)}
-            disabled={scannedIds.size === 0}
-            className="w-full px-3 py-2 bg-primary hover:bg-primary/90 disabled:opacity-40 text-primary-foreground rounded-lg text-xs font-medium transition"
-          >
-            {scanMode === 'out' ? 'Conferma uscita' : 'Conferma rientro'}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowCamera(true)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-muted hover:bg-muted/70 text-muted-foreground rounded-lg text-xs font-medium transition"
+            >
+              <Camera className="w-3.5 h-3.5" />
+              Camera
+            </button>
+            <button
+              onClick={() => setConfirmScan(true)}
+              disabled={scannedIds.size === 0}
+              className="flex-1 px-3 py-2 bg-primary hover:bg-primary/90 disabled:opacity-40 text-primary-foreground rounded-lg text-xs font-medium transition"
+            >
+              {scanMode === 'out' ? 'Conferma uscita' : 'Conferma rientro'}
+            </button>
+          </div>
         </div>
       )}
 
@@ -770,6 +796,14 @@ export default function SetDetailPage({ params }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Camera scanner overlay */}
+      {showCamera && (
+        <CameraScanner
+          onDetected={(raw) => { handleCameraDetected(raw); setShowCamera(false) }}
+          onClose={() => setShowCamera(false)}
+        />
       )}
     </div>
   )

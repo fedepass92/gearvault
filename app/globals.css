@@ -53,6 +53,15 @@ body {
   animation: scan-pulse 1s ease-in-out infinite;
 }
 
+@keyframes scan-line {
+  0% { top: 4px; }
+  50% { top: calc(100% - 4px); }
+  100% { top: 4px; }
+}
+.animate-scan-line {
+  animation: scan-line 2s ease-in-out infinite;
+}
+
 @theme inline {
   --font-sans: system-ui, -apple-system, sans-serif;
   --font-mono: ui-monospace, "SFMono-Regular", "Consolas", monospace;
