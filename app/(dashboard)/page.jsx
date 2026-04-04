@@ -1,19 +1,16 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createServerSupabase } from '@/lib/supabase-server'
-import { Package, TrendingUp, ArrowUpRight, Briefcase, Plus, Tag, FileText, AlertTriangle } from 'lucide-react'
-import { format, differenceInDays } from 'date-fns'
+import {
+  Package, TrendingUp, ArrowUpRight, Briefcase, Plus, Tag, FileText,
+  AlertTriangle, Calendar, MapPin, Clock,
+} from 'lucide-react'
+import { format, differenceInDays, isAfter, startOfDay } from 'date-fns'
 import { it } from 'date-fns/locale'
 
 const CATEGORY_LABELS = {
-  camera: 'Camera',
-  lens: 'Obiettivo',
-  drone: 'Drone',
-  audio: 'Audio',
-  lighting: 'Illuminazione',
-  support: 'Supporto',
-  accessory: 'Accessorio',
-  altro: 'Altro',
+  camera: 'Camera', lens: 'Obiettivo', drone: 'Drone', audio: 'Audio',
+  lighting: 'Illuminazione', support: 'Supporto', accessory: 'Accessorio', altro: 'Altro',
 }
 
 const STATUS_STYLES = {
@@ -23,10 +20,7 @@ const STATUS_STYLES = {
   incomplete: 'bg-red-500/20 text-red-300',
 }
 const STATUS_LABELS = {
-  planned: 'Pianificato',
-  out: 'In uscita',
-  returned: 'Rientrato',
-  incomplete: 'Incompleto',
+  planned: 'Pianificato', out: 'In uscita', returned: 'Rientrato', incomplete: 'Incompleto',
 }
 
 export default async function DashboardPage() {
@@ -35,22 +29,35 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const today = startOfDay(new Date())
+
   const [
     { data: equipment },
-    { data: sets },
+    { data: activeSets },
+    { data: upcomingSets },
+    { data: recentSets },
+    { data: incompleteSets },
     { data: setItemsOut },
     { count: setsTotal },
   ] = await Promise.all([
     supabase.from('equipment').select('*'),
-    supabase.from('sets').select('*').order('created_at', { ascending: false }).limit(5),
-    supabase.from('set_items').select('*').eq('status', 'out'),
+    // Sets currently out
+    supabase.from('sets').select('*, set_items(count)').eq('status', 'out').order('job_date', { ascending: true }),
+    // Upcoming planned sets with a future job date
+    supabase.from('sets').select('*, set_items(count)').eq('status', 'planned')
+      .gte('job_date', today.toISOString()).order('job_date', { ascending: true }).limit(5),
+    // Recent sets (last 5, any status, for fallback)
+    supabase.from('sets').select('*, set_items(count)').order('created_at', { ascending: false }).limit(5),
+    // Incomplete sets
+    supabase.from('sets').select('id, name').eq('status', 'incomplete'),
+    supabase.from('set_items').select('equipment_id').eq('status', 'out'),
     supabase.from('sets').select('*', { count: 'exact', head: true }),
   ])
 
   const totalValue = equipment?.reduce((s, e) => s + (parseFloat(e.market_value) || 0), 0) ?? 0
   const outCount = setItemsOut?.length ?? 0
-
   const now = new Date()
+
   const maintenanceItems = equipment?.filter((e) => {
     if (!e.last_checked_at) return true
     return differenceInDays(now, new Date(e.last_checked_at)) > 90
@@ -60,6 +67,10 @@ export default async function DashboardPage() {
     acc[e.category] = (acc[e.category] || 0) + 1
     return acc
   }, {}) ?? {}
+
+  // Left panel: upcoming if any, else recent
+  const leftSets = upcomingSets?.length > 0 ? upcomingSets : (recentSets || [])
+  const leftTitle = upcomingSets?.length > 0 ? 'Prossimi lavori' : 'Ultimi set'
 
   const stats = [
     { label: 'Attrezzature totali', value: equipment?.length ?? 0, icon: Package, color: 'blue' },
@@ -76,14 +87,75 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
       <div>
         <h1 className="text-xl font-bold">Dashboard</h1>
         <p className="text-muted-foreground text-sm mt-1">
-          {format(new Date(), "EEEE d MMMM yyyy", { locale: it })}
+          {format(now, "EEEE d MMMM yyyy", { locale: it })}
         </p>
       </div>
+
+      {/* Active sets alert */}
+      {activeSets && activeSets.length > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-amber-500/20">
+            <ArrowUpRight className="w-4 h-4 text-amber-400" />
+            <span className="text-xs font-semibold text-amber-300 uppercase tracking-wider">
+              {activeSets.length} set attualmente fuori
+            </span>
+          </div>
+          <div className="divide-y divide-amber-500/10">
+            {activeSets.map((set) => (
+              <Link
+                key={set.id}
+                href={`/set/${set.id}`}
+                className="flex items-center justify-between px-4 py-3 hover:bg-amber-500/5 transition group"
+              >
+                <div className="min-w-0">
+                  <div className="text-sm font-medium group-hover:text-amber-300 transition truncate">{set.name}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
+                    {set.job_date && (
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-3 h-3" />
+                        {format(new Date(set.job_date), 'd MMM', { locale: it })}
+                      </span>
+                    )}
+                    {set.location && (
+                      <span className="flex items-center gap-1">
+                        <MapPin className="w-3 h-3" />
+                        {set.location}
+                      </span>
+                    )}
+                    <span>{set.set_items?.[0]?.count ?? 0} item</span>
+                  </div>
+                </div>
+                <span className="text-xs text-amber-400 flex-shrink-0">Gestisci →</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Incomplete sets alert */}
+      {incompleteSets && incompleteSets.length > 0 && (
+        <Link
+          href="/set"
+          className="flex items-center gap-3 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 hover:bg-red-500/15 transition"
+        >
+          <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-red-300">
+              {incompleteSets.length} set con rientro incompleto
+            </p>
+            <p className="text-xs text-red-400/70 mt-0.5 truncate">
+              {incompleteSets.slice(0, 3).map((s) => s.name).join(', ')}
+              {incompleteSets.length > 3 ? ` e altri ${incompleteSets.length - 3}…` : ''}
+            </p>
+          </div>
+          <span className="text-xs text-red-400 flex-shrink-0">Vedi →</span>
+        </Link>
+      )}
 
       {/* Maintenance alert */}
       {maintenanceItems.length > 0 && (
@@ -119,30 +191,39 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Recent sets */}
+        {/* Upcoming / recent sets */}
         <div className="bg-card rounded-xl border border-border">
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-            <h2 className="text-sm font-semibold">Ultimi set</h2>
+            <div className="flex items-center gap-2">
+              {upcomingSets?.length > 0
+                ? <Calendar className="w-4 h-4 text-primary" />
+                : <Clock className="w-4 h-4 text-muted-foreground" />
+              }
+              <h2 className="text-sm font-semibold">{leftTitle}</h2>
+            </div>
             <Link href="/set" className="text-xs text-primary hover:underline">Vedi tutti →</Link>
           </div>
           <div className="divide-y divide-border/50">
-            {sets?.length === 0 && (
-              <p className="text-sm text-muted-foreground px-5 py-6 text-center">Nessun set creato ancora</p>
+            {leftSets.length === 0 && (
+              <p className="text-sm text-muted-foreground px-5 py-6 text-center">Nessun set pianificato</p>
             )}
-            {sets?.map((set) => (
+            {leftSets.map((set) => (
               <Link
                 key={set.id}
                 href={`/set/${set.id}`}
                 className="flex items-center justify-between px-5 py-3 hover:bg-muted/30 transition group"
               >
-                <div>
-                  <div className="text-sm font-medium group-hover:text-primary transition">{set.name}</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">
-                    {set.job_date ? format(new Date(set.job_date), 'd MMM yyyy', { locale: it }) : 'Data non impostata'}
-                    {set.location ? ` · ${set.location}` : ''}
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium group-hover:text-primary transition truncate">{set.name}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
+                    {set.job_date
+                      ? <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{format(new Date(set.job_date), 'd MMM yyyy', { locale: it })}</span>
+                      : <span>Data non impostata</span>
+                    }
+                    {set.location && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{set.location}</span>}
                   </div>
                 </div>
-                <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_STYLES[set.status] || 'bg-muted text-muted-foreground'}`}>
+                <span className={`text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 ml-3 ${STATUS_STYLES[set.status] || 'bg-muted text-muted-foreground'}`}>
                   {STATUS_LABELS[set.status] || set.status}
                 </span>
               </Link>
