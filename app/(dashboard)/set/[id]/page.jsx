@@ -284,6 +284,30 @@ export default function SetDetailPage({ params }) {
     fetchSet()
   }
 
+  async function bulkOut() {
+    const supabase = getSupabase()
+    const now = new Date().toISOString()
+    const plannedItems = items.filter((i) => i.status === 'planned')
+    for (const item of plannedItems) {
+      await supabase.from('set_items').update({ status: 'out', checked_out_at: now }).eq('id', item.id)
+    }
+    await supabase.from('sets').update({ status: 'out' }).eq('id', id)
+    await logMovements('checkout', plannedItems.map((i) => i.equipment_id))
+    fetchSet()
+  }
+
+  async function bulkIn() {
+    const supabase = getSupabase()
+    const now = new Date().toISOString()
+    const outItems = items.filter((i) => i.status === 'out')
+    for (const item of outItems) {
+      await supabase.from('set_items').update({ status: 'returned', checked_in_at: now }).eq('id', item.id)
+    }
+    await supabase.from('sets').update({ status: 'returned' }).eq('id', id)
+    await logMovements('checkin', outItems.map((i) => i.equipment_id))
+    fetchSet()
+  }
+
   async function handleNotePhotoUpload(e) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -484,22 +508,40 @@ export default function SetDetailPage({ params }) {
             Aggiungi item
           </button>
           {items.some((i) => i.status === 'planned') && (
-            <button
-              onClick={() => { setScanMode('out'); setScannedIds(new Set()); setLastScanResult(null) }}
-              className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-sm font-medium transition"
-            >
-              <ArrowUpRight className="w-4 h-4" />
-              Inizia uscita
-            </button>
+            <>
+              <button
+                onClick={() => { setScanMode('out'); setScannedIds(new Set()); setLastScanResult(null) }}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-sm font-medium transition"
+              >
+                <Scan className="w-4 h-4" />
+                Scansiona uscita
+              </button>
+              <button
+                onClick={bulkOut}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-600/30 rounded-lg text-sm font-medium transition"
+              >
+                <ArrowUpRight className="w-4 h-4" />
+                Tutto fuori
+              </button>
+            </>
           )}
           {items.some((i) => i.status === 'out') && (
-            <button
-              onClick={() => { setScanMode('in'); setScannedIds(new Set()); setLastScanResult(null) }}
-              className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm font-medium transition"
-            >
-              <RotateCcw className="w-4 h-4" />
-              Rientro
-            </button>
+            <>
+              <button
+                onClick={() => { setScanMode('in'); setScannedIds(new Set()); setLastScanResult(null) }}
+                className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm font-medium transition"
+              >
+                <Scan className="w-4 h-4" />
+                Scansiona rientro
+              </button>
+              <button
+                onClick={bulkIn}
+                className="flex items-center gap-2 px-4 py-2 bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 rounded-lg text-sm font-medium transition"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Tutto rientrato
+              </button>
+            </>
           )}
         </div>
       )}
