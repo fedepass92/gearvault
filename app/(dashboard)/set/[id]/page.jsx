@@ -91,6 +91,7 @@ export default function SetDetailPage({ params }) {
   const [availableEquipment, setAvailableEquipment] = useState([])
   const [availableCases, setAvailableCases] = useState([])
   const [availableKits, setAvailableKits] = useState([])
+  const [outEquipmentIds, setOutEquipmentIds] = useState(new Set())
   const [confirmScan, setConfirmScan] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(false)
   const [showCamera, setShowCamera] = useState(false)
@@ -143,7 +144,7 @@ export default function SetDetailPage({ params }) {
       const addedIds = new Set(items.map((i) => i.equipment_id))
       const searchLower = pickerSearch.toLowerCase()
 
-      const [eqRes, casesRes, kitsRes] = await Promise.all([
+      const [eqRes, casesRes, kitsRes, outRes] = await Promise.all([
         (() => {
           let q = supabase.from('equipment').select('id, name, brand, model, serial_number, battery_status').order('name')
           if (pickerSearch) q = q.or(`name.ilike.%${pickerSearch}%,serial_number.ilike.%${pickerSearch}%,brand.ilike.%${pickerSearch}%`)
@@ -151,8 +152,11 @@ export default function SetDetailPage({ params }) {
         })(),
         supabase.from('cases').select('id, name, description, case_items(equipment_id, equipment(id, name, brand, model, serial_number, battery_status))').order('name'),
         supabase.from('kits').select('id, name, description, kit_items(equipment_id, equipment(id, name, brand, model, serial_number, battery_status))').order('name'),
+        // Items currently out on OTHER sets
+        supabase.from('set_items').select('equipment_id').eq('status', 'out').neq('set_id', id),
       ])
 
+      setOutEquipmentIds(new Set((outRes.data || []).map((r) => r.equipment_id)))
       setAvailableEquipment((eqRes.data || []).filter((e) => !addedIds.has(e.id)))
       setAvailableCases(
         (casesRes.data || [])
@@ -815,14 +819,22 @@ export default function SetDetailPage({ params }) {
                   <div className="divide-y divide-border/50">
                     {availableEquipment.map((eq) => {
                       const BattIcon = BATTERY_ICON[eq.battery_status] || Minus
+                      const isOut = outEquipmentIds.has(eq.id)
                       return (
                         <button
                           key={eq.id}
                           onClick={() => addItem(eq)}
-                          className="w-full flex items-center gap-3 px-5 py-3 hover:bg-muted/30 transition text-left"
+                          className={`w-full flex items-center gap-3 px-5 py-3 hover:bg-muted/30 transition text-left ${isOut ? 'opacity-60' : ''}`}
                         >
                           <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium truncate">{eq.name}</div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium truncate">{eq.name}</span>
+                              {isOut && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20 flex-shrink-0">
+                                  In uso
+                                </span>
+                              )}
+                            </div>
                             <div className="text-xs text-muted-foreground">
                               {[eq.brand, eq.model].filter(Boolean).join(' · ')}
                               {eq.serial_number ? ` · S/N: ${eq.serial_number}` : ''}

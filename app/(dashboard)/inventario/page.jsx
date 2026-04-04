@@ -689,6 +689,7 @@ export default function InventarioPage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [recentlyChecked, setRecentlyChecked] = useState({}) // { [id]: true }
+  const [outEquipmentIds, setOutEquipmentIds] = useState(new Set())
 
   const fetchEquipment = useCallback(async () => {
     const supabase = getSupabase()
@@ -697,8 +698,12 @@ export default function InventarioPage() {
     if (conditionFilter !== 'all') q = q.eq('condition', conditionFilter)
     if (locationFilter !== 'all') q = q.eq('location', locationFilter)
     if (search) q = q.or(`name.ilike.%${search}%,serial_number.ilike.%${search}%,brand.ilike.%${search}%`)
-    const { data } = await q
+    const [{ data }, { data: outItems }] = await Promise.all([
+      q,
+      supabase.from('set_items').select('equipment_id').eq('status', 'out'),
+    ])
     setEquipment(data || [])
+    setOutEquipmentIds(new Set((outItems || []).map((r) => r.equipment_id)))
     setLoading(false)
   }, [search, categoryFilter, conditionFilter, locationFilter])
 
@@ -842,6 +847,7 @@ export default function InventarioPage() {
                   const BattIcon = BATTERY_ICON[item.battery_status] || Minus
                   const maintenance = needsMaintenance(item)
                   const justChecked = recentlyChecked[item.id]
+                  const isOut = outEquipmentIds.has(item.id)
 
                   return (
                     <tr
@@ -862,7 +868,14 @@ export default function InventarioPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="font-medium text-foreground leading-none">{item.name}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-foreground leading-none">{item.name}</span>
+                          {isOut && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20 flex-shrink-0">
+                              In uso
+                            </span>
+                          )}
+                        </div>
                         {maintenance && !justChecked && (
                           <div className="text-[10px] text-red-400 flex items-center gap-0.5 mt-1">
                             <AlertTriangle className="w-2.5 h-2.5" />
