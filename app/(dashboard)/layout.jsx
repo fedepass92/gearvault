@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createServerSupabase } from '@/lib/supabase-server'
 import Sidebar from '@/components/Sidebar'
+import { Toaster } from '@/components/ui/sonner'
 
 export default async function DashboardLayout({ children }) {
   const supabase = await createServerSupabase()
@@ -27,6 +28,7 @@ export default async function DashboardLayout({ children }) {
           {children}
         </div>
       </main>
+      <Toaster position="bottom-right" richColors />
     </div>
   )
 }

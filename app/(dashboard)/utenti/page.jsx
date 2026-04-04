@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { getSupabase } from '@/lib/supabase'
-import { Users, Mail, Loader2, ShieldCheck, Send } from 'lucide-react'
+import { Users, Mail, Loader2, ShieldCheck, Send, Activity } from 'lucide-react'
 import { format } from 'date-fns'
 import { it } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
@@ -17,6 +17,7 @@ import {
 
 export default function UtentiPage() {
   const [profiles, setProfiles] = useState([])
+  const [activityCounts, setActivityCounts] = useState({})
   const [loading, setLoading] = useState(true)
   const [currentUserId, setCurrentUserId] = useState(null)
   const [isAdmin, setIsAdmin] = useState(false)
@@ -37,8 +38,14 @@ export default function UtentiPage() {
       if (profile?.role !== 'admin') { setLoading(false); return }
       setIsAdmin(true)
 
-      const { data: allProfiles } = await supabase.from('profiles').select('*').order('created_at')
+      const [{ data: allProfiles }, { data: movLogs }] = await Promise.all([
+        supabase.from('profiles').select('*').order('created_at'),
+        supabase.from('movement_log').select('user_id'),
+      ])
       setProfiles(allProfiles || [])
+      const counts = {}
+      ;(movLogs || []).forEach((m) => { if (m.user_id) counts[m.user_id] = (counts[m.user_id] || 0) + 1 })
+      setActivityCounts(counts)
       setLoading(false)
     }
     init()
@@ -115,6 +122,7 @@ export default function UtentiPage() {
               <tr className="border-b border-border">
                 <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Utente</th>
                 <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell">Registrato il</th>
+                <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Attività</th>
                 <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Ruolo</th>
               </tr>
             </thead>
@@ -139,6 +147,16 @@ export default function UtentiPage() {
                   </td>
                   <td className="px-5 py-4 hidden md:table-cell text-muted-foreground text-xs">
                     {profile.created_at ? format(new Date(profile.created_at), 'd MMM yyyy', { locale: it }) : '—'}
+                  </td>
+                  <td className="px-5 py-4 hidden sm:table-cell">
+                    {activityCounts[profile.id] > 0 ? (
+                      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Activity className="w-3.5 h-3.5" />
+                        {activityCounts[profile.id]} mov.
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground/40">—</span>
+                    )}
                   </td>
                   <td className="px-5 py-4">
                     {profile.id === currentUserId ? (

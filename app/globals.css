@@ -14,10 +14,13 @@ body {
     visibility: hidden;
   }
   #print-area,
-  #print-area * {
+  #print-area *,
+  #quick-print-area,
+  #quick-print-area * {
     visibility: visible;
   }
-  #print-area {
+  #print-area,
+  #quick-print-area {
     position: absolute;
     left: 0;
     top: 0;

@@ -9,7 +9,11 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(npm install:*)",
-      "Bash(npx shadcn@latest:*)"
+      "Bash(npx shadcn@latest:*)",
+      "Bash(npx next:*)",
+      "Bash(ls /Users/federicopassaro/Documents/gearvault/.env*)",
+      "Bash(ls /Users/federicopassaro/Documents/gearvault/components/ui/sonner*)",
+      "Bash(ls /Users/federicopassaro/Documents/gearvault/components/ui/toast*)"
     ]
   }
 }

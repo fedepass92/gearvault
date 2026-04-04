@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useCallback, use, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import Image from 'next/image'
 import { getSupabase } from '@/lib/supabase'
-import { exportSetInsurancePDF } from '@/lib/pdf'
+import { exportSetInsurancePDF, exportSetChecklist } from '@/lib/pdf'
+import { toast } from 'sonner'
 import { useScannerListener } from '@/components/ScannerContext'
 import CameraScanner from '@/components/CameraScanner'
 import {
@@ -12,7 +14,7 @@ import {
   Loader2, Search, X, Trash2, Package, ArrowUpRight, RotateCcw,
   FileDown, ImageOff, Upload, MessageSquare, ChevronDown, ChevronUp,
   Battery, BatteryLow, BatteryCharging, Minus, Box, Layers, Camera,
-  Pencil,
+  Pencil, ClipboardList,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { it } from 'date-fns/locale'
@@ -48,6 +50,12 @@ const ITEM_STATUS_LABELS = { planned: 'Pianificato', out: 'Fuori', returned: 'Ri
 
 const BATTERY_ICON = { charged: Battery, charging: BatteryCharging, low: BatteryLow, na: Minus }
 const BATTERY_COLOR = { charged: 'text-emerald-400', charging: 'text-primary', low: 'text-red-400', na: 'text-muted-foreground' }
+
+const CATEGORY_LABELS = {
+  camera: 'Camera', lens: 'Obiettivo', drone: 'Drone', audio: 'Audio',
+  lighting: 'Illuminazione', support: 'Supporto', accessory: 'Accessorio', altro: 'Altro',
+}
+const CATEGORY_ORDER = ['camera', 'lens', 'drone', 'audio', 'lighting', 'support', 'accessory', 'altro']
 
 /** Compress image via Canvas API before upload */
 async function compressImage(file) {
@@ -94,8 +102,10 @@ export default function SetDetailPage({ params }) {
   const [outEquipmentIds, setOutEquipmentIds] = useState(new Set())
   const [confirmScan, setConfirmScan] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(false)
+  const [checklistLoading, setChecklistLoading] = useState(false)
   const [showCamera, setShowCamera] = useState(false)
   const [batteryPopover, setBatteryPopover] = useState(null) // equipment_id
+  const [groupByCategory, setGroupByCategory] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
   const [editForm, setEditForm] = useState({})
   const [editSaving, setEditSaving] = useState(false)
@@ -307,6 +317,13 @@ export default function SetDetailPage({ params }) {
     setBatteryPopover(null)
   }
 
+  async function quickSetStatus(newStatus) {
+    const supabase = getSupabase()
+    const { data: updated } = await supabase.from('sets').update({ status: newStatus }).eq('id', id).select().single()
+    if (updated) setSet(updated)
+    toast.success(`Set segnato come: ${STATUS_LABELS[newStatus] || newStatus}`)
+  }
+
   async function bulkOut() {
     const supabase = getSupabase()
     const now = new Date().toISOString()
@@ -316,6 +333,7 @@ export default function SetDetailPage({ params }) {
     }
     await supabase.from('sets').update({ status: 'out' }).eq('id', id)
     await logMovements('checkout', plannedItems.map((i) => i.equipment_id))
+    toast.success(`${plannedItems.length} item confermati in uscita`)
     fetchSet()
   }
 
@@ -328,6 +346,7 @@ export default function SetDetailPage({ params }) {
     }
     await supabase.from('sets').update({ status: 'returned' }).eq('id', id)
     await logMovements('checkin', outItems.map((i) => i.equipment_id))
+    toast.success(`${outItems.length} item confermati rientrati`)
     fetchSet()
   }
 
@@ -372,6 +391,15 @@ export default function SetDetailPage({ params }) {
     fetchNotes()
   }
 
+  async function handleExportChecklist() {
+    setChecklistLoading(true)
+    try {
+      await exportSetChecklist(set, items)
+    } finally {
+      setChecklistLoading(false)
+    }
+  }
+
   async function handleExportPDF() {
     setPdfLoading(true)
     try {
@@ -400,6 +428,7 @@ export default function SetDetailPage({ params }) {
     if (updated) setSet(updated)
     setEditSaving(false)
     setShowEdit(false)
+    toast.success('Set aggiornato')
   }
 
   async function handleDelete() {
@@ -409,6 +438,78 @@ export default function SetDetailPage({ params }) {
     await supabase.from('set_items').delete().eq('set_id', id)
     await supabase.from('sets').delete().eq('id', id)
     router.push('/set')
+  }
+
+  // Renders a single set item row — used in both flat and grouped views
+  function ItemRow({ item }) {
+    const isScanned = scannedIds.has(item.equipment_id)
+    const isMissing = scanMode === 'in' && item.status === 'out' && !isScanned
+    const BattIcon = BATTERY_ICON[item.equipment?.battery_status] || Minus
+    return (
+      <div className={`flex items-center gap-3 px-4 py-3 transition ${isScanned && scanMode ? 'bg-emerald-500/5' : isMissing ? 'bg-red-500/5' : ''}`}>
+        {scanMode && (
+          <div className="flex-shrink-0">
+            {isScanned ? <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              : isMissing ? <AlertTriangle className="w-5 h-5 text-red-400" />
+              : <div className="w-5 h-5 rounded-full border-2 border-border" />}
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          {!scanMode && item.equipment?.id ? (
+            <Link href={`/scan/${item.equipment_id}`} className="text-sm font-medium truncate block hover:text-primary transition">
+              {item.equipment.name}
+            </Link>
+          ) : (
+            <div className="text-sm font-medium truncate">{item.equipment?.name || 'Item eliminato'}</div>
+          )}
+          <div className="text-xs text-muted-foreground">
+            {[item.equipment?.brand, item.equipment?.model].filter(Boolean).join(' · ')}
+            {item.equipment?.serial_number ? ` · S/N: ${item.equipment.serial_number}` : ''}
+          </div>
+        </div>
+        {!scanMode && item.equipment && (
+          <div className="relative flex-shrink-0">
+            <button
+              onClick={() => setBatteryPopover(batteryPopover === item.equipment_id ? null : item.equipment_id)}
+              title="Aggiorna batteria"
+              className={`p-1 rounded transition hover:bg-muted ${BATTERY_COLOR[item.equipment.battery_status] || 'text-muted-foreground'}`}
+            >
+              <BattIcon className="w-4 h-4" />
+            </button>
+            {batteryPopover === item.equipment_id && (
+              <div className="absolute right-0 top-7 z-20 bg-popover border border-border rounded-xl shadow-xl p-1.5 flex gap-1">
+                {[
+                  { value: 'charged', icon: Battery, label: 'Carica', color: 'text-emerald-400' },
+                  { value: 'charging', icon: BatteryCharging, label: 'In carica', color: 'text-primary' },
+                  { value: 'low', icon: BatteryLow, label: 'Scarica', color: 'text-red-400' },
+                  { value: 'na', icon: Minus, label: 'N/D', color: 'text-muted-foreground' },
+                ].map(({ value, icon: Icon, label, color }) => (
+                  <button
+                    key={value}
+                    onClick={() => updateBattery(item.equipment_id, value)}
+                    title={label}
+                    className={`p-2 rounded-lg hover:bg-muted transition ${item.equipment.battery_status === value ? 'bg-muted' : ''} ${color}`}
+                  >
+                    <Icon className="w-4 h-4" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${ITEM_STATUS_STYLES[item.status] || 'bg-muted text-muted-foreground'}`}>
+          {ITEM_STATUS_LABELS[item.status] || item.status}
+        </span>
+        {!scanMode && (
+          <button
+            onClick={() => removeItem(item.id)}
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition flex-shrink-0"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+    )
   }
 
   if (loading) {
@@ -421,6 +522,10 @@ export default function SetDetailPage({ params }) {
   if (!set) return null
 
   const outItems = items.filter((i) => i.status === 'out')
+  const returnedItems = items.filter((i) => i.status === 'returned')
+  const plannedItems = items.filter((i) => i.status === 'planned')
+  const totalMarket = items.reduce((s, i) => s + (parseFloat(i.equipment?.market_value) || 0), 0)
+  const totalInsured = items.reduce((s, i) => s + (parseFloat(i.equipment?.insured_value) || 0), 0)
   const preNotes = notes.filter((n) => n.type === 'pre')
   const postNotes = notes.filter((n) => n.type === 'post')
 
@@ -456,9 +561,19 @@ export default function SetDetailPage({ params }) {
             <Pencil className="w-4 h-4" />
           </button>
           <button
+            onClick={handleExportChecklist}
+            disabled={checklistLoading || items.length === 0}
+            className="flex items-center gap-2 px-3 py-2 bg-muted hover:bg-muted/70 disabled:opacity-40 text-muted-foreground rounded-lg text-sm font-medium transition"
+            title="Checklist di carico"
+          >
+            {checklistLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ClipboardList className="w-4 h-4" />}
+            <span className="hidden sm:inline">Checklist</span>
+          </button>
+          <button
             onClick={handleExportPDF}
             disabled={pdfLoading || items.length === 0}
             className="flex items-center gap-2 px-3 py-2 bg-muted hover:bg-muted/70 disabled:opacity-40 text-muted-foreground rounded-lg text-sm font-medium transition"
+            title="Report assicurativo"
           >
             {pdfLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
             <span className="hidden sm:inline">PDF</span>
@@ -469,6 +584,95 @@ export default function SetDetailPage({ params }) {
       {set.notes && (
         <div className="bg-card rounded-xl border border-border px-4 py-3 text-sm text-muted-foreground">
           {set.notes}
+        </div>
+      )}
+
+      {/* Item progress bar */}
+      {items.length > 0 && (
+        <div className="bg-card rounded-xl border border-border px-4 py-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-muted-foreground">Stato item</span>
+            <span className="text-xs text-muted-foreground">
+              {returnedItems.length} rientrati · {outItems.length} fuori · {plannedItems.length} in attesa
+            </span>
+          </div>
+          <div className="flex h-2 rounded-full overflow-hidden gap-px bg-muted">
+            {returnedItems.length > 0 && (
+              <div
+                className="bg-emerald-400 rounded-full transition-all"
+                style={{ width: `${(returnedItems.length / items.length) * 100}%` }}
+                title={`${returnedItems.length} rientrati`}
+              />
+            )}
+            {outItems.length > 0 && (
+              <div
+                className="bg-amber-400 rounded-full transition-all"
+                style={{ width: `${(outItems.length / items.length) * 100}%` }}
+                title={`${outItems.length} fuori`}
+              />
+            )}
+            {plannedItems.length > 0 && (
+              <div
+                className="bg-muted-foreground/20 rounded-full transition-all"
+                style={{ width: `${(plannedItems.length / items.length) * 100}%` }}
+                title={`${plannedItems.length} in attesa`}
+              />
+            )}
+          </div>
+          {returnedItems.length === items.length && items.length > 0 && (
+            <p className="text-xs text-emerald-400 mt-1.5 flex items-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5" /> Tutto rientrato
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Value summary */}
+      {totalMarket > 0 && (
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-card rounded-xl border border-border px-4 py-3">
+            <div className="text-xs text-muted-foreground mb-1">Valore di mercato</div>
+            <div className="text-base font-bold">€ {totalMarket.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</div>
+          </div>
+          <div className={`bg-card rounded-xl border px-4 py-3 ${totalInsured > 0 && totalInsured < totalMarket ? 'border-amber-500/30' : 'border-border'}`}>
+            <div className="text-xs text-muted-foreground mb-1">Valore assicurato</div>
+            <div className={`text-base font-bold ${totalInsured === 0 ? 'text-muted-foreground' : totalInsured < totalMarket ? 'text-amber-400' : 'text-emerald-400'}`}>
+              {totalInsured > 0 ? `€ ${totalInsured.toLocaleString('it-IT', { minimumFractionDigits: 0 })}` : '—'}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick status actions */}
+      {set.status === 'planned' && items.length > 0 && (
+        <div className="flex items-center gap-3 bg-primary/5 border border-primary/20 rounded-xl px-4 py-3">
+          <div className="flex-1 text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">{plannedItems.length}</span> item pianificati
+          </div>
+          <Button size="sm" onClick={bulkOut} className="h-8 text-xs flex-shrink-0">
+            <ArrowUpRight className="w-3.5 h-3.5" />
+            Conferma uscita
+          </Button>
+        </div>
+      )}
+      {set.status === 'out' && returnedItems.length === items.length && items.length > 0 && (
+        <div className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-4 py-3">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+          <div className="flex-1 text-sm text-emerald-300 font-medium">Tutti gli item sono rientrati</div>
+          <Button size="sm" onClick={() => quickSetStatus('returned')} className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 flex-shrink-0">
+            Segna come rientrato
+          </Button>
+        </div>
+      )}
+      {set.status === 'out' && outItems.length > 0 && returnedItems.length > 0 && returnedItems.length < items.length && (
+        <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3">
+          <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+          <div className="flex-1 text-sm text-amber-300">
+            <span className="font-medium">{outItems.length}</span> item ancora fuori
+          </div>
+          <Button size="sm" variant="outline" onClick={() => quickSetStatus('incomplete')} className="h-8 text-xs border-amber-500/30 text-amber-300 hover:bg-amber-500/10 flex-shrink-0">
+            Segna incompleto
+          </Button>
         </div>
       )}
 
@@ -571,89 +775,56 @@ export default function SetDetailPage({ params }) {
 
       {/* Items list */}
       <div className="bg-card rounded-xl border border-border overflow-hidden">
-        <div className="px-4 py-3 border-b border-border">
-          <h2 className="text-sm font-semibold">Attrezzatura nel set</h2>
+        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+          <h2 className="text-sm font-semibold">Attrezzatura nel set <span className="text-muted-foreground font-normal">({items.length})</span></h2>
+          {items.length > 0 && (
+            <button
+              onClick={() => setGroupByCategory((v) => !v)}
+              className={`text-xs px-2 py-1 rounded-lg transition ${groupByCategory ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+            >
+              Per categoria
+            </button>
+          )}
         </div>
         {items.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             <Package className="w-8 h-8 mx-auto mb-2 opacity-40" />
             <p className="text-sm">Nessun item aggiunto al set</p>
           </div>
-        ) : (
-          <div className="divide-y divide-border/50">
-            {items.map((item) => {
-              const isScanned = scannedIds.has(item.equipment_id)
-              const isMissing = scanMode === 'in' && item.status === 'out' && !isScanned
-              const BattIcon = BATTERY_ICON[item.equipment?.battery_status] || Minus
-              return (
-                <div
-                  key={item.id}
-                  className={`flex items-center gap-3 px-4 py-3 transition ${
-                    isScanned && scanMode ? 'bg-emerald-500/5' : isMissing ? 'bg-red-500/5' : ''
-                  }`}
-                >
-                  {scanMode && (
-                    <div className="flex-shrink-0">
-                      {isScanned ? (
-                        <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                      ) : isMissing ? (
-                        <AlertTriangle className="w-5 h-5 text-red-400" />
-                      ) : (
-                        <div className="w-5 h-5 rounded-full border-2 border-border" />
-                      )}
+        ) : groupByCategory ? (
+          // Grouped by category
+          (() => {
+            const groups = {}
+            items.forEach((item) => {
+              const cat = item.equipment?.category || 'altro'
+              if (!groups[cat]) groups[cat] = []
+              groups[cat].push(item)
+            })
+            const orderedKeys = [
+              ...CATEGORY_ORDER.filter((k) => groups[k]),
+              ...Object.keys(groups).filter((k) => !CATEGORY_ORDER.includes(k)),
+            ]
+            return (
+              <div>
+                {orderedKeys.map((cat) => (
+                  <div key={cat}>
+                    <div className="px-4 py-2 bg-muted/40 border-b border-border/50 flex items-center justify-between">
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        {CATEGORY_LABELS[cat] || cat}
+                      </span>
+                      <span className="text-xs text-muted-foreground">{groups[cat].length}</span>
                     </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">{item.equipment?.name || 'Item eliminato'}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {[item.equipment?.brand, item.equipment?.model].filter(Boolean).join(' · ')}
-                      {item.equipment?.serial_number ? ` · S/N: ${item.equipment.serial_number}` : ''}
+                    <div className="divide-y divide-border/50">
+                      {groups[cat].map((item) => <ItemRow key={item.id} item={item} />)}
                     </div>
                   </div>
-                  {!scanMode && item.equipment && (
-                    <div className="relative flex-shrink-0">
-                      <button
-                        onClick={() => setBatteryPopover(batteryPopover === item.equipment_id ? null : item.equipment_id)}
-                        title="Aggiorna batteria"
-                        className={`p-1 rounded transition hover:bg-muted ${BATTERY_COLOR[item.equipment.battery_status] || 'text-muted-foreground'}`}
-                      >
-                        <BattIcon className="w-4 h-4" />
-                      </button>
-                      {batteryPopover === item.equipment_id && (
-                        <div className="absolute right-0 top-7 z-20 bg-popover border border-border rounded-xl shadow-xl p-1.5 flex gap-1">
-                          {[
-                            { value: 'charged', icon: Battery, label: 'Carica', color: 'text-emerald-400' },
-                            { value: 'charging', icon: BatteryCharging, label: 'In carica', color: 'text-primary' },
-                            { value: 'low', icon: BatteryLow, label: 'Scarica', color: 'text-red-400' },
-                            { value: 'na', icon: Minus, label: 'N/D', color: 'text-muted-foreground' },
-                          ].map(({ value, icon: Icon, label, color }) => (
-                            <button
-                              key={value}
-                              onClick={() => updateBattery(item.equipment_id, value)}
-                              title={label}
-                              className={`p-2 rounded-lg hover:bg-muted transition ${item.equipment.battery_status === value ? 'bg-muted' : ''} ${color}`}
-                            >
-                              <Icon className="w-4 h-4" />
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${ITEM_STATUS_STYLES[item.status] || 'bg-muted text-muted-foreground'}`}>
-                    {ITEM_STATUS_LABELS[item.status] || item.status}
-                  </span>
-                  {!scanMode && (
-                    <button
-                      onClick={() => removeItem(item.id)}
-                      className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition flex-shrink-0"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              )
-            })}
+                ))}
+              </div>
+            )
+          })()
+        ) : (
+          <div className="divide-y divide-border/50">
+            {items.map((item) => <ItemRow key={item.id} item={item} />)}
           </div>
         )}
       </div>

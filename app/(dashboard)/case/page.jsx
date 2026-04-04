@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { getSupabase } from '@/lib/supabase'
-import { Plus, Box, Loader2, ChevronRight } from 'lucide-react'
+import { Plus, Box, Loader2, ChevronRight, Search } from 'lucide-react'
 import { format } from 'date-fns'
 import { it } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
@@ -23,6 +23,7 @@ export default function CasePage() {
   const [form, setForm] = useState(EMPTY)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [search, setSearch] = useState('')
 
   useEffect(() => { fetchCases() }, [])
 
@@ -30,7 +31,7 @@ export default function CasePage() {
     const supabase = getSupabase()
     const { data } = await supabase
       .from('cases')
-      .select('*, case_items(count), case_kits(count)')
+      .select('*, case_items(count, equipment(market_value)), case_kits(count)')
       .order('created_at', { ascending: false })
     setCases(data || [])
     setLoading(false)
@@ -55,18 +56,36 @@ export default function CasePage() {
     setSaving(false)
   }
 
+  const displayCases = search
+    ? cases.filter((c) => c.name?.toLowerCase().includes(search.toLowerCase()) || c.description?.toLowerCase().includes(search.toLowerCase()))
+    : cases
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold">Case</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">{cases.length} case creati</p>
+          <p className="text-muted-foreground text-sm mt-0.5">
+            {displayCases.length}{displayCases.length !== cases.length ? ` / ${cases.length}` : ''} case
+          </p>
         </div>
         <Button size="sm" onClick={() => setShowModal(true)}>
           <Plus className="w-4 h-4" />
           <span className="hidden sm:inline">Nuovo case</span>
         </Button>
       </div>
+
+      {cases.length > 0 && (
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cerca case…"
+            className="pl-8 h-8 text-sm"
+          />
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
@@ -78,9 +97,13 @@ export default function CasePage() {
           <p className="text-muted-foreground text-sm mb-4">Nessun case creato ancora</p>
           <Button size="sm" onClick={() => setShowModal(true)}>Crea il primo case</Button>
         </div>
+      ) : displayCases.length === 0 ? (
+        <div className="bg-card rounded-xl border border-border p-12 text-center">
+          <p className="text-muted-foreground text-sm">Nessun case trovato</p>
+        </div>
       ) : (
         <div className="grid gap-3">
-          {cases.map((c) => (
+          {displayCases.map((c) => (
             <Link
               key={c.id}
               href={`/case/${c.id}`}
@@ -95,6 +118,10 @@ export default function CasePage() {
                   {c.description && <span className="truncate max-w-xs">{c.description}</span>}
                   <span>{(c.case_items?.[0]?.count ?? 0)} item</span>
                   <span>{(c.case_kits?.[0]?.count ?? 0)} kit</span>
+                  {(() => {
+                    const val = (c.case_items || []).reduce((s, ci) => s + (parseFloat(ci.equipment?.market_value) || 0), 0)
+                    return val > 0 ? <span>€ {val.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</span> : null
+                  })()}
                   <span>{format(new Date(c.created_at), 'd MMM yyyy', { locale: it })}</span>
                 </div>
               </div>

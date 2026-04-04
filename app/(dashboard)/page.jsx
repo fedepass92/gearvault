@@ -3,9 +3,9 @@ import Link from 'next/link'
 import { createServerSupabase } from '@/lib/supabase-server'
 import {
   Package, TrendingUp, ArrowUpRight, Briefcase, Plus, Tag, FileText,
-  AlertTriangle, Calendar, MapPin, Clock,
+  AlertTriangle, Calendar, MapPin, Clock, LogOut, LogIn, Activity, QrCode, BatteryLow, Wrench,
 } from 'lucide-react'
-import { format, differenceInDays, isAfter, startOfDay } from 'date-fns'
+import { format, differenceInDays, isAfter, startOfDay, endOfDay, addDays, isSameDay, parseISO } from 'date-fns'
 import { it } from 'date-fns/locale'
 
 const CATEGORY_LABELS = {
@@ -29,7 +29,9 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const today = startOfDay(new Date())
+  const now = new Date()
+  const today = startOfDay(now)
+  const todayEnd = endOfDay(now)
 
   const [
     { data: equipment },
@@ -39,34 +41,71 @@ export default async function DashboardPage() {
     { data: incompleteSets },
     { data: setItemsOut },
     { count: setsTotal },
+    { data: todaySets },
+    { data: overdueSets },
+    { data: recentActivity },
+    { data: weekSets },
   ] = await Promise.all([
     supabase.from('equipment').select('*'),
     // Sets currently out
     supabase.from('sets').select('*, set_items(count)').eq('status', 'out').order('job_date', { ascending: true }),
-    // Upcoming planned sets with a future job date
+    // Upcoming planned sets with a future job date (tomorrow onwards)
     supabase.from('sets').select('*, set_items(count)').eq('status', 'planned')
-      .gte('job_date', today.toISOString()).order('job_date', { ascending: true }).limit(5),
+      .gt('job_date', todayEnd.toISOString()).order('job_date', { ascending: true }).limit(5),
     // Recent sets (last 5, any status, for fallback)
     supabase.from('sets').select('*, set_items(count)').order('created_at', { ascending: false }).limit(5),
     // Incomplete sets
     supabase.from('sets').select('id, name').eq('status', 'incomplete'),
     supabase.from('set_items').select('equipment_id').eq('status', 'out'),
     supabase.from('sets').select('*', { count: 'exact', head: true }),
+    // Sets with job_date = today
+    supabase.from('sets').select('*, set_items(count)')
+      .gte('job_date', today.toISOString())
+      .lte('job_date', todayEnd.toISOString())
+      .order('created_at', { ascending: false }),
+    // Overdue: still 'out' but job_date is in the past
+    supabase.from('sets').select('id, name, job_date, location')
+      .eq('status', 'out')
+      .lt('job_date', today.toISOString())
+      .order('job_date', { ascending: true }),
+    // Recent activity feed
+    supabase.from('movement_log')
+      .select('id, action, created_at, equipment(name), sets(name), profiles(full_name)')
+      .order('created_at', { ascending: false })
+      .limit(6),
+    // Sets in the next 7 days (tomorrow to today+7)
+    supabase.from('sets').select('id, name, job_date, status, location')
+      .gt('job_date', todayEnd.toISOString())
+      .lte('job_date', endOfDay(addDays(now, 7)).toISOString())
+      .order('job_date', { ascending: true }),
   ])
 
   const totalValue = equipment?.reduce((s, e) => s + (parseFloat(e.market_value) || 0), 0) ?? 0
   const outCount = setItemsOut?.length ?? 0
-  const now = new Date()
 
   const maintenanceItems = equipment?.filter((e) => {
     if (!e.last_checked_at) return true
     return differenceInDays(now, new Date(e.last_checked_at)) > 90
   }) ?? []
 
+  const lowBatteryItems = equipment?.filter((e) => e.battery_status === 'low' && e.condition !== 'retired') ?? []
+  const repairItems = equipment?.filter((e) => e.condition === 'repair') ?? []
+
+  const batteryBreakdown = equipment?.reduce((acc, e) => {
+    if (e.condition === 'retired') return acc
+    const status = e.battery_status || 'na'
+    acc[status] = (acc[status] || 0) + 1
+    return acc
+  }, {}) ?? {}
+  const hasBatteryData = Object.values(batteryBreakdown).some((v) => v > 0) && batteryBreakdown.na !== Object.values(batteryBreakdown).reduce((s, v) => s + v, 0)
+
   const categoryCounts = equipment?.reduce((acc, e) => {
     acc[e.category] = (acc[e.category] || 0) + 1
     return acc
   }, {}) ?? {}
+
+  // 7-day calendar strip: build days array
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(startOfDay(now), i + 1))
 
   // Left panel: upcoming if any, else recent
   const leftSets = upcomingSets?.length > 0 ? upcomingSets : (recentSets || [])
@@ -157,6 +196,37 @@ export default async function DashboardPage() {
         </Link>
       )}
 
+      {/* Overdue sets alert */}
+      {overdueSets && overdueSets.length > 0 && (
+        <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-orange-500/20">
+            <Clock className="w-4 h-4 text-orange-400" />
+            <span className="text-xs font-semibold text-orange-300 uppercase tracking-wider">
+              {overdueSets.length} set in ritardo — non ancora rientrati
+            </span>
+          </div>
+          <div className="divide-y divide-orange-500/10">
+            {overdueSets.map((set) => (
+              <Link
+                key={set.id}
+                href={`/set/${set.id}`}
+                className="flex items-center justify-between px-4 py-3 hover:bg-orange-500/5 transition group"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium group-hover:text-orange-300 transition truncate">{set.name}</div>
+                  {set.job_date && (
+                    <div className="text-xs text-orange-400/70 mt-0.5">
+                      Previsto il {format(new Date(set.job_date), 'd MMM yyyy', { locale: it })} — {differenceInDays(now, new Date(set.job_date))} giorni fa
+                    </div>
+                  )}
+                </div>
+                <span className="text-xs text-orange-400 flex-shrink-0 ml-3">Gestisci →</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Maintenance alert */}
       {maintenanceItems.length > 0 && (
         <Link
@@ -177,6 +247,156 @@ export default async function DashboardPage() {
         </Link>
       )}
 
+      {/* Repair items alert */}
+      {repairItems.length > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-amber-500/20">
+            <Wrench className="w-4 h-4 text-amber-400" />
+            <span className="text-xs font-semibold text-amber-300 uppercase tracking-wider">
+              {repairItems.length} {repairItems.length === 1 ? 'item in riparazione' : 'item in riparazione'}
+            </span>
+          </div>
+          <div className="divide-y divide-amber-500/10">
+            {repairItems.slice(0, 4).map((item) => (
+              <Link
+                key={item.id}
+                href={`/scan/${item.id}`}
+                className="flex items-center gap-3 px-4 py-2.5 hover:bg-amber-500/5 transition group"
+              >
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-medium group-hover:text-amber-300 transition truncate block">{item.name}</span>
+                  {(item.brand || item.model) && (
+                    <span className="text-xs text-muted-foreground">{[item.brand, item.model].filter(Boolean).join(' · ')}</span>
+                  )}
+                </div>
+                <span className="text-xs text-amber-400 flex-shrink-0">Segna riparato →</span>
+              </Link>
+            ))}
+            {repairItems.length > 4 && (
+              <Link href="/inventario" className="block px-4 py-2 text-xs text-muted-foreground hover:text-foreground transition text-center">
+                e altri {repairItems.length - 4} item →
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Low battery alert */}
+      {lowBatteryItems.length > 0 && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-red-500/20">
+            <BatteryLow className="w-4 h-4 text-red-400" />
+            <span className="text-xs font-semibold text-red-300 uppercase tracking-wider">
+              {lowBatteryItems.length} {lowBatteryItems.length === 1 ? 'item con batteria scarica' : 'item con batteria scarica'}
+            </span>
+          </div>
+          <div className="divide-y divide-red-500/10">
+            {lowBatteryItems.slice(0, 5).map((item) => (
+              <Link
+                key={item.id}
+                href={`/scan/${item.id}`}
+                className="flex items-center gap-3 px-4 py-2.5 hover:bg-red-500/5 transition group"
+              >
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-medium group-hover:text-red-300 transition truncate block">{item.name}</span>
+                  {(item.brand || item.model) && (
+                    <span className="text-xs text-muted-foreground truncate block">{[item.brand, item.model].filter(Boolean).join(' · ')}</span>
+                  )}
+                </div>
+                <span className="text-xs text-red-400 flex-shrink-0">Aggiorna →</span>
+              </Link>
+            ))}
+            {lowBatteryItems.length > 5 && (
+              <Link href="/inventario" className="block px-4 py-2 text-xs text-muted-foreground hover:text-foreground transition text-center">
+                e altri {lowBatteryItems.length - 5} item →
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Today's sets */}
+      {todaySets && todaySets.length > 0 && (
+        <div className="bg-card rounded-xl border border-border overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border">
+            <Calendar className="w-4 h-4 text-primary" />
+            <span className="text-xs font-semibold text-foreground uppercase tracking-wider">
+              Oggi — {format(now, 'd MMMM', { locale: it })}
+            </span>
+            <span className="ml-auto text-xs text-muted-foreground">{todaySets.length} set</span>
+          </div>
+          <div className="divide-y divide-border/50">
+            {todaySets.map((set) => {
+              const isOut = set.status === 'out'
+              const isReturned = set.status === 'returned'
+              return (
+                <Link
+                  key={set.id}
+                  href={`/set/${set.id}`}
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition group"
+                >
+                  <div className={`p-1.5 rounded-lg flex-shrink-0 ${isOut ? 'bg-amber-500/10 text-amber-400' : isReturned ? 'bg-emerald-500/10 text-emerald-400' : 'bg-primary/10 text-primary'}`}>
+                    {isOut ? <LogOut className="w-3.5 h-3.5" /> : isReturned ? <LogIn className="w-3.5 h-3.5" /> : <Calendar className="w-3.5 h-3.5" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium group-hover:text-primary transition truncate">{set.name}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {set.set_items?.[0]?.count ?? 0} item
+                      {set.location && <span className="ml-2 flex-shrink-0">{set.location}</span>}
+                    </div>
+                  </div>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${STATUS_STYLES[set.status] || 'bg-muted text-muted-foreground'}`}>
+                    {STATUS_LABELS[set.status] || set.status}
+                  </span>
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 7-day ahead strip */}
+      {weekDays.some((day) => (weekSets || []).some((s) => s.job_date && isSameDay(parseISO(s.job_date), day))) && (
+        <div className="bg-card rounded-xl border border-border overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border">
+            <Calendar className="w-4 h-4 text-muted-foreground" />
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Prossimi 7 giorni</span>
+          </div>
+          <div className="grid grid-cols-7 divide-x divide-border/50">
+            {weekDays.map((day) => {
+              const daySets = (weekSets || []).filter((s) => s.job_date && isSameDay(parseISO(s.job_date), day))
+              return (
+                <div key={day.toISOString()} className={`px-2 py-3 text-center min-w-0 ${daySets.length > 0 ? 'bg-primary/5' : ''}`}>
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                    {format(day, 'EEE', { locale: it })}
+                  </div>
+                  <div className={`text-sm font-semibold mt-0.5 ${daySets.length > 0 ? 'text-primary' : 'text-muted-foreground/50'}`}>
+                    {format(day, 'd')}
+                  </div>
+                  {daySets.length > 0 && (
+                    <div className="mt-1.5 space-y-1">
+                      {daySets.slice(0, 2).map((s) => (
+                        <Link
+                          key={s.id}
+                          href={`/set/${s.id}`}
+                          className="block text-[9px] leading-tight text-primary/80 hover:text-primary truncate px-0.5 py-0.5 rounded bg-primary/10 hover:bg-primary/20 transition"
+                          title={s.name}
+                        >
+                          {s.name}
+                        </Link>
+                      ))}
+                      {daySets.length > 2 && (
+                        <div className="text-[9px] text-muted-foreground">+{daySets.length - 2}</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Stats cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat) => (
@@ -189,6 +409,33 @@ export default async function DashboardPage() {
           </div>
         ))}
       </div>
+
+      {/* Battery status breakdown */}
+      {hasBatteryData && (
+        <div className="bg-card rounded-xl border border-border px-5 py-4">
+          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Stato batterie</h2>
+          <div className="grid grid-cols-4 gap-3">
+            {[
+              { key: 'charged', label: 'Cariche', color: 'text-emerald-400', bar: 'bg-emerald-400' },
+              { key: 'charging', label: 'In carica', color: 'text-primary', bar: 'bg-primary' },
+              { key: 'low', label: 'Scariche', color: 'text-red-400', bar: 'bg-red-400' },
+              { key: 'na', label: 'N/D', color: 'text-muted-foreground', bar: 'bg-muted-foreground/30' },
+            ].map(({ key, label, color, bar }) => {
+              const count = batteryBreakdown[key] || 0
+              const total = Object.values(batteryBreakdown).reduce((s, v) => s + v, 0)
+              return (
+                <div key={key} className="text-center">
+                  <div className={`text-xl font-bold ${color}`}>{count}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5 mb-1.5">{label}</div>
+                  <div className="h-1 bg-muted rounded-full overflow-hidden">
+                    <div className={`h-full ${bar} rounded-full`} style={{ width: total > 0 ? `${Math.round((count / total) * 100)}%` : '0%' }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Upcoming / recent sets */}
@@ -257,6 +504,39 @@ export default async function DashboardPage() {
         </div>
       </div>
 
+      {/* Recent activity */}
+      {recentActivity && recentActivity.length > 0 && (
+        <div className="bg-card rounded-xl border border-border overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+            <h2 className="text-sm font-semibold">Attività recente</h2>
+            <Link href="/storico" className="text-xs text-primary hover:underline">Storico completo →</Link>
+          </div>
+          <div className="divide-y divide-border/50">
+            {recentActivity.map((m) => {
+              const isOut = m.action === 'checkout'
+              return (
+                <div key={m.id} className="flex items-center gap-3 px-5 py-3">
+                  <div className={`p-1.5 rounded-lg flex-shrink-0 ${isOut ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                    {isOut ? <ArrowUpRight className="w-3.5 h-3.5" /> : <LogIn className="w-3.5 h-3.5" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{m.equipment?.name || '—'}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {isOut ? 'Uscita' : 'Rientro'}
+                      {m.sets?.name ? ` · ${m.sets.name}` : ''}
+                      {m.profiles?.full_name ? ` · ${m.profiles.full_name}` : ''}
+                    </p>
+                  </div>
+                  <span className="text-xs text-muted-foreground flex-shrink-0">
+                    {format(new Date(m.created_at), 'd MMM HH:mm', { locale: it })}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Quick actions */}
       <div>
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Azioni rapide</h2>
@@ -276,6 +556,10 @@ export default async function DashboardPage() {
           <Link href="/report" className="flex items-center gap-3 bg-card hover:bg-muted/30 border border-border rounded-xl p-4 transition group">
             <div className="p-2 rounded-lg bg-muted text-muted-foreground"><FileText className="w-4 h-4" /></div>
             <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition">Report assicurativo</span>
+          </Link>
+          <Link href="/manutenzione" className="flex items-center gap-3 bg-card hover:bg-muted/30 border border-border rounded-xl p-4 transition group">
+            <div className="p-2 rounded-lg bg-orange-500/10 text-orange-400"><AlertTriangle className="w-4 h-4" /></div>
+            <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition">Manutenzione</span>
           </Link>
         </div>
       </div>

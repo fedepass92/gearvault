@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback, use } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { getSupabase } from '@/lib/supabase'
 import LabelCard from '@/components/LabelCard'
 import {
   ArrowLeft, Box, Plus, Trash2, Search, Loader2,
-  Printer, Package, Pencil, Layers, ChevronDown, ChevronRight,
+  Printer, Package, Pencil, Layers, ChevronDown, ChevronRight, QrCode,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { it } from 'date-fns/locale'
@@ -139,6 +140,10 @@ export default function CaseDetailPage({ params }) {
   }
 
   const totalItems = items.length + kits.reduce((s, k) => s + (k.kits?.kit_items?.length || 0), 0)
+  const totalValue = [
+    ...items.map((i) => parseFloat(i.equipment?.market_value) || 0),
+    ...kits.flatMap((k) => (k.kits?.kit_items || []).map((ki) => parseFloat(ki.equipment?.market_value) || 0)),
+  ].reduce((s, v) => s + v, 0)
 
   if (loading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
@@ -161,7 +166,9 @@ export default function CaseDetailPage({ params }) {
             <p className="text-xs text-muted-foreground mt-1 ml-7">{caseData.description}</p>
           )}
           <p className="text-xs text-muted-foreground mt-0.5 ml-7">
-            {items.length} item singoli · {kits.length} kit · {totalItems} item totali · creato {format(new Date(caseData.created_at), 'd MMM yyyy', { locale: it })}
+            {items.length} item singoli · {kits.length} kit · {totalItems} item totali
+            {totalValue > 0 && ` · € ${totalValue.toLocaleString('it-IT', { minimumFractionDigits: 0 })}`}
+            {' · '}creato {format(new Date(caseData.created_at), 'd MMM yyyy', { locale: it })}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
@@ -192,10 +199,18 @@ export default function CaseDetailPage({ params }) {
       </div>
 
       {/* Action bar */}
-      <Button size="sm" onClick={() => setShowAddPicker(true)}>
-        <Plus className="w-4 h-4" />
-        Aggiungi contenuto
-      </Button>
+      <div className="flex items-center gap-2">
+        <Button size="sm" onClick={() => setShowAddPicker(true)}>
+          <Plus className="w-4 h-4" />
+          Aggiungi contenuto
+        </Button>
+        <Link href={`/scan/case/${id}`}>
+          <Button size="sm" variant="outline">
+            <QrCode className="w-4 h-4" />
+            Scansiona case
+          </Button>
+        </Link>
+      </div>
 
       {/* Content */}
       <div className="bg-card rounded-xl border border-border overflow-hidden">
@@ -212,15 +227,15 @@ export default function CaseDetailPage({ params }) {
           <div className="divide-y divide-border/50">
             {/* Individual items */}
             {items.map((item) => (
-              <div key={item.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition">
+              <div key={item.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition group">
                 <Package className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">{item.equipment?.name || 'Eliminato'}</div>
+                <Link href={`/scan/${item.equipment?.id}`} className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate group-hover:text-primary transition">{item.equipment?.name || 'Eliminato'}</div>
                   <div className="text-xs text-muted-foreground">
                     {[item.equipment?.brand, item.equipment?.model].filter(Boolean).join(' · ')}
                     {item.equipment?.serial_number ? ` · S/N: ${item.equipment.serial_number}` : ''}
                   </div>
-                </div>
+                </Link>
                 <button
                   onClick={() => removeItem(item.id)}
                   className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition flex-shrink-0"

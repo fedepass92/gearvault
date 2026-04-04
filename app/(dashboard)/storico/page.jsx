@@ -2,16 +2,16 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { getSupabase } from '@/lib/supabase'
-import { History, Search, Loader2, ArrowUpRight, RotateCcw, Download } from 'lucide-react'
-import { format } from 'date-fns'
+import { History, Search, Loader2, ArrowUpRight, RotateCcw, Download, X } from 'lucide-react'
+import { format, parseISO, startOfDay, endOfDay } from 'date-fns'
 import { it } from 'date-fns/locale'
 import Link from 'next/link'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { Button } from '@/components/ui/button'
 
 function exportCSV(logs) {
   const headers = ['Data', 'Ora', 'Azione', 'Attrezzatura', 'Seriale', 'Set', 'Utente']
@@ -45,33 +45,47 @@ export default function StoricoPage() {
   const [loading, setLoading] = useState(true)
   const [equipmentList, setEquipmentList] = useState([])
   const [setsList, setSetsList] = useState([])
+  const [usersList, setUsersList] = useState([])
   const [equipmentFilter, setEquipmentFilter] = useState('all')
   const [setFilter, setSetFilter] = useState('all')
+  const [actionFilter, setActionFilter] = useState('all')
+  const [userFilter, setUserFilter] = useState('all')
   const [search, setSearch] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
 
   useEffect(() => {
     async function fetchFilters() {
       const supabase = getSupabase()
-      const [{ data: eq }, { data: st }] = await Promise.all([
+      const [{ data: eq }, { data: st }, { data: us }] = await Promise.all([
         supabase.from('equipment').select('id, name').order('name'),
         supabase.from('sets').select('id, name').order('created_at', { ascending: false }),
+        supabase.from('profiles').select('id, full_name').order('full_name'),
       ])
       setEquipmentList(eq || [])
       setSetsList(st || [])
+      setUsersList((us || []).filter((u) => u.full_name))
     }
     fetchFilters()
   }, [])
 
   const fetchLogs = useCallback(async () => {
+    setLoading(true)
     const supabase = getSupabase()
     let q = supabase
       .from('movement_log')
       .select('*, equipment(id, name, brand, serial_number), sets(id, name), profiles(full_name)')
       .order('created_at', { ascending: false })
-      .limit(200)
 
     if (equipmentFilter !== 'all') q = q.eq('equipment_id', equipmentFilter)
     if (setFilter !== 'all') q = q.eq('set_id', setFilter)
+    if (actionFilter !== 'all') q = q.eq('action', actionFilter)
+    if (userFilter !== 'all') q = q.eq('user_id', userFilter)
+    if (dateFrom) q = q.gte('created_at', startOfDay(parseISO(dateFrom)).toISOString())
+    if (dateTo) q = q.lte('created_at', endOfDay(parseISO(dateTo)).toISOString())
+
+    // Only apply 500 limit when no date range is set
+    if (!dateFrom && !dateTo) q = q.limit(500)
 
     const { data } = await q
     let results = data || []
@@ -88,16 +102,23 @@ export default function StoricoPage() {
 
     setLogs(results)
     setLoading(false)
-  }, [equipmentFilter, setFilter, search])
+  }, [equipmentFilter, setFilter, actionFilter, userFilter, search, dateFrom, dateTo])
 
   useEffect(() => { fetchLogs() }, [fetchLogs])
+
+  const hasDateFilter = dateFrom || dateTo
+
+  function clearDates() {
+    setDateFrom('')
+    setDateTo('')
+  }
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold">Storico movimenti</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">{logs.length} movimenti</p>
+          <p className="text-muted-foreground text-sm mt-0.5">{logs.length} movimenti{!hasDateFilter ? ' (ultimi 500)' : ''}</p>
         </div>
         <Button size="sm" variant="outline" onClick={() => exportCSV(logs)} disabled={logs.length === 0}>
           <Download className="w-4 h-4" />
@@ -106,34 +127,84 @@ export default function StoricoPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Cerca per attrezzatura, set, utente…"
-            className="pl-8 h-8"
-          />
+      <div className="space-y-2">
+        <div className="flex flex-col sm:flex-row gap-2 flex-wrap">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Cerca per attrezzatura, set, utente…"
+              className="pl-8 h-8"
+            />
+          </div>
+          <Select value={actionFilter} onValueChange={setActionFilter}>
+            <SelectTrigger className="w-auto min-w-[130px] h-8 text-sm">
+              <SelectValue placeholder="Tutte le azioni" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tutte le azioni</SelectItem>
+              <SelectItem value="checkout">Uscita</SelectItem>
+              <SelectItem value="checkin">Rientro</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={equipmentFilter} onValueChange={setEquipmentFilter}>
+            <SelectTrigger className="w-auto min-w-[160px] h-8 text-sm">
+              <SelectValue placeholder="Tutte le attrezzature" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tutte le attrezzature</SelectItem>
+              {equipmentList.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={setFilter} onValueChange={setSetFilter}>
+            <SelectTrigger className="w-auto min-w-[140px] h-8 text-sm">
+              <SelectValue placeholder="Tutti i set" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tutti i set</SelectItem>
+              {setsList.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          {usersList.length > 0 && (
+            <Select value={userFilter} onValueChange={setUserFilter}>
+              <SelectTrigger className="w-auto min-w-[140px] h-8 text-sm">
+                <SelectValue placeholder="Tutti gli utenti" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tutti gli utenti</SelectItem>
+                {usersList.map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
         </div>
-        <Select value={equipmentFilter} onValueChange={setEquipmentFilter}>
-          <SelectTrigger className="w-auto min-w-[160px] h-8 text-sm">
-            <SelectValue placeholder="Tutte le attrezzature" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tutte le attrezzature</SelectItem>
-            {equipmentList.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={setFilter} onValueChange={setSetFilter}>
-          <SelectTrigger className="w-auto min-w-[140px] h-8 text-sm">
-            <SelectValue placeholder="Tutti i set" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tutti i set</SelectItem>
-            {setsList.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
+
+        {/* Date range */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-muted-foreground">Dal</span>
+          <Input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="h-8 w-36 text-sm"
+          />
+          <span className="text-xs text-muted-foreground">al</span>
+          <Input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="h-8 w-36 text-sm"
+          />
+          {hasDateFilter && (
+            <button
+              onClick={clearDates}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition px-2 py-1 rounded-lg hover:bg-muted"
+            >
+              <X className="w-3 h-3" />
+              Rimuovi
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Table */}
@@ -174,9 +245,13 @@ export default function StoricoPage() {
                         </Badge>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="font-medium text-sm">
-                          {log.equipment?.name || <span className="text-muted-foreground italic">Eliminata</span>}
-                        </div>
+                        {log.equipment?.id ? (
+                          <Link href={`/scan/${log.equipment.id}`} className="font-medium text-sm hover:text-primary transition">
+                            {log.equipment.name}
+                          </Link>
+                        ) : (
+                          <span className="text-muted-foreground italic text-sm">Eliminata</span>
+                        )}
                         {log.equipment?.serial_number && (
                           <div className="text-xs text-muted-foreground font-mono">S/N {log.equipment.serial_number}</div>
                         )}

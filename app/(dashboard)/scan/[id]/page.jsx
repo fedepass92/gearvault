@@ -8,8 +8,15 @@ import { it } from 'date-fns/locale'
 import {
   ArrowLeft, Battery, BatteryLow, BatteryCharging, Minus,
   MapPin, Tag, Wrench, Briefcase, Box, Layers, AlertTriangle,
-  CheckCircle2, Clock,
+  CheckCircle2, Clock, ArrowUpRight, RotateCcw,
 } from 'lucide-react'
+import MarkCheckedButton from '@/components/MarkCheckedButton'
+import MarkRepairedButton from '@/components/MarkRepairedButton'
+import MarkForRepairButton from '@/components/MarkForRepairButton'
+import QuickNote from '@/components/QuickNote'
+import QuickLocation from '@/components/QuickLocation'
+import QuickAddToSet from '@/components/QuickAddToSet'
+import QuickPrintLabel from '@/components/QuickPrintLabel'
 
 const CATEGORY_LABELS = {
   camera: 'Camera', lens: 'Obiettivo', drone: 'Drone', audio: 'Audio',
@@ -57,8 +64,8 @@ export default async function ScanEquipmentPage({ params }) {
     )
   }
 
-  // Fetch current assignments in parallel
-  const [{ data: setItems }, { data: kitItems }, { data: caseItems }] = await Promise.all([
+  // Fetch current assignments + movement history in parallel
+  const [{ data: setItems }, { data: kitItems }, { data: caseItems }, { data: movements }] = await Promise.all([
     supabase.from('set_items')
       .select('status, sets(id, name, status, job_date)')
       .eq('equipment_id', id)
@@ -71,6 +78,11 @@ export default async function ScanEquipmentPage({ params }) {
     supabase.from('case_items')
       .select('cases(id, name)')
       .eq('equipment_id', id),
+    supabase.from('movement_log')
+      .select('id, action, created_at, sets(id, name), profiles(full_name)')
+      .eq('equipment_id', id)
+      .order('created_at', { ascending: false })
+      .limit(8),
   ])
 
   const depr = calcDepreciation(item)
@@ -220,6 +232,71 @@ export default async function ScanEquipmentPage({ params }) {
           </div>
         </div>
       )}
+
+      {/* Notes */}
+      {item.notes && (
+        <div className="bg-card rounded-xl border border-border px-4 py-3">
+          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Note</h2>
+          <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{item.notes}</p>
+        </div>
+      )}
+
+      {/* Movement history */}
+      {movements && movements.length > 0 && (
+        <div className="bg-card rounded-xl border border-border overflow-hidden">
+          <div className="px-4 py-3 border-b border-border">
+            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Storico movimenti</h2>
+          </div>
+          <div className="divide-y divide-border/50">
+            {movements.map((m) => {
+              const isOut = m.action === 'checkout'
+              return (
+                <div key={m.id} className="flex items-center gap-3 px-4 py-2.5">
+                  <div className={`p-1.5 rounded-lg flex-shrink-0 ${isOut ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                    {isOut ? <ArrowUpRight className="w-3.5 h-3.5" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-medium truncate">{m.sets?.name || '—'}</div>
+                    {m.profiles?.full_name && (
+                      <div className="text-xs text-muted-foreground truncate">{m.profiles.full_name}</div>
+                    )}
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <div className="text-xs text-muted-foreground">{format(new Date(m.created_at), 'd MMM', { locale: it })}</div>
+                    <div className="text-xs text-muted-foreground/60">{format(new Date(m.created_at), 'HH:mm')}</div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Repair card */}
+      {item.condition === 'repair' && (
+        <MarkRepairedButton equipmentId={item.id} />
+      )}
+      {item.condition === 'active' && (
+        <MarkForRepairButton equipmentId={item.id} />
+      )}
+
+      {/* Quick location */}
+      <QuickLocation equipmentId={item.id} currentLocation={item.location} />
+
+      {/* Add to set */}
+      <QuickAddToSet
+        equipmentId={item.id}
+        currentSetIds={(setItems || []).map((si) => si.sets?.id).filter(Boolean)}
+      />
+
+      {/* Quick note */}
+      <QuickNote equipmentId={item.id} currentNotes={item.notes} />
+
+      {/* Mark checked */}
+      <MarkCheckedButton equipmentId={item.id} currentCheckedAt={item.last_checked_at} />
+
+      {/* Print label */}
+      <QuickPrintLabel item={item} />
 
       {/* Footer link */}
       <div className="text-center pb-4">

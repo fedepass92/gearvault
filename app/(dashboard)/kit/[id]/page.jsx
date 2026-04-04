@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback, use } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { getSupabase } from '@/lib/supabase'
 import {
-  ArrowLeft, Layers, Plus, Trash2, Search, Loader2, Package, Pencil,
+  ArrowLeft, Layers, Plus, Trash2, Search, Loader2, Package, Pencil, QrCode,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { it } from 'date-fns/locale'
@@ -44,7 +45,7 @@ export default function KitDetailPage({ params }) {
 
     const { data: itemsData } = await supabase
       .from('kit_items')
-      .select('*, equipment(*)')
+      .select('*, equipment(id, name, brand, model, serial_number, category, market_value, insured_value, battery_status, condition)')
       .eq('kit_id', id)
       .order('added_at', { ascending: true })
     setItems(itemsData || [])
@@ -127,6 +128,10 @@ export default function KitDetailPage({ params }) {
           )}
           <p className="text-xs text-muted-foreground mt-0.5 ml-7">
             {items.length} item · creato {format(new Date(kitData.created_at), 'd MMM yyyy', { locale: it })}
+            {items.length > 0 && (() => {
+              const total = items.reduce((s, i) => s + (parseFloat(i.equipment?.market_value) || 0), 0)
+              return total > 0 ? ` · Valore: € ${total.toLocaleString('it-IT', { minimumFractionDigits: 0 })}` : ''
+            })()}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
@@ -140,11 +145,17 @@ export default function KitDetailPage({ params }) {
       </div>
 
       {/* Action bar */}
-      <div>
+      <div className="flex items-center gap-2">
         <Button size="sm" onClick={() => setShowAddPicker(true)}>
           <Plus className="w-4 h-4" />
           Aggiungi attrezzatura
         </Button>
+        <Link href={`/scan/kit/${id}`}>
+          <Button size="sm" variant="outline">
+            <QrCode className="w-4 h-4" />
+            Scansiona kit
+          </Button>
+        </Link>
       </div>
 
       {/* Items list */}
@@ -160,14 +171,14 @@ export default function KitDetailPage({ params }) {
         ) : (
           <div className="divide-y divide-border/50">
             {items.map((item) => (
-              <div key={item.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition">
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">{item.equipment?.name || 'Eliminato'}</div>
+              <div key={item.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition group">
+                <Link href={`/scan/${item.equipment?.id}`} className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate group-hover:text-primary transition">{item.equipment?.name || 'Eliminato'}</div>
                   <div className="text-xs text-muted-foreground">
                     {[item.equipment?.brand, item.equipment?.model].filter(Boolean).join(' · ')}
                     {item.equipment?.serial_number ? ` · S/N: ${item.equipment.serial_number}` : ''}
                   </div>
-                </div>
+                </Link>
                 <button
                   onClick={() => removeItem(item.id)}
                   className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition flex-shrink-0"

@@ -4,12 +4,14 @@ import { useEffect, useRef } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import JsBarcode from 'jsbarcode'
 
-export default function LabelCard({ item, type = 'qr', isCase = false }) {
+export default function LabelCard({ item, type = 'qr', isCase = false, isKit = false }) {
   const barcodeRef = useRef()
 
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://gear.braindigital.it'
   const qrValue = isCase
     ? `${origin}/scan/case/${item.id}`
+    : isKit
+    ? `${origin}/scan/kit/${item.id}`
     : `${origin}/scan/${item.id}`
 
   useEffect(() => {
@@ -63,7 +65,7 @@ export default function LabelCard({ item, type = 'qr', isCase = false }) {
         </div>
 
         {/* Brand / Model or case description */}
-        {isCase ? (
+        {(isCase || isKit) ? (
           item.description && (
             <div style={{
               fontSize: '7px',
@@ -112,7 +114,7 @@ export default function LabelCard({ item, type = 'qr', isCase = false }) {
         </div>
 
         {/* Serial / Case badge */}
-        {!isCase && item.serial_number && (
+        {!isCase && !isKit && item.serial_number && (
           <div style={{
             fontSize: '7px',
             fontFamily: 'monospace',
@@ -123,17 +125,17 @@ export default function LabelCard({ item, type = 'qr', isCase = false }) {
             S/N {item.serial_number}
           </div>
         )}
-        {isCase && (
+        {(isCase || isKit) && (
           <div style={{
             fontSize: '6.5px',
-            color: '#1e40af',
+            color: isKit ? '#7c3aed' : '#1e40af',
             textAlign: 'center',
             marginTop: '2px',
             fontWeight: '600',
             textTransform: 'uppercase',
             letterSpacing: '0.05em',
           }}>
-            Case / Kit
+            {isKit ? 'Kit' : 'Case'}
           </div>
         )}
       </div>

@@ -9,7 +9,9 @@ import {
   Download, Upload, Battery, BatteryLow, BatteryCharging,
   Minus, AlertTriangle, CheckCircle2, Package, MapPin, Clock,
   Layers, Box, TrendingUp, ArrowUpDown, ChevronRight,
+  Square, CheckSquare, X, Briefcase,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { format, differenceInDays } from 'date-fns'
 import { it } from 'date-fns/locale'
 import Papa from 'papaparse'
@@ -465,6 +467,19 @@ function MembershipSection({ title, icon, items, emptyLabel }) {
   )
 }
 
+function SortHeader({ label, field, sortField, sortDir, onSort, align = 'left' }) {
+  const active = sortField === field
+  return (
+    <button
+      onClick={() => onSort(field)}
+      className={`flex items-center gap-1 uppercase tracking-wider text-xs font-medium transition hover:text-foreground ${active ? 'text-foreground' : 'text-muted-foreground'} ${align === 'right' ? 'ml-auto' : align === 'center' ? 'mx-auto' : ''}`}
+    >
+      {label}
+      <ArrowUpDown className={`w-3 h-3 flex-shrink-0 ${active ? 'text-primary' : 'opacity-40'}`} />
+    </button>
+  )
+}
+
 // ─── Add Price Form ───────────────────────────────────────────────────────────
 
 function AddPriceForm({ itemId, onAdded }) {
@@ -690,8 +705,18 @@ export default function InventarioPage() {
   const [deleting, setDeleting] = useState(false)
   const [recentlyChecked, setRecentlyChecked] = useState({}) // { [id]: true }
   const [outEquipmentIds, setOutEquipmentIds] = useState(new Set())
+  const [availabilityFilter, setAvailabilityFilter] = useState('all') // 'all' | 'free' | 'in_use'
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [bulkLoading, setBulkLoading] = useState(false)
+  const [sortField, setSortField] = useState('name') // 'name' | 'market_value' | 'last_checked_at' | 'purchase_date' | 'category'
+  const [sortDir, setSortDir] = useState('asc')
+  const [addToSetModal, setAddToSetModal] = useState(false)
+  const [setsList, setSetsList] = useState([])
+  const [targetSetId, setTargetSetId] = useState('')
+  const [addingToSet, setAddingToSet] = useState(false)
 
   const fetchEquipment = useCallback(async () => {
+    setSelectedIds(new Set())
     const supabase = getSupabase()
     let q = supabase.from('equipment').select('*').order('created_at', { ascending: false })
     if (categoryFilter !== 'all') q = q.eq('category', categoryFilter)
@@ -720,6 +745,17 @@ export default function InventarioPage() {
     checkRole()
   }, [])
 
+  const BATTERY_CYCLE = { charged: 'low', low: 'charging', charging: 'na', na: 'charged' }
+
+  async function handleBatteryCycle(item, e) {
+    e.stopPropagation()
+    const next = BATTERY_CYCLE[item.battery_status] || 'charged'
+    const supabase = getSupabase()
+    await supabase.from('equipment').update({ battery_status: next }).eq('id', item.id)
+    setEquipment((prev) => prev.map((eq) => eq.id === item.id ? { ...eq, battery_status: next } : eq))
+    toast.success(`Batteria: ${BATTERY_LABEL[next]}`)
+  }
+
   async function handleControllato(item, e) {
     e.stopPropagation()
     const supabase = getSupabase()
@@ -740,7 +776,103 @@ export default function InventarioPage() {
     fetchEquipment()
   }
 
+  function toggleSelect(id) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds(selectedIds.size === displayEquipment.length
+      ? new Set()
+      : new Set(displayEquipment.map((e) => e.id))
+    )
+  }
+
+  async function bulkMarkChecked() {
+    setBulkLoading(true)
+    const supabase = getSupabase()
+    const now = new Date().toISOString()
+    await supabase.from('equipment').update({ last_checked_at: now }).in('id', [...selectedIds])
+    setEquipment((prev) => prev.map((e) => selectedIds.has(e.id) ? { ...e, last_checked_at: now } : e))
+    setRecentlyChecked((prev) => {
+      const next = { ...prev }
+      selectedIds.forEach((id) => { next[id] = true })
+      return next
+    })
+    const count = selectedIds.size
+    setSelectedIds(new Set())
+    setBulkLoading(false)
+    toast.success(`${count} item segnati come controllati`)
+  }
+
+  async function bulkUpdateField(field, value) {
+    setBulkLoading(true)
+    const supabase = getSupabase()
+    await supabase.from('equipment').update({ [field]: value }).in('id', [...selectedIds])
+    setEquipment((prev) => prev.map((e) => selectedIds.has(e.id) ? { ...e, [field]: value } : e))
+    const count = selectedIds.size
+    setSelectedIds(new Set())
+    setBulkLoading(false)
+    toast.success(`${count} item aggiornati`)
+  }
+
+  function bulkExport() {
+    const selected = equipment.filter((e) => selectedIds.has(e.id))
+    exportCSV(selected)
+    toast.success(`${selected.length} item esportati`)
+  }
+
+  async function openAddToSet() {
+    const supabase = getSupabase()
+    const { data } = await supabase.from('sets').select('id, name, status, job_date')
+      .in('status', ['planned', 'out']).order('job_date', { ascending: true, nullsFirst: false })
+    setSetsList(data || [])
+    setTargetSetId('')
+    setAddToSetModal(true)
+  }
+
+  async function bulkAddToSet() {
+    if (!targetSetId) return
+    setAddingToSet(true)
+    const supabase = getSupabase()
+    const rows = [...selectedIds].map((eid) => ({ set_id: targetSetId, equipment_id: eid, status: 'planned' }))
+    const { error } = await supabase.from('set_items').upsert(rows, { onConflict: 'set_id,equipment_id', ignoreDuplicates: true })
+    setAddingToSet(false)
+    setAddToSetModal(false)
+    if (error) { toast.error('Errore durante l\'assegnazione'); return }
+    const setName = setsList.find((s) => s.id === targetSetId)?.name || 'set'
+    toast.success(`${selectedIds.size} item aggiunti a "${setName}"`)
+    setSelectedIds(new Set())
+  }
+
   const maintenanceCount = equipment.filter(needsMaintenance).length
+
+  const filteredEquipment = availabilityFilter === 'free'
+    ? equipment.filter((e) => !outEquipmentIds.has(e.id))
+    : availabilityFilter === 'in_use'
+    ? equipment.filter((e) => outEquipmentIds.has(e.id))
+    : equipment
+
+  const displayEquipment = [...filteredEquipment].sort((a, b) => {
+    let av, bv
+    if (sortField === 'name') { av = (a.name || '').toLowerCase(); bv = (b.name || '').toLowerCase() }
+    else if (sortField === 'brand') { av = ([a.brand, a.model].filter(Boolean).join(' ') || '').toLowerCase(); bv = ([b.brand, b.model].filter(Boolean).join(' ') || '').toLowerCase() }
+    else if (sortField === 'market_value') { av = parseFloat(a.market_value) || 0; bv = parseFloat(b.market_value) || 0 }
+    else if (sortField === 'last_checked_at') { av = a.last_checked_at ? new Date(a.last_checked_at).getTime() : 0; bv = b.last_checked_at ? new Date(b.last_checked_at).getTime() : 0 }
+    else if (sortField === 'category') { av = (CATEGORY_LABELS[a.category] || a.category || '').toLowerCase(); bv = (CATEGORY_LABELS[b.category] || b.category || '').toLowerCase() }
+    else { av = ''; bv = '' }
+    if (av < bv) return sortDir === 'asc' ? -1 : 1
+    if (av > bv) return sortDir === 'asc' ? 1 : -1
+    return 0
+  })
+
+  function toggleSort(field) {
+    if (sortField === field) setSortDir((d) => d === 'asc' ? 'desc' : 'asc')
+    else { setSortField(field); setSortDir('asc') }
+  }
 
   return (
     <div className="space-y-5">
@@ -749,7 +881,9 @@ export default function InventarioPage() {
         <div>
           <h1 className="text-xl font-bold">Inventario</h1>
           <div className="flex items-center gap-2 mt-0.5">
-            <p className="text-muted-foreground text-sm">{equipment.length} attrezzature</p>
+            <p className="text-muted-foreground text-sm">
+              {displayEquipment.length}{displayEquipment.length !== equipment.length ? ` / ${equipment.length}` : ''} attrezzature
+            </p>
             {maintenanceCount > 0 && (
               <Badge variant="outline" className="text-xs border bg-red-500/15 text-red-400 border-red-500/20">
                 <AlertTriangle className="w-3 h-3 mr-1" />
@@ -813,7 +947,72 @@ export default function InventarioPage() {
             {LOCATIONS.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
           </SelectContent>
         </Select>
+        <Select value={availabilityFilter} onValueChange={setAvailabilityFilter}>
+          <SelectTrigger className="w-auto min-w-[140px] h-8 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Disponibilità: tutti</SelectItem>
+            <SelectItem value="free">Solo disponibili</SelectItem>
+            <SelectItem value="in_use">Solo in uso</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
+
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-2 flex-wrap bg-primary/10 border border-primary/30 rounded-xl px-4 py-2.5">
+          <span className="text-sm font-medium text-primary flex-shrink-0">{selectedIds.size} selezionati</span>
+          <div className="flex items-center gap-1.5 flex-wrap flex-1">
+            <Button size="sm" variant="outline" className="h-7 text-xs" disabled={bulkLoading} onClick={bulkMarkChecked}>
+              {bulkLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+              Segna controllati
+            </Button>
+            <Select onValueChange={(v) => bulkUpdateField('location', v)}>
+              <SelectTrigger className="h-7 w-auto min-w-[120px] text-xs" disabled={bulkLoading}>
+                <SelectValue placeholder="Location…" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="studio">Studio</SelectItem>
+                <SelectItem value="campo">Campo</SelectItem>
+                <SelectItem value="prestito">Prestito</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select onValueChange={(v) => bulkUpdateField('condition', v)}>
+              <SelectTrigger className="h-7 w-auto min-w-[130px] text-xs" disabled={bulkLoading}>
+                <SelectValue placeholder="Condizione…" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Attivo</SelectItem>
+                <SelectItem value="repair">In riparazione</SelectItem>
+                <SelectItem value="retired">Ritirato</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select onValueChange={(v) => bulkUpdateField('battery_status', v)}>
+              <SelectTrigger className="h-7 w-auto min-w-[120px] text-xs" disabled={bulkLoading}>
+                <SelectValue placeholder="Batteria…" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="charged">Carica</SelectItem>
+                <SelectItem value="charging">In carica</SelectItem>
+                <SelectItem value="low">Scarica</SelectItem>
+                <SelectItem value="na">N/D</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button size="sm" variant="outline" className="h-7 text-xs" disabled={bulkLoading} onClick={bulkExport}>
+              <Download className="w-3 h-3" />
+              Esporta
+            </Button>
+            <Button size="sm" variant="outline" className="h-7 text-xs" disabled={bulkLoading} onClick={openAddToSet}>
+              <Briefcase className="w-3 h-3" />
+              Aggiungi a Set
+            </Button>
+          </div>
+          <button onClick={() => setSelectedIds(new Set())} className="p-1 rounded text-muted-foreground hover:text-foreground transition flex-shrink-0">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Table */}
       <div className="bg-card rounded-xl border border-border overflow-hidden">
@@ -821,7 +1020,7 @@ export default function InventarioPage() {
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
           </div>
-        ) : equipment.length === 0 ? (
+        ) : displayEquipment.length === 0 ? (
           <div className="text-center py-20 text-muted-foreground">
             <Package className="w-10 h-10 mx-auto mb-3 opacity-30" />
             <p className="text-sm">Nessuna attrezzatura trovata</p>
@@ -831,19 +1030,34 @@ export default function InventarioPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
+                  <th className="w-10 px-4 py-3">
+                    <button onClick={toggleSelectAll} className="text-muted-foreground hover:text-foreground transition">
+                      {selectedIds.size > 0 && selectedIds.size === displayEquipment.length
+                        ? <CheckSquare className="w-4 h-4 text-primary" />
+                        : <Square className="w-4 h-4" />}
+                    </button>
+                  </th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider w-12">Foto</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Nome</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell">Marca / Modello</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    <SortHeader label="Nome" field="name" sortField={sortField} sortDir={sortDir} onSort={toggleSort} />
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell">
+                    <SortHeader label="Marca / Modello" field="brand" sortField={sortField} sortDir={sortDir} onSort={toggleSort} />
+                  </th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Seriale</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden xl:table-cell">Location</th>
                   <th className="text-center px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden xl:table-cell">Batteria</th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Val. Mercato</th>
-                  <th className="text-center px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Stato</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden lg:table-cell">
+                    <SortHeader label="Val. Mercato" field="market_value" sortField={sortField} sortDir={sortDir} onSort={toggleSort} align="right" />
+                  </th>
+                  <th className="text-center px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    <SortHeader label="Stato" field="category" sortField={sortField} sortDir={sortDir} onSort={toggleSort} align="center" />
+                  </th>
                   <th className="w-24 px-4 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
-                {equipment.map((item) => {
+                {displayEquipment.map((item) => {
                   const BattIcon = BATTERY_ICON[item.battery_status] || Minus
                   const maintenance = needsMaintenance(item)
                   const justChecked = recentlyChecked[item.id]
@@ -852,9 +1066,16 @@ export default function InventarioPage() {
                   return (
                     <tr
                       key={item.id}
-                      className="hover:bg-muted/30 transition cursor-pointer"
+                      className={`hover:bg-muted/30 transition cursor-pointer ${selectedIds.has(item.id) ? 'bg-primary/5' : ''}`}
                       onClick={() => setDetailItem(item)}
                     >
+                      <td className="px-4 py-3" onClick={(e) => { e.stopPropagation(); toggleSelect(item.id) }}>
+                        <button className="text-muted-foreground hover:text-foreground transition">
+                          {selectedIds.has(item.id)
+                            ? <CheckSquare className="w-4 h-4 text-primary" />
+                            : <Square className="w-4 h-4" />}
+                        </button>
+                      </td>
                       <td className="px-4 py-3">
                         <div className="relative w-9 h-9 rounded-lg overflow-hidden bg-muted flex items-center justify-center">
                           {item.photo_url ? (
@@ -904,10 +1125,13 @@ export default function InventarioPage() {
                           </span>
                         ) : '—'}
                       </td>
-                      <td className="px-4 py-3 hidden xl:table-cell text-center">
-                        <span title={BATTERY_LABEL[item.battery_status]}>
-                          <BattIcon className={`w-4 h-4 mx-auto ${BATTERY_COLOR[item.battery_status] || 'text-muted-foreground'}`} />
-                        </span>
+                      <td className="px-4 py-3 hidden xl:table-cell text-center" onClick={(e) => { e.stopPropagation(); handleBatteryCycle(item, e) }}>
+                        <button
+                          title={`Batteria: ${BATTERY_LABEL[item.battery_status]} — clicca per cambiare`}
+                          className="p-1 rounded hover:bg-muted transition mx-auto block"
+                        >
+                          <BattIcon className={`w-4 h-4 ${BATTERY_COLOR[item.battery_status] || 'text-muted-foreground'}`} />
+                        </button>
                       </td>
                       <td className="px-4 py-3 hidden lg:table-cell text-muted-foreground text-right text-xs">
                         {item.market_value ? fmtEur(item.market_value) : '—'}
@@ -985,6 +1209,44 @@ export default function InventarioPage() {
         onClose={() => setImportOpen(false)}
         onImported={fetchEquipment}
       />
+
+      {/* Add to Set Modal */}
+      <Dialog open={addToSetModal} onOpenChange={(o) => { if (!o) setAddToSetModal(false) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Aggiungi a Set</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-1">
+            <p className="text-sm text-muted-foreground">
+              {selectedIds.size} item selezionati verranno aggiunti al set scelto.
+            </p>
+            {setsList.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Nessun set attivo disponibile</p>
+            ) : (
+              <Select value={targetSetId} onValueChange={setTargetSetId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleziona un set…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {setsList.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      <span className="font-medium">{s.name}</span>
+                      {s.job_date && <span className="text-muted-foreground ml-2 text-xs">{new Date(s.job_date).toLocaleDateString('it-IT')}</span>}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setAddToSetModal(false)}>Annulla</Button>
+            <Button onClick={bulkAddToSet} disabled={!targetSetId || addingToSet}>
+              {addingToSet && <Loader2 className="w-4 h-4 animate-spin" />}
+              Aggiungi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirm */}
       <AlertDialog open={!!deleteConfirm} onOpenChange={(o) => { if (!o) setDeleteConfirm(null) }}>

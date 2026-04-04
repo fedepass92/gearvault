@@ -3,19 +3,21 @@
 import { useState, useEffect } from 'react'
 import { getSupabase } from '@/lib/supabase'
 import LabelCard from '@/components/LabelCard'
-import { Search, Printer, QrCode, Barcode, CheckSquare, Square, Loader2, Package, Box } from 'lucide-react'
+import { Search, Printer, QrCode, Barcode, CheckSquare, Square, Loader2, Package, Box, Layers } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
 const TABS = [
   { id: 'equipment', label: 'Attrezzatura', icon: Package },
   { id: 'cases', label: 'Case', icon: Box },
+  { id: 'kits', label: 'Kit', icon: Layers },
 ]
 
 export default function EtichettePage() {
   const [tab, setTab] = useState('equipment')
   const [equipment, setEquipment] = useState([])
   const [cases, setCases] = useState([])
+  const [kits, setKits] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(new Set())
@@ -35,6 +37,11 @@ export default function EtichettePage() {
         if (search) q = q.or(`name.ilike.%${search}%,serial_number.ilike.%${search}%,brand.ilike.%${search}%`)
         const { data } = await q
         setEquipment(data || [])
+      } else if (tab === 'kits') {
+        let q = supabase.from('kits').select('id, name, description').order('name')
+        if (search) q = q.ilike('name', `%${search}%`)
+        const { data } = await q
+        setKits(data || [])
       } else {
         let q = supabase.from('cases').select('id, name, description').order('name')
         if (search) q = q.ilike('name', `%${search}%`)
@@ -46,7 +53,7 @@ export default function EtichettePage() {
     fetchData()
   }, [tab, search])
 
-  const items = tab === 'equipment' ? equipment : cases
+  const items = tab === 'equipment' ? equipment : tab === 'kits' ? kits : cases
 
   function toggleSelect(id) {
     setSelected((prev) => {
@@ -67,6 +74,7 @@ export default function EtichettePage() {
 
   const selectedItems = items.filter((e) => selected.has(e.id))
   const isCase = tab === 'cases'
+  const isKit = tab === 'kits'
 
   function handlePrint() {
     setTimeout(() => window.print(), 100)
@@ -147,13 +155,13 @@ export default function EtichettePage() {
                   <div className="flex-1 min-w-0 cursor-pointer" onClick={() => toggleSelect(item.id)}>
                     <div className="text-sm font-medium truncate">{item.name}</div>
                     <div className="text-xs text-muted-foreground">
-                      {isCase
+                      {isCase || isKit
                         ? (item.description || 'Nessuna descrizione')
                         : [item.brand, item.model].filter(Boolean).join(' · ') + (item.serial_number ? ` · S/N: ${item.serial_number}` : '')
                       }
                     </div>
                   </div>
-                  {!isCase && (
+                  {!isCase && !isKit && (
                     <div className="flex items-center gap-1 flex-shrink-0">
                       <button
                         onClick={() => setLabelType(item.id, 'qr')}
@@ -186,7 +194,7 @@ export default function EtichettePage() {
           <div id="print-area">
             <div className="grid gap-4 print:grid-cols-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(90mm, 1fr))' }}>
               {selectedItems.map((item) => (
-                <LabelCard key={item.id} item={item} type={isCase ? 'qr' : (labelTypes[item.id] || 'qr')} isCase={isCase} />
+                <LabelCard key={item.id} item={item} type={(isCase || isKit) ? 'qr' : (labelTypes[item.id] || 'qr')} isCase={isCase} isKit={isKit} />
               ))}
             </div>
           </div>

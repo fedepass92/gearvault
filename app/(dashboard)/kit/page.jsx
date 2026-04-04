@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { getSupabase } from '@/lib/supabase'
-import { Plus, Layers, Loader2, ChevronRight } from 'lucide-react'
+import { Plus, Layers, Loader2, ChevronRight, Search } from 'lucide-react'
+import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { it } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
@@ -23,6 +24,7 @@ export default function KitPage() {
   const [form, setForm] = useState(EMPTY)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [search, setSearch] = useState('')
 
   useEffect(() => { fetchKits() }, [])
 
@@ -30,7 +32,7 @@ export default function KitPage() {
     const supabase = getSupabase()
     const { data } = await supabase
       .from('kits')
-      .select('*, kit_items(count)')
+      .select('*, kit_items(count, equipment(market_value))')
       .order('created_at', { ascending: false })
     setKits(data || [])
     setLoading(false)
@@ -51,22 +53,41 @@ export default function KitPage() {
       setShowModal(false)
       setForm(EMPTY)
       fetchKits()
+      toast.success(`Kit "${form.name}" creato`)
     }
     setSaving(false)
   }
+
+  const displayKits = search
+    ? kits.filter((k) => k.name?.toLowerCase().includes(search.toLowerCase()) || k.description?.toLowerCase().includes(search.toLowerCase()))
+    : kits
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold">Kit</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">{kits.length} kit creati</p>
+          <p className="text-muted-foreground text-sm mt-0.5">
+            {displayKits.length}{displayKits.length !== kits.length ? ` / ${kits.length}` : ''} kit
+          </p>
         </div>
         <Button size="sm" onClick={() => setShowModal(true)}>
           <Plus className="w-4 h-4" />
           <span className="hidden sm:inline">Nuovo kit</span>
         </Button>
       </div>
+
+      {kits.length > 0 && (
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cerca kit…"
+            className="pl-8 h-8 text-sm"
+          />
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
@@ -80,9 +101,13 @@ export default function KitPage() {
             Crea il primo kit
           </Button>
         </div>
+      ) : displayKits.length === 0 ? (
+        <div className="bg-card rounded-xl border border-border p-12 text-center">
+          <p className="text-muted-foreground text-sm">Nessun kit trovato</p>
+        </div>
       ) : (
         <div className="grid gap-3">
-          {kits.map((k) => (
+          {displayKits.map((k) => (
             <Link
               key={k.id}
               href={`/kit/${k.id}`}
@@ -96,6 +121,10 @@ export default function KitPage() {
                 <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
                   {k.description && <span className="truncate max-w-xs">{k.description}</span>}
                   <span>{k.kit_items?.[0]?.count ?? 0} item</span>
+                  {(() => {
+                    const val = (k.kit_items || []).reduce((s, ki) => s + (parseFloat(ki.equipment?.market_value) || 0), 0)
+                    return val > 0 ? <span>€ {val.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</span> : null
+                  })()}
                   <span>{format(new Date(k.created_at), 'd MMM yyyy', { locale: it })}</span>
                 </div>
               </div>
