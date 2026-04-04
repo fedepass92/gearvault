@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { getSupabase } from '@/lib/supabase'
-import { History, Search, Loader2, ArrowUpRight, RotateCcw } from 'lucide-react'
+import { History, Search, Loader2, ArrowUpRight, RotateCcw, Download } from 'lucide-react'
 import { format } from 'date-fns'
 import { it } from 'date-fns/locale'
 import Link from 'next/link'
@@ -11,6 +11,28 @@ import { Badge } from '@/components/ui/badge'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
+import { Button } from '@/components/ui/button'
+
+function exportCSV(logs) {
+  const headers = ['Data', 'Ora', 'Azione', 'Attrezzatura', 'Seriale', 'Set', 'Utente']
+  const rows = logs.map((l) => [
+    format(new Date(l.created_at), 'd MMM yyyy', { locale: it }),
+    format(new Date(l.created_at), 'HH:mm'),
+    l.action === 'checkout' ? 'Uscita' : 'Rientro',
+    l.equipment?.name || '',
+    l.equipment?.serial_number || '',
+    l.sets?.name || '',
+    l.profiles?.full_name || '',
+  ])
+  const csv = [headers, ...rows].map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `storico-movimenti-${format(new Date(), 'yyyy-MM-dd')}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 const ACTION_BADGE = {
   checkout: 'bg-amber-500/15 text-amber-300 border-amber-500/20',
@@ -77,7 +99,10 @@ export default function StoricoPage() {
           <h1 className="text-xl font-bold">Storico movimenti</h1>
           <p className="text-muted-foreground text-sm mt-0.5">{logs.length} movimenti</p>
         </div>
-        <History className="w-5 h-5 text-muted-foreground" />
+        <Button size="sm" variant="outline" onClick={() => exportCSV(logs)} disabled={logs.length === 0}>
+          <Download className="w-4 h-4" />
+          <span className="hidden sm:inline">CSV</span>
+        </Button>
       </div>
 
       {/* Filters */}
