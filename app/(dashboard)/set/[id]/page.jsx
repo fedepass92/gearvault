@@ -95,6 +95,7 @@ export default function SetDetailPage({ params }) {
   const [confirmScan, setConfirmScan] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(false)
   const [showCamera, setShowCamera] = useState(false)
+  const [batteryPopover, setBatteryPopover] = useState(null) // equipment_id
   const [showEdit, setShowEdit] = useState(false)
   const [editForm, setEditForm] = useState({})
   const [editSaving, setEditSaving] = useState(false)
@@ -136,6 +137,13 @@ export default function SetDetailPage({ params }) {
 
   useEffect(() => { fetchSet() }, [fetchSet])
   useEffect(() => { fetchNotes() }, [fetchNotes])
+
+  useEffect(() => {
+    if (!batteryPopover) return
+    function handleClick() { setBatteryPopover(null) }
+    document.addEventListener('click', handleClick, { capture: true, once: true })
+    return () => document.removeEventListener('click', handleClick, { capture: true })
+  }, [batteryPopover])
 
   useEffect(() => {
     if (!showAddPicker) return
@@ -286,6 +294,17 @@ export default function SetDetailPage({ params }) {
     await logMovements('checkin', returnedIds)
     setScanMode(null); setScannedIds(new Set()); setConfirmScan(false)
     fetchSet()
+  }
+
+  async function updateBattery(equipmentId, batteryStatus) {
+    const supabase = getSupabase()
+    await supabase.from('equipment').update({ battery_status: batteryStatus }).eq('id', equipmentId)
+    setItems((prev) => prev.map((i) =>
+      i.equipment_id === equipmentId
+        ? { ...i, equipment: { ...i.equipment, battery_status: batteryStatus } }
+        : i
+    ))
+    setBatteryPopover(null)
   }
 
   async function bulkOut() {
@@ -591,8 +610,35 @@ export default function SetDetailPage({ params }) {
                       {item.equipment?.serial_number ? ` · S/N: ${item.equipment.serial_number}` : ''}
                     </div>
                   </div>
-                  {!scanMode && item.equipment?.battery_status && (
-                    <BattIcon className={`w-4 h-4 flex-shrink-0 ${BATTERY_COLOR[item.equipment.battery_status]}`} />
+                  {!scanMode && item.equipment && (
+                    <div className="relative flex-shrink-0">
+                      <button
+                        onClick={() => setBatteryPopover(batteryPopover === item.equipment_id ? null : item.equipment_id)}
+                        title="Aggiorna batteria"
+                        className={`p-1 rounded transition hover:bg-muted ${BATTERY_COLOR[item.equipment.battery_status] || 'text-muted-foreground'}`}
+                      >
+                        <BattIcon className="w-4 h-4" />
+                      </button>
+                      {batteryPopover === item.equipment_id && (
+                        <div className="absolute right-0 top-7 z-20 bg-popover border border-border rounded-xl shadow-xl p-1.5 flex gap-1">
+                          {[
+                            { value: 'charged', icon: Battery, label: 'Carica', color: 'text-emerald-400' },
+                            { value: 'charging', icon: BatteryCharging, label: 'In carica', color: 'text-primary' },
+                            { value: 'low', icon: BatteryLow, label: 'Scarica', color: 'text-red-400' },
+                            { value: 'na', icon: Minus, label: 'N/D', color: 'text-muted-foreground' },
+                          ].map(({ value, icon: Icon, label, color }) => (
+                            <button
+                              key={value}
+                              onClick={() => updateBattery(item.equipment_id, value)}
+                              title={label}
+                              className={`p-2 rounded-lg hover:bg-muted transition ${item.equipment.battery_status === value ? 'bg-muted' : ''} ${color}`}
+                            >
+                              <Icon className="w-4 h-4" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${ITEM_STATUS_STYLES[item.status] || 'bg-muted text-muted-foreground'}`}>
                     {ITEM_STATUS_LABELS[item.status] || item.status}
