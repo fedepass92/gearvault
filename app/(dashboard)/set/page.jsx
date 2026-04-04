@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { getSupabase } from '@/lib/supabase'
-import { Plus, Briefcase, MapPin, Calendar, Loader2, ChevronRight } from 'lucide-react'
+import { Plus, Briefcase, MapPin, Calendar, Loader2, ChevronRight, Copy } from 'lucide-react'
 import { format } from 'date-fns'
 import { it } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
@@ -26,12 +27,14 @@ const STATUS_LABELS = { planned: 'Pianificato', out: 'In uscita', returned: 'Rie
 const EMPTY_SET = { name: '', job_date: '', location: '', notes: '', status: 'planned' }
 
 export default function SetPage() {
+  const router = useRouter()
   const [sets, setSets] = useState([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(EMPTY_SET)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [duplicating, setDuplicating] = useState(null) // set id being duplicated
 
   useEffect(() => { fetchSets() }, [])
 
@@ -65,6 +68,42 @@ export default function SetPage() {
       fetchSets()
     }
     setSaving(false)
+  }
+
+  async function duplicateSet(set, e) {
+    e.preventDefault()
+    e.stopPropagation()
+    setDuplicating(set.id)
+    const supabase = getSupabase()
+
+    // Create new set
+    const { data: newSet, error: setErr } = await supabase
+      .from('sets')
+      .insert({
+        name: `${set.name} (copia)`,
+        location: set.location || null,
+        notes: set.notes || null,
+        status: 'planned',
+      })
+      .select()
+      .single()
+
+    if (setErr || !newSet) { setDuplicating(null); return }
+
+    // Copy all items with status reset to planned
+    const { data: sourceItems } = await supabase
+      .from('set_items')
+      .select('equipment_id')
+      .eq('set_id', set.id)
+
+    if (sourceItems?.length > 0) {
+      await supabase.from('set_items').insert(
+        sourceItems.map((i) => ({ set_id: newSet.id, equipment_id: i.equipment_id, status: 'planned' }))
+      )
+    }
+
+    setDuplicating(null)
+    router.push(`/set/${newSet.id}`)
   }
 
   return (
@@ -124,6 +163,17 @@ export default function SetPage() {
                   <span>{set.set_items?.[0]?.count ?? 0} item</span>
                 </div>
               </div>
+              <button
+                onClick={(e) => duplicateSet(set, e)}
+                disabled={duplicating === set.id}
+                title="Duplica set"
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition flex-shrink-0 disabled:opacity-40"
+              >
+                {duplicating === set.id
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : <Copy className="w-4 h-4" />
+                }
+              </button>
               <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition flex-shrink-0" />
             </Link>
           ))}
