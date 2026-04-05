@@ -10,6 +10,7 @@ import {
   Camera, LayoutDashboard, Package, Tag, Briefcase, FileText,
   Users, LogOut, Menu, X, Box, History, Layers, Settings, Loader2,
   Search, Wrench, BarChart2, Moon, Sun, Plus, Upload, Eye, EyeOff,
+  Calendar, ChevronRight,
 } from 'lucide-react'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -21,21 +22,58 @@ import { Separator } from '@/components/ui/separator'
 import CommandPalette from '@/components/CommandPalette'
 import { toast } from 'sonner'
 
-const NAV_MAIN = [
-  { href: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { href: '/inventario', icon: Package, label: 'Inventario' },
-  { href: '/set', icon: Briefcase, label: 'Set Manager', badgeKey: 'overdueSets' },
-  { href: '/case', icon: Box, label: 'Case' },
-  { href: '/kit', icon: Layers, label: 'Kit' },
-  { href: '/statistiche', icon: BarChart2, label: 'Statistiche' },
+// ── Nav structure ─────────────────────────────────────────────────────────────
+
+const NAV_SECTIONS = [
+  {
+    id: 'main',
+    label: null, // no section label for top items
+    items: [
+      { href: '/',           icon: LayoutDashboard, label: 'Dashboard' },
+      { href: '/calendario', icon: Calendar,         label: 'Calendario' },
+    ],
+  },
+  {
+    id: 'attrezzatura',
+    label: 'Attrezzatura',
+    items: [
+      { href: '/inventario', icon: Package, label: 'Inventario' },
+      { href: '/case',       icon: Box,     label: 'Case' },
+      { href: '/kit',        icon: Layers,  label: 'Kit' },
+    ],
+  },
+  {
+    id: 'set',
+    label: 'Set',
+    items: [
+      { href: '/set',     icon: Briefcase, label: 'Set Manager',      badgeKey: 'overdueSets' },
+      { href: '/storico', icon: History,   label: 'Storico movimenti' },
+    ],
+  },
+  {
+    id: 'documenti',
+    label: 'Documenti',
+    items: [
+      { href: '/etichette', icon: Tag,      label: 'Etichette' },
+      { href: '/report',    icon: FileText, label: 'Report Assicurativo' },
+    ],
+  },
+  {
+    id: 'analisi',
+    label: 'Analisi',
+    items: [
+      { href: '/statistiche', icon: BarChart2, label: 'Statistiche' },
+      { href: '/manutenzione',icon: Wrench,    label: 'Manutenzione', badgeKey: 'maintenance' },
+    ],
+  },
 ]
 
-const NAV_DOCS = [
-  { href: '/etichette', icon: Tag, label: 'Etichette' },
-  { href: '/report', icon: FileText, label: 'Report Assicurativo' },
-  { href: '/storico', icon: History, label: 'Storico movimenti' },
-  { href: '/manutenzione', icon: Wrench, label: 'Manutenzione', badgeKey: 'maintenance' },
+const NAV_ADMIN = [
+  { href: '/utenti',       icon: Users,    label: 'Utenti' },
+  { href: '/impostazioni', icon: Settings, label: 'Impostazioni' },
 ]
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function Sidebar({ user, profile }) {
   const pathname = usePathname()
@@ -71,8 +109,7 @@ export default function Sidebar({ user, profile }) {
       ])
       const maintenanceCount = (equipment || []).filter((e) => {
         if (!e.last_checked_at) return true
-        const days = Math.floor((Date.now() - new Date(e.last_checked_at).getTime()) / 86400000)
-        return days > 90
+        return Math.floor((Date.now() - new Date(e.last_checked_at).getTime()) / 86400000) > 90
       }).length
       setBadges({ maintenance: maintenanceCount, overdueSets: (overdue || []).length })
     }
@@ -120,10 +157,7 @@ export default function Sidebar({ user, profile }) {
     setProfileSaving(true)
     setProfileError('')
     const supabase = getSupabase()
-    const { error } = await supabase
-      .from('profiles')
-      .update({ full_name: profileName.trim() })
-      .eq('id', user.id)
+    const { error } = await supabase.from('profiles').update({ full_name: profileName.trim() }).eq('id', user.id)
     setProfileSaving(false)
     if (error) { setProfileError('Errore nel salvataggio'); return }
     setProfileOpen(false)
@@ -133,27 +167,34 @@ export default function Sidebar({ user, profile }) {
 
   async function handlePasswordSave() {
     if (!newPassword) return
-    if (newPassword.length < 6) { toast.error('La password deve essere di almeno 6 caratteri'); return }
+    if (newPassword.length < 6) { toast.error('Password minimo 6 caratteri'); return }
     if (newPassword !== confirmPassword) { toast.error('Le password non coincidono'); return }
     setPwdSaving(true)
     const supabase = getSupabase()
     const { error } = await supabase.auth.updateUser({ password: newPassword })
     setPwdSaving(false)
     if (error) { toast.error('Errore nel cambio password'); return }
-    setNewPassword('')
-    setConfirmPassword('')
+    setNewPassword(''); setConfirmPassword('')
     toast.success('Password aggiornata')
   }
 
+  function openProfile() {
+    setProfileName(profile?.full_name || '')
+    setProfileError('')
+    setNewPassword('')
+    setConfirmPassword('')
+    setProfileOpen(true)
+  }
+
+  // ── NavLink ──────────────────────────────────────────────────────────────────
   const NavLink = ({ item }) => {
-    if (item.adminOnly && !isAdmin) return null
     const active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
     const badgeCount = item.badgeKey ? badges[item.badgeKey] : 0
     return (
       <Link
         href={item.href}
         onClick={() => setMobileOpen(false)}
-        className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm transition-colors group ${
+        className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm transition-colors ${
           active
             ? 'bg-primary text-primary-foreground font-medium'
             : 'text-muted-foreground hover:text-foreground hover:bg-accent'
@@ -172,18 +213,20 @@ export default function Sidebar({ user, profile }) {
     )
   }
 
+  // ── Sidebar content ───────────────────────────────────────────────────────────
   const SidebarContent = () => (
     <div className="flex flex-col h-full bg-sidebar border-r border-sidebar-border">
+
       {/* Logo */}
-      <div className="flex items-center gap-2 px-4 h-14 border-b border-sidebar-border">
+      <div className="flex items-center gap-2 px-4 h-14 border-b border-sidebar-border flex-shrink-0">
         <div className="flex items-center justify-center w-6 h-6 rounded-full bg-foreground">
           <Camera className="w-3.5 h-3.5 text-background" />
         </div>
         <span className="text-sm font-semibold text-sidebar-foreground">GearVault</span>
       </div>
 
-      {/* Quick create + search */}
-      <div className="px-3 py-3 space-y-1 border-b border-sidebar-border">
+      {/* Quick search */}
+      <div className="px-3 py-3 border-b border-sidebar-border flex-shrink-0">
         <button
           onClick={() => setSearchOpen(true)}
           className="w-full flex items-center gap-2 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition"
@@ -194,50 +237,50 @@ export default function Sidebar({ user, profile }) {
         </button>
       </div>
 
-      {/* Nav main */}
-      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
-        <div className="space-y-0.5">
-          {NAV_MAIN.map((item) => (
-            <NavLink key={item.href} item={item} />
-          ))}
-        </div>
-
-        <div>
-          <p className="px-2 pb-1 text-xs font-medium text-sidebar-muted uppercase tracking-wider">
-            Documenti
-          </p>
-          <div className="space-y-0.5">
-            {NAV_DOCS.map((item) => (
-              <NavLink key={item.href} item={item} />
-            ))}
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-4 min-h-0">
+        {NAV_SECTIONS.map((section) => (
+          <div key={section.id}>
+            {section.label && (
+              <p className="px-2 pb-1.5 text-[10px] font-semibold text-sidebar-muted uppercase tracking-widest">
+                {section.label}
+              </p>
+            )}
+            <div className="space-y-0.5">
+              {section.items.map((item) => (
+                <NavLink key={item.href} item={item} />
+              ))}
+            </div>
           </div>
-        </div>
+        ))}
 
+        {/* Admin section */}
         {isAdmin && (
           <div>
-            <p className="px-2 pb-1 text-xs font-medium text-sidebar-muted uppercase tracking-wider">
-              Admin
-            </p>
-            <NavLink item={{ href: '/utenti', icon: Users, label: 'Utenti' }} />
+            <div className="flex items-center gap-2 px-2 pb-1.5">
+              <div className="flex-1 h-px bg-sidebar-border" />
+              <p className="text-[10px] font-semibold text-sidebar-muted uppercase tracking-widest whitespace-nowrap">
+                Admin
+              </p>
+              <div className="flex-1 h-px bg-sidebar-border" />
+            </div>
+            <div className="space-y-0.5">
+              {NAV_ADMIN.map((item) => (
+                <NavLink key={item.href} item={item} />
+              ))}
+            </div>
           </div>
         )}
       </nav>
 
-      {/* Bottom links */}
-      <div className="px-3 py-2 border-t border-sidebar-border space-y-0.5">
+      {/* Bottom: theme + logout */}
+      <div className="px-3 py-2 border-t border-sidebar-border space-y-0.5 flex-shrink-0">
         <button
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
           className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition"
         >
           {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           <span>{theme === 'dark' ? 'Tema chiaro' : 'Tema scuro'}</span>
-        </button>
-        <button
-          onClick={() => { setProfileName(profile?.full_name || ''); setProfileError(''); setNewPassword(''); setConfirmPassword(''); setProfileOpen(true) }}
-          className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition"
-        >
-          <Settings className="w-4 h-4" />
-          <span>Impostazioni</span>
         </button>
         <button
           onClick={handleLogout}
@@ -248,10 +291,10 @@ export default function Sidebar({ user, profile }) {
         </button>
       </div>
 
-      {/* User */}
-      <div className="px-3 py-3 border-t border-sidebar-border">
+      {/* User footer */}
+      <div className="px-3 py-3 border-t border-sidebar-border flex-shrink-0">
         <button
-          onClick={() => { setProfileName(profile?.full_name || ''); setProfileError(''); setNewPassword(''); setConfirmPassword(''); setProfileOpen(true) }}
+          onClick={openProfile}
           className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-accent transition group"
         >
           <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center flex-shrink-0 border border-border overflow-hidden">
@@ -267,9 +310,7 @@ export default function Sidebar({ user, profile }) {
             <div className="text-xs font-medium truncate text-sidebar-foreground">
               {profile?.full_name || user?.email?.split('@')[0] || 'Utente'}
             </div>
-            <div className="text-[10px] truncate text-sidebar-muted">
-              {user?.email}
-            </div>
+            <div className="text-[10px] truncate text-sidebar-muted">{user?.email}</div>
           </div>
           <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${
             isAdmin ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
@@ -290,10 +331,7 @@ export default function Sidebar({ user, profile }) {
 
       {/* Mobile topbar */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-sidebar border-b border-sidebar-border flex items-center gap-3 px-4 py-3">
-        <button
-          onClick={() => setMobileOpen(true)}
-          className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition"
-        >
+        <button onClick={() => setMobileOpen(true)} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition">
           <Menu className="w-5 h-5" />
         </button>
         <div className="flex items-center gap-2 flex-1">
@@ -302,10 +340,7 @@ export default function Sidebar({ user, profile }) {
           </div>
           <span className="text-sm font-semibold">GearVault</span>
         </div>
-        <button
-          onClick={() => setSearchOpen(true)}
-          className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition"
-        >
+        <button onClick={() => setSearchOpen(true)} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition">
           <Search className="w-5 h-5" />
         </button>
       </div>
@@ -315,10 +350,7 @@ export default function Sidebar({ user, profile }) {
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
           <aside className="relative w-64 h-full shadow-2xl">
-            <button
-              onClick={() => setMobileOpen(false)}
-              className="absolute top-4 right-3 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition z-10"
-            >
+            <button onClick={() => setMobileOpen(false)} className="absolute top-4 right-3 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition z-10">
               <X className="w-4 h-4" />
             </button>
             <SidebarContent />
@@ -332,17 +364,11 @@ export default function Sidebar({ user, profile }) {
       {/* Profile modal */}
       <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
         <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Profilo</DialogTitle>
-          </DialogHeader>
-
+          <DialogHeader><DialogTitle>Profilo</DialogTitle></DialogHeader>
           <div className="space-y-5 py-1">
-            {/* ── Avatar ── */}
+            {/* Avatar */}
             <div className="flex flex-col items-center gap-3">
-              <div
-                className="relative w-20 h-20 rounded-full bg-muted border-2 border-border overflow-hidden cursor-pointer group"
-                onClick={() => avatarInputRef.current?.click()}
-              >
+              <div className="relative w-20 h-20 rounded-full bg-muted border-2 border-border overflow-hidden cursor-pointer group" onClick={() => avatarInputRef.current?.click()}>
                 {avatarUrl ? (
                   <Image src={avatarUrl} alt="avatar" fill className="object-cover" />
                 ) : (
@@ -353,99 +379,59 @@ export default function Sidebar({ user, profile }) {
                   </div>
                 )}
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-                  {avatarUploading
-                    ? <Loader2 className="w-5 h-5 text-white animate-spin" />
-                    : <Upload className="w-5 h-5 text-white" />}
+                  {avatarUploading ? <Loader2 className="w-5 h-5 text-white animate-spin" /> : <Upload className="w-5 h-5 text-white" />}
                 </div>
               </div>
-              <input
-                ref={avatarInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleAvatarUpload}
-              />
+              <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
               <p className="text-xs text-muted-foreground">Clicca per cambiare foto</p>
             </div>
 
             <Separator />
 
-            {/* ── Info ── */}
+            {/* Info */}
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label htmlFor="profile-email">Email</Label>
-                <Input id="profile-email" value={user?.email || ''} disabled className="bg-muted/50 h-8 text-sm" />
+                <Label>Email</Label>
+                <Input value={user?.email || ''} disabled className="bg-muted/50 h-8 text-sm" />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="profile-name">Nome completo</Label>
-                <Input
-                  id="profile-name"
-                  value={profileName}
-                  onChange={(e) => setProfileName(e.target.value)}
-                  placeholder="Mario Rossi"
-                  className="h-8 text-sm"
-                  onKeyDown={(e) => e.key === 'Enter' && handleProfileSave()}
-                />
+                <Label>Nome completo</Label>
+                <Input value={profileName} onChange={(e) => setProfileName(e.target.value)} placeholder="Mario Rossi" className="h-8 text-sm" onKeyDown={(e) => e.key === 'Enter' && handleProfileSave()} />
               </div>
               <div className="space-y-1.5">
                 <Label>Ruolo</Label>
-                <div className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
-                  isAdmin ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
-                }`}>
+                <div className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${isAdmin ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
                   {isAdmin ? 'Amministratore' : 'Operatore'}
                 </div>
               </div>
               {profileError && <p className="text-xs text-destructive">{profileError}</p>}
-            </div>
-
-            <div className="flex justify-end">
-              <Button size="sm" onClick={handleProfileSave} disabled={profileSaving}>
-                {profileSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                Salva nome
-              </Button>
+              <div className="flex justify-end">
+                <Button size="sm" onClick={handleProfileSave} disabled={profileSaving}>
+                  {profileSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  Salva nome
+                </Button>
+              </div>
             </div>
 
             <Separator />
 
-            {/* ── Password ── */}
+            {/* Password */}
             <div className="space-y-3">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cambia password</p>
               <div className="space-y-1.5">
-                <Label htmlFor="new-pwd">Nuova password</Label>
+                <Label>Nuova password</Label>
                 <div className="relative">
-                  <Input
-                    id="new-pwd"
-                    type={showNewPwd ? 'text' : 'password'}
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Minimo 6 caratteri"
-                    className="h-8 text-sm pr-8"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowNewPwd((v) => !v)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
+                  <Input type={showNewPwd ? 'text' : 'password'} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Minimo 6 caratteri" className="h-8 text-sm pr-8" />
+                  <button type="button" onClick={() => setShowNewPwd((v) => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                     {showNewPwd ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                   </button>
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="confirm-pwd">Conferma password</Label>
+                <Label>Conferma password</Label>
                 <div className="relative">
-                  <Input
-                    id="confirm-pwd"
-                    type={showConfirmPwd ? 'text' : 'password'}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Ripeti la nuova password"
-                    className="h-8 text-sm pr-8"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPwd((v) => !v)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
+                  <Input type={showConfirmPwd ? 'text' : 'password'} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Ripeti la nuova password" className="h-8 text-sm pr-8" />
+                  <button type="button" onClick={() => setShowConfirmPwd((v) => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                     {showConfirmPwd ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                   </button>
                 </div>
@@ -458,7 +444,6 @@ export default function Sidebar({ user, profile }) {
               </div>
             </div>
           </div>
-
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setProfileOpen(false)}>Chiudi</Button>
           </DialogFooter>
