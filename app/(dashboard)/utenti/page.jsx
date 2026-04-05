@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { getSupabase } from '@/lib/supabase'
-import { Users, Mail, Loader2, ShieldCheck, Send, Activity } from 'lucide-react'
+import { Users, Mail, Loader2, ShieldCheck, Send, Activity, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { it } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
@@ -21,11 +21,21 @@ export default function UtentiPage() {
   const [loading, setLoading] = useState(true)
   const [currentUserId, setCurrentUserId] = useState(null)
   const [isAdmin, setIsAdmin] = useState(false)
+
+  // Invite state
   const [showInvite, setShowInvite] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState('operator')
   const [inviting, setInviting] = useState(false)
   const [inviteError, setInviteError] = useState('')
   const [inviteSuccess, setInviteSuccess] = useState('')
+
+  // Delete state
+  const [deleteTarget, setDeleteTarget] = useState(null) // profile to delete
+  const [deleting, setDeleting] = useState(false)
+
+  // Store current user's name for invite emails
+  const [myName, setMyName] = useState(null)
 
   useEffect(() => {
     async function init() {
@@ -34,9 +44,10 @@ export default function UtentiPage() {
       if (!user) return
       setCurrentUserId(user.id)
 
-      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+      const { data: profile } = await supabase.from('profiles').select('role, full_name').eq('id', user.id).single()
       if (profile?.role !== 'admin') { setLoading(false); return }
       setIsAdmin(true)
+      setMyName(profile?.full_name || null)
 
       const [{ data: allProfiles }, { data: movLogs }] = await Promise.all([
         supabase.from('profiles').select('*').order('created_at'),
@@ -64,47 +75,47 @@ export default function UtentiPage() {
     setInviteError('')
     setInviteSuccess('')
 
-    // 1. Create the user account in Supabase Auth
-    const supabase = getSupabase()
-    const tempPassword = Math.random().toString(36).slice(-12) + 'Aa1!'
-    const loginUrl = `${window.location.origin}/login`
-    const { data: { user: newUser }, error: signUpError } = await supabase.auth.signUp({
-      email: inviteEmail,
-      password: tempPassword,
-      options: { emailRedirectTo: loginUrl },
+    const res = await fetch('/api/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'invite',
+        to: inviteEmail,
+        role: inviteRole,
+        inviterName: myName,
+        loginUrl: `${window.location.origin}/login`,
+      }),
     })
 
-    if (signUpError) {
-      setInviteError(signUpError.message)
+    const json = await res.json()
+    if (!res.ok) {
+      setInviteError(json.error || 'Errore durante l\'invito')
       setInviting(false)
       return
     }
 
-    // 2. Get current user's name for the invite email
-    const { data: { user: me } } = await supabase.auth.getUser()
-    const { data: myProfile } = await supabase.from('profiles').select('full_name').eq('id', me.id).single()
-
-    // 3. Send branded invite email via Resend
-    try {
-      await fetch('/api/email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'invite',
-          to: inviteEmail,
-          inviteeEmail: inviteEmail,
-          inviterName: myProfile?.full_name || null,
-          loginUrl,
-        }),
-      })
-    } catch (_) {
-      // Email failure is non-blocking — account was created successfully
-    }
-
     setInviteSuccess(`Invito inviato a ${inviteEmail}`)
     setInviteEmail('')
+    setInviteRole('operator')
     setShowInvite(false)
     setInviting(false)
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+
+    const res = await fetch('/api/admin/delete-user', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: deleteTarget.id }),
+    })
+
+    if (res.ok) {
+      setProfiles((prev) => prev.filter((p) => p.id !== deleteTarget.id))
+    }
+    setDeleting(false)
+    setDeleteTarget(null)
   }
 
   if (!isAdmin && !loading) {
@@ -150,6 +161,7 @@ export default function UtentiPage() {
                 <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell">Registrato il</th>
                 <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Attività</th>
                 <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Ruolo</th>
+                <th className="w-10" />
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
@@ -202,6 +214,17 @@ export default function UtentiPage() {
                       </Select>
                     )}
                   </td>
+                  <td className="px-3 py-4">
+                    {profile.id !== currentUserId && (
+                      <button
+                        onClick={() => setDeleteTarget(profile)}
+                        className="p-1.5 rounded-md text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition"
+                        title="Elimina utente"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -209,7 +232,8 @@ export default function UtentiPage() {
         )}
       </div>
 
-      <Dialog open={showInvite} onOpenChange={(o) => { if (!o) { setShowInvite(false); setInviteError('') } }}>
+      {/* Invite dialog */}
+      <Dialog open={showInvite} onOpenChange={(o) => { if (!o) { setShowInvite(false); setInviteError(''); setInviteRole('operator') } }}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Invita nuovo utente</DialogTitle></DialogHeader>
           <form onSubmit={handleInvite} className="space-y-4">
@@ -228,6 +252,18 @@ export default function UtentiPage() {
                 />
               </div>
             </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="invite-role">Ruolo</Label>
+              <Select value={inviteRole} onValueChange={setInviteRole}>
+                <SelectTrigger id="invite-role">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="operator">Operatore</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             {inviteError && <p className="text-sm text-destructive">{inviteError}</p>}
             <DialogFooter className="gap-2">
               <Button type="button" variant="outline" onClick={() => setShowInvite(false)}>Annulla</Button>
@@ -237,6 +273,32 @@ export default function UtentiPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirm dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="w-4 h-4" />
+              Elimina utente
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Sei sicuro di voler eliminare{' '}
+            <strong className="text-foreground">{deleteTarget?.full_name || deleteTarget?.id}</strong>?
+            {' '}Questa azione è irreversibile.
+          </p>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+              Annulla
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting && <Loader2 className="w-4 h-4 animate-spin" />}
+              Elimina
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

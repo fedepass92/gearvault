@@ -1,5 +1,14 @@
 import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { resend, FROM_EMAIL, FROM_NAME, inviteTemplate, maintenanceAlertTemplate, setConfirmTemplate } from '@/lib/resend'
+
+function getAdminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
 
 export async function POST(request) {
   try {
@@ -12,7 +21,42 @@ export async function POST(request) {
 
     let subject, html
     if (type === 'invite') {
-      ;({ subject, html } = inviteTemplate(data))
+      const admin = getAdminClient()
+      const loginUrl = data.loginUrl || `${request.headers.get('origin') || ''}/login`
+
+      // Create user via admin API (no email confirmation required)
+      const { data: created, error: createError } = await admin.auth.admin.createUser({
+        email: to,
+        password: Math.random().toString(36).slice(-12) + 'Aa1!',
+        email_confirm: true,
+      })
+      if (createError) {
+        return NextResponse.json({ error: createError.message }, { status: 400 })
+      }
+
+      // Set role on profile (trigger may have already created it)
+      const role = data.role || 'operator'
+      await admin.from('profiles').upsert(
+        { id: created.user.id, role },
+        { onConflict: 'id' }
+      )
+
+      // Send branded email
+      ;({ subject, html } = inviteTemplate({ inviteeEmail: to, inviterName: data.inviterName || null, loginUrl }))
+
+      const { data: result, error } = await resend.emails.send({
+        from: `${FROM_NAME} <${FROM_EMAIL}>`,
+        to: [to],
+        subject,
+        html,
+      })
+      if (error) {
+        console.error('[email route] Resend error:', error)
+        // User was created — return success with warning
+        return NextResponse.json({ id: null, warning: 'User created but email failed' })
+      }
+      return NextResponse.json({ id: result?.id })
+
     } else if (type === 'maintenance_alert') {
       ;({ subject, html } = maintenanceAlertTemplate(data))
     } else if (type === 'set_confirm') {
