@@ -64,7 +64,7 @@ export default function EtichettePage() {
       setLoading(true)
       const supabase = getSupabase()
       if (tab === 'equipment') {
-        let q = supabase.from('equipment').select('id, name, brand, model, serial_number').order('name')
+        let q = supabase.from('equipment').select('id, name, brand, model, serial_number, label_note').order('name')
         if (search) q = q.or(`name.ilike.%${search}%,serial_number.ilike.%${search}%,brand.ilike.%${search}%`)
         const { data } = await q
         setEquipment(data || [])

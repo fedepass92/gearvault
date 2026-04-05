@@ -58,7 +58,7 @@ const EMPTY = {
   name: '', brand: '', model: '', serial_number: '', category: '',
   purchase_date: '', purchase_price: '', market_value: '', insured_value: '',
   condition: 'active', battery_status: 'na', last_checked_at: '',
-  location: 'studio', useful_life_years: '', notes: '', photo_url: '',
+  location: 'studio', useful_life_years: '', notes: '', label_note: '', photo_url: '',
 }
 
 async function compressImage(file) {
@@ -189,6 +189,7 @@ export default function EquipmentModal({ item, onClose, onSaved }) {
       location: form.location || null,
       useful_life_years: form.useful_life_years !== '' ? parseInt(form.useful_life_years) : null,
       notes: form.notes || null,
+      label_note: form.label_note || null,
       photo_url: form.photo_url || null,
     }
 
@@ -392,6 +393,16 @@ export default function EquipmentModal({ item, onClose, onSaved }) {
             <Textarea value={form.notes} onChange={(e) => setField('notes', e.target.value)} rows={3} placeholder="Note aggiuntive…" className="resize-none" />
           </Field>
 
+          {/* Label note */}
+          <Field label="Nota etichetta" hint="Testo breve che appare sulle etichette stampate">
+            <Input
+              value={form.label_note}
+              onChange={(e) => setField('label_note', e.target.value)}
+              placeholder="Es. «Fragile» · «Box 3» · «Solo studio»"
+              maxLength={40}
+            />
+          </Field>
+
           {error && (
             <div className="bg-destructive/10 border border-destructive/30 rounded-lg px-4 py-3 text-sm text-destructive">
               {error}
@@ -411,10 +422,13 @@ export default function EquipmentModal({ item, onClose, onSaved }) {
   )
 }
 
-function Field({ label, children }) {
+function Field({ label, hint, children }) {
   return (
     <div>
-      <Label className="text-xs text-muted-foreground mb-1.5 block">{label}</Label>
+      <div className="flex items-baseline gap-2 mb-1.5">
+        <Label className="text-xs text-muted-foreground">{label}</Label>
+        {hint && <span className="text-[10px] text-muted-foreground/70 italic">{hint}</span>}
+      </div>
       {children}
     </div>
   )

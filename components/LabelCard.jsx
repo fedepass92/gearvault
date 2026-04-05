@@ -143,6 +143,18 @@ function LabelKeyTag({ item, isCase, isKit, qrValue }) {
         }}>
           {serial}
         </div>
+
+        {/* Label note */}
+        {item.label_note && (
+          <div style={{
+            fontSize: '5.5px', fontWeight: '600', color: '#92400e',
+            background: '#fef3c7', border: '1px solid #fcd34d',
+            borderRadius: '3px', padding: '1mm 2.5mm', textAlign: 'center',
+            letterSpacing: '0.04em',
+          }}>
+            {item.label_note}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -263,6 +275,16 @@ function LabelBaby({ item, isCase, isKit, qrValue }) {
               marginTop: '1.5mm', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
               {serial}
+            </div>
+          )}
+          {item.label_note && (
+            <div style={{
+              fontSize: '4.5px', fontWeight: '600', color: '#92400e',
+              background: '#fef3c7', border: '1px solid #fcd34d',
+              borderRadius: '2px', padding: '0.5mm 1.5mm', marginTop: '1mm',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {item.label_note}
             </div>
           )}
         </div>

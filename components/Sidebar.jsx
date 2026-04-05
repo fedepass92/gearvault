@@ -1,14 +1,15 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTheme } from 'next-themes'
 import { getSupabase } from '@/lib/supabase'
 import {
   Camera, LayoutDashboard, Package, Tag, Briefcase, FileText,
   Users, LogOut, Menu, X, Box, History, Layers, Settings, Loader2,
-  Search, Wrench, BarChart2, HelpCircle, Moon, Sun, Plus,
+  Search, Wrench, BarChart2, Moon, Sun, Plus, Upload, Eye, EyeOff,
 } from 'lucide-react'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -16,6 +17,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Separator } from '@/components/ui/separator'
 import CommandPalette from '@/components/CommandPalette'
 import { toast } from 'sonner'
 
@@ -46,6 +48,16 @@ export default function Sidebar({ user, profile }) {
   const [profileSaving, setProfileSaving] = useState(false)
   const [profileError, setProfileError] = useState('')
   const [badges, setBadges] = useState({ maintenance: 0, overdueSets: 0 })
+  // Avatar
+  const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || null)
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const avatarInputRef = useRef(null)
+  // Password change
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showNewPwd, setShowNewPwd] = useState(false)
+  const [showConfirmPwd, setShowConfirmPwd] = useState(false)
+  const [pwdSaving, setPwdSaving] = useState(false)
   const isAdmin = profile?.role === 'admin'
 
   useEffect(() => {
@@ -84,6 +96,25 @@ export default function Sidebar({ user, profile }) {
     router.push('/login')
   }
 
+  async function handleAvatarUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) { toast.error('Seleziona un file immagine'); return }
+    setAvatarUploading(true)
+    const supabase = getSupabase()
+    const ext = file.name.split('.').pop()
+    const path = `${user.id}/avatar.${ext}`
+    const { error: upErr } = await supabase.storage.from('avatars').upload(path, file, { upsert: true })
+    if (upErr) { toast.error('Errore upload avatar'); setAvatarUploading(false); return }
+    const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path)
+    const url = `${publicUrl}?t=${Date.now()}`
+    await supabase.from('profiles').update({ avatar_url: url }).eq('id', user.id)
+    setAvatarUrl(url)
+    setAvatarUploading(false)
+    toast.success('Avatar aggiornato')
+    router.refresh()
+  }
+
   async function handleProfileSave() {
     if (!profileName.trim()) { setProfileError('Il nome non può essere vuoto'); return }
     setProfileSaving(true)
@@ -98,6 +129,20 @@ export default function Sidebar({ user, profile }) {
     setProfileOpen(false)
     toast.success('Profilo aggiornato')
     router.refresh()
+  }
+
+  async function handlePasswordSave() {
+    if (!newPassword) return
+    if (newPassword.length < 6) { toast.error('La password deve essere di almeno 6 caratteri'); return }
+    if (newPassword !== confirmPassword) { toast.error('Le password non coincidono'); return }
+    setPwdSaving(true)
+    const supabase = getSupabase()
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    setPwdSaving(false)
+    if (error) { toast.error('Errore nel cambio password'); return }
+    setNewPassword('')
+    setConfirmPassword('')
+    toast.success('Password aggiornata')
   }
 
   const NavLink = ({ item }) => {
@@ -188,7 +233,7 @@ export default function Sidebar({ user, profile }) {
           <span>{theme === 'dark' ? 'Tema chiaro' : 'Tema scuro'}</span>
         </button>
         <button
-          onClick={() => { setProfileName(profile?.full_name || ''); setProfileError(''); setProfileOpen(true) }}
+          onClick={() => { setProfileName(profile?.full_name || ''); setProfileError(''); setNewPassword(''); setConfirmPassword(''); setProfileOpen(true) }}
           className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition"
         >
           <Settings className="w-4 h-4" />
@@ -206,13 +251,17 @@ export default function Sidebar({ user, profile }) {
       {/* User */}
       <div className="px-3 py-3 border-t border-sidebar-border">
         <button
-          onClick={() => { setProfileName(profile?.full_name || ''); setProfileError(''); setProfileOpen(true) }}
+          onClick={() => { setProfileName(profile?.full_name || ''); setProfileError(''); setNewPassword(''); setConfirmPassword(''); setProfileOpen(true) }}
           className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-accent transition group"
         >
-          <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center flex-shrink-0 border border-border">
-            <span className="text-xs font-semibold text-foreground">
-              {(profile?.full_name || user?.email || 'U')[0].toUpperCase()}
-            </span>
+          <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center flex-shrink-0 border border-border overflow-hidden">
+            {avatarUrl ? (
+              <Image src={avatarUrl} alt="avatar" width={28} height={28} className="object-cover w-full h-full" />
+            ) : (
+              <span className="text-xs font-semibold text-foreground">
+                {(profile?.full_name || user?.email || 'U')[0].toUpperCase()}
+              </span>
+            )}
           </div>
           <div className="flex-1 min-w-0 text-left">
             <div className="text-xs font-medium truncate text-sidebar-foreground">
@@ -286,37 +335,132 @@ export default function Sidebar({ user, profile }) {
           <DialogHeader>
             <DialogTitle>Profilo</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="profile-email">Email</Label>
-              <Input id="profile-email" value={user?.email || ''} disabled className="bg-muted/50" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="profile-name">Nome completo</Label>
-              <Input
-                id="profile-name"
-                value={profileName}
-                onChange={(e) => setProfileName(e.target.value)}
-                placeholder="Mario Rossi"
-                onKeyDown={(e) => e.key === 'Enter' && handleProfileSave()}
+
+          <div className="space-y-5 py-1">
+            {/* ── Avatar ── */}
+            <div className="flex flex-col items-center gap-3">
+              <div
+                className="relative w-20 h-20 rounded-full bg-muted border-2 border-border overflow-hidden cursor-pointer group"
+                onClick={() => avatarInputRef.current?.click()}
+              >
+                {avatarUrl ? (
+                  <Image src={avatarUrl} alt="avatar" fill className="object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <span className="text-2xl font-bold text-muted-foreground">
+                      {(profile?.full_name || user?.email || 'U')[0].toUpperCase()}
+                    </span>
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                  {avatarUploading
+                    ? <Loader2 className="w-5 h-5 text-white animate-spin" />
+                    : <Upload className="w-5 h-5 text-white" />}
+                </div>
+              </div>
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleAvatarUpload}
               />
+              <p className="text-xs text-muted-foreground">Clicca per cambiare foto</p>
             </div>
-            <div className="space-y-1.5">
-              <Label>Ruolo</Label>
-              <div className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
-                isAdmin ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
-              }`}>
-                {isAdmin ? 'Amministratore' : 'Operatore'}
+
+            <Separator />
+
+            {/* ── Info ── */}
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="profile-email">Email</Label>
+                <Input id="profile-email" value={user?.email || ''} disabled className="bg-muted/50 h-8 text-sm" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="profile-name">Nome completo</Label>
+                <Input
+                  id="profile-name"
+                  value={profileName}
+                  onChange={(e) => setProfileName(e.target.value)}
+                  placeholder="Mario Rossi"
+                  className="h-8 text-sm"
+                  onKeyDown={(e) => e.key === 'Enter' && handleProfileSave()}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Ruolo</Label>
+                <div className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
+                  isAdmin ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                }`}>
+                  {isAdmin ? 'Amministratore' : 'Operatore'}
+                </div>
+              </div>
+              {profileError && <p className="text-xs text-destructive">{profileError}</p>}
+            </div>
+
+            <div className="flex justify-end">
+              <Button size="sm" onClick={handleProfileSave} disabled={profileSaving}>
+                {profileSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                Salva nome
+              </Button>
+            </div>
+
+            <Separator />
+
+            {/* ── Password ── */}
+            <div className="space-y-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cambia password</p>
+              <div className="space-y-1.5">
+                <Label htmlFor="new-pwd">Nuova password</Label>
+                <div className="relative">
+                  <Input
+                    id="new-pwd"
+                    type={showNewPwd ? 'text' : 'password'}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Minimo 6 caratteri"
+                    className="h-8 text-sm pr-8"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPwd((v) => !v)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showNewPwd ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="confirm-pwd">Conferma password</Label>
+                <div className="relative">
+                  <Input
+                    id="confirm-pwd"
+                    type={showConfirmPwd ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Ripeti la nuova password"
+                    className="h-8 text-sm pr-8"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPwd((v) => !v)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showConfirmPwd ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <Button size="sm" variant="outline" onClick={handlePasswordSave} disabled={pwdSaving || !newPassword}>
+                  {pwdSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  Aggiorna password
+                </Button>
               </div>
             </div>
-            {profileError && <p className="text-xs text-destructive">{profileError}</p>}
           </div>
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setProfileOpen(false)} disabled={profileSaving}>Annulla</Button>
-            <Button onClick={handleProfileSave} disabled={profileSaving}>
-              {profileSaving && <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />}
-              Salva
-            </Button>
+            <Button variant="outline" size="sm" onClick={() => setProfileOpen(false)}>Chiudi</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

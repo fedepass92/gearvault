@@ -9,7 +9,7 @@ import {
   Download, Upload, Battery, BatteryLow, BatteryCharging,
   Minus, AlertTriangle, CheckCircle2, Package, MapPin, Clock,
   Layers, Box, TrendingUp, ArrowUpDown, ChevronRight,
-  Square, CheckSquare, X, Briefcase,
+  Square, CheckSquare, X, Briefcase, Tag,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format, differenceInDays } from 'date-fns'
@@ -356,6 +356,20 @@ function ItemDetailModal({ item, onClose, onEdit, onDelete }) {
                         <span className="text-muted-foreground">Valore residuo stimato</span>
                         <span className="font-bold text-foreground text-base">{fmtEur(depr.residual)}</span>
                       </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {item.label_note && (
+                <>
+                  <Separator />
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <Tag className="w-3 h-3" /> Nota etichetta
+                    </p>
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-800 dark:text-amber-300 text-sm font-medium">
+                      {item.label_note}
                     </div>
                   </div>
                 </>
