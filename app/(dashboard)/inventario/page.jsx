@@ -209,108 +209,152 @@ function ItemDetailModal({ item, onClose, onEdit, onDelete }) {
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
       <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0">
-        <DialogHeader className="px-5 pt-5 pb-0">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-4 flex-1 min-w-0">
-              {item.photo_url ? (
-                <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-card shrink-0">
-                  <Image src={item.photo_url} alt={item.name} fill className="object-cover" />
-                </div>
-              ) : (
-                <div className="w-16 h-16 rounded-xl bg-card border border-border flex items-center justify-center shrink-0">
-                  <Package className="w-6 h-6 text-muted-foreground" />
-                </div>
-              )}
+
+        {/* ── Hero photo banner ── */}
+        {item.photo_url ? (
+          <div className="relative w-full h-48 shrink-0 overflow-hidden rounded-t-xl bg-muted">
+            <Image src={item.photo_url} alt={item.name} fill className="object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+            <div className="absolute bottom-0 left-0 right-0 px-5 pb-4">
+              <DialogTitle className="text-lg font-bold text-white leading-tight">{item.name}</DialogTitle>
+              <p className="text-sm text-white/70 mt-0.5">
+                {[item.brand, item.model].filter(Boolean).join(' · ') || ''}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <DialogHeader className="px-5 pt-5 pb-3 border-b border-border">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-muted border border-border flex items-center justify-center shrink-0">
+                <Package className="w-5 h-5 text-muted-foreground" />
+              </div>
               <div className="min-w-0">
-                <DialogTitle className="text-base font-semibold truncate">{item.name}</DialogTitle>
+                <DialogTitle className="text-base font-semibold">{item.name}</DialogTitle>
                 <p className="text-sm text-muted-foreground mt-0.5">
                   {[item.brand, item.model].filter(Boolean).join(' · ') || 'Nessuna marca/modello'}
                 </p>
-                <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                  {item.category && (
-                    <Badge variant="secondary" className="text-xs">{CATEGORY_LABELS[item.category] || item.category}</Badge>
-                  )}
-                  <Badge
-                    variant="outline"
-                    className={`text-xs border ${
-                      item.condition === 'active' ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/20'
-                      : item.condition === 'repair' ? 'bg-amber-500/15 text-amber-300 border-amber-500/20'
-                      : 'bg-muted text-muted-foreground'
-                    }`}
-                  >
-                    {CONDITION_LABEL[item.condition] || item.condition}
-                  </Badge>
-                  {item.location && (
-                    <Badge variant="outline" className={`text-xs border ${LOCATION_BADGE[item.location] || ''}`}>
-                      <MapPin className="w-2.5 h-2.5 mr-1" />
-                      {LOCATION_LABEL[item.location] || item.location}
-                    </Badge>
-                  )}
-                  {maintenance && (
-                    <Badge variant="outline" className="text-xs border bg-red-500/15 text-red-400 border-red-500/20">
-                      <AlertTriangle className="w-2.5 h-2.5 mr-1" />
-                      {item.last_checked_at
-                        ? `${differenceInDays(new Date(), new Date(item.last_checked_at))}gg senza controllo`
-                        : 'Mai controllato'}
-                    </Badge>
-                  )}
-                </div>
               </div>
             </div>
-          </div>
-        </DialogHeader>
+          </DialogHeader>
+        )}
+
+        {/* ── Badge row ── */}
+        <div className="flex flex-wrap items-center gap-1.5 px-5 py-3 border-b border-border bg-muted/30">
+          {item.category && (
+            <Badge variant="secondary" className="text-xs">{CATEGORY_LABELS[item.category] || item.category}</Badge>
+          )}
+          <Badge
+            variant="outline"
+            className={`text-xs border ${
+              item.condition === 'active' ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border-emerald-500/30'
+              : item.condition === 'repair' ? 'bg-amber-500/15 text-amber-600 dark:text-amber-300 border-amber-500/30'
+              : 'bg-muted text-muted-foreground'
+            }`}
+          >
+            {item.condition === 'active' && <CheckCircle2 className="w-2.5 h-2.5 mr-1" />}
+            {CONDITION_LABEL[item.condition] || item.condition}
+          </Badge>
+          {item.location && (
+            <Badge variant="outline" className={`text-xs border ${LOCATION_BADGE[item.location] || ''}`}>
+              <MapPin className="w-2.5 h-2.5 mr-1" />
+              {LOCATION_LABEL[item.location] || item.location}
+            </Badge>
+          )}
+          {maintenance && (
+            <Badge variant="outline" className="text-xs border bg-red-500/15 text-red-500 dark:text-red-400 border-red-500/30">
+              <AlertTriangle className="w-2.5 h-2.5 mr-1" />
+              {item.last_checked_at
+                ? `${differenceInDays(new Date(), new Date(item.last_checked_at))}gg senza controllo`
+                : 'Mai controllato'}
+            </Badge>
+          )}
+        </div>
 
         <ScrollArea className="flex-1 overflow-y-auto">
           <Tabs defaultValue="dettagli" className="w-full">
-            <div className="px-5 pt-4">
-              <TabsList className="w-full">
-                <TabsTrigger value="dettagli" className="flex-1">Dettagli</TabsTrigger>
-                <TabsTrigger value="storico" className="flex-1">Storico</TabsTrigger>
-                <TabsTrigger value="appartenenza" className="flex-1">Appartenenza</TabsTrigger>
+            {/* ── Tabs header ── */}
+            <div className="sticky top-0 z-10 bg-background border-b border-border px-5 pt-3 pb-0">
+              <TabsList className="h-auto bg-transparent p-0 gap-0 w-full justify-start rounded-none">
+                {[
+                  { value: 'dettagli', label: 'Dettagli' },
+                  { value: 'storico', label: 'Storico' },
+                  { value: 'appartenenza', label: 'Appartenenza' },
+                ].map(({ value, label }) => (
+                  <TabsTrigger
+                    key={value}
+                    value={value}
+                    className="relative rounded-none bg-transparent px-4 pb-3 pt-1 font-medium text-sm text-muted-foreground shadow-none transition-colors hover:text-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-t-full data-[state=active]:after:bg-primary"
+                  >
+                    {label}
+                  </TabsTrigger>
+                ))}
               </TabsList>
             </div>
 
             {/* ── Dettagli ── */}
-            <TabsContent value="dettagli" className="px-5 pb-5 pt-4 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <DetailField label="Seriale" value={item.serial_number} mono />
-                <DetailField label="Categoria" value={CATEGORY_LABELS[item.category] || item.category} />
-                <DetailField label="Data acquisto" value={item.purchase_date ? format(new Date(item.purchase_date), 'd MMM yyyy', { locale: it }) : null} />
-                <DetailField label="Vita utile" value={item.useful_life_years ? `${item.useful_life_years} anni` : null} />
-                <DetailField label="Val. acquisto" value={fmtEur(item.purchase_price)} />
-                <DetailField label="Val. mercato" value={fmtEur(item.market_value)} />
-                <DetailField label="Val. assicurato" value={fmtEur(item.insured_value)} />
-                <DetailField
-                  label="Batteria"
-                  value={BATTERY_LABEL[item.battery_status] || '—'}
-                  valueClass={BATTERY_COLOR[item.battery_status]}
-                />
-                <DetailField
-                  label="Ult. controllo"
-                  value={item.last_checked_at ? format(new Date(item.last_checked_at), 'd MMM yyyy', { locale: it }) : null}
-                  fallback="Mai controllato"
-                />
+            <TabsContent value="dettagli" className="px-5 pb-5 pt-5 space-y-5 mt-0">
+              {/* Identificazione */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Identificazione</p>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                  <DetailField label="Numero seriale" value={item.serial_number} mono />
+                  <DetailField label="Categoria" value={CATEGORY_LABELS[item.category] || item.category} />
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Valori */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Valori economici</p>
+                <div className="grid grid-cols-3 gap-x-4 gap-y-4">
+                  <DetailField label="Prezzo acquisto" value={fmtEur(item.purchase_price)} />
+                  <DetailField label="Valore di mercato" value={fmtEur(item.market_value)} />
+                  <DetailField label="Valore assicurato" value={fmtEur(item.insured_value)} />
+                  <DetailField label="Data acquisto" value={item.purchase_date ? format(new Date(item.purchase_date), 'd MMM yyyy', { locale: it }) : null} />
+                  <DetailField label="Vita utile" value={item.useful_life_years ? `${item.useful_life_years} anni` : null} />
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Stato */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Stato operativo</p>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                  <DetailField
+                    label="Stato batteria"
+                    value={BATTERY_LABEL[item.battery_status] || '—'}
+                    valueClass={BATTERY_COLOR[item.battery_status]}
+                  />
+                  <DetailField
+                    label="Ultimo controllo"
+                    value={item.last_checked_at ? format(new Date(item.last_checked_at), 'd MMM yyyy', { locale: it }) : null}
+                    fallback="Mai controllato"
+                    valueClass={maintenance ? 'text-red-500 dark:text-red-400' : ''}
+                  />
+                </div>
               </div>
 
               {depr && (
                 <>
                   <Separator />
                   <div>
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Ammortamento</p>
-                    <div className="bg-card rounded-lg border border-border p-3 space-y-2">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Ammortamento</p>
+                    <div className="rounded-lg border border-border bg-muted/40 p-4 space-y-3">
                       <div className="flex justify-between items-center text-sm">
-                        <span className="text-muted-foreground">Deprezzamento</span>
-                        <span className="font-medium text-amber-400">{depr.pct}%</span>
+                        <span className="text-muted-foreground">Deprezzamento accumulato</span>
+                        <span className="font-semibold text-amber-600 dark:text-amber-400">{depr.pct}%</span>
                       </div>
-                      <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                      <div className="w-full bg-border rounded-full h-2 overflow-hidden">
                         <div
                           className="h-full rounded-full bg-amber-500 transition-all"
                           style={{ width: `${depr.pct}%` }}
                         />
                       </div>
-                      <div className="flex justify-between items-center text-sm">
+                      <div className="flex justify-between items-center text-sm pt-1">
                         <span className="text-muted-foreground">Valore residuo stimato</span>
-                        <span className="font-semibold text-foreground">{fmtEur(depr.residual)}</span>
+                        <span className="font-bold text-foreground text-base">{fmtEur(depr.residual)}</span>
                       </div>
                     </div>
                   </div>
@@ -321,35 +365,35 @@ function ItemDetailModal({ item, onClose, onEdit, onDelete }) {
                 <>
                   <Separator />
                   <div>
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Note</p>
-                    <p className="text-sm text-foreground whitespace-pre-wrap">{item.notes}</p>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Note</p>
+                    <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{item.notes}</p>
                   </div>
                 </>
               )}
             </TabsContent>
 
             {/* ── Storico ── */}
-            <TabsContent value="storico" className="px-5 pb-5 pt-4 space-y-5">
+            <TabsContent value="storico" className="px-5 pb-5 pt-5 space-y-5 mt-0">
               {loading ? (
                 <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
               ) : (
                 <>
                   {chartData.length > 1 && (
                     <div>
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                        <TrendingUp className="w-3.5 h-3.5" /> Storico prezzi
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                        <TrendingUp className="w-3.5 h-3.5" /> Andamento valore
                       </p>
-                      <div className="bg-card rounded-lg border border-border p-3">
+                      <div className="rounded-lg border border-border bg-muted/20 p-3">
                         <ResponsiveContainer width="100%" height={160}>
                           <LineChart data={chartData}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.38 0.025 263 / 40%)" />
-                            <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'oklch(0.67 0.02 263)' }} />
-                            <YAxis tick={{ fontSize: 10, fill: 'oklch(0.67 0.02 263)' }} tickFormatter={(v) => `€${v}`} width={55} />
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                            <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} />
+                            <YAxis tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} tickFormatter={(v) => `€${v}`} width={55} />
                             <Tooltip
-                              contentStyle={{ background: 'oklch(0.265 0.027 263)', border: '1px solid oklch(0.38 0.025 263 / 60%)', borderRadius: '8px', fontSize: '12px' }}
+                              contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px' }}
                               formatter={(v) => [`€ ${v.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`, 'Valore']}
                             />
-                            <Line type="monotone" dataKey="valore" stroke="oklch(0.546 0.22 264)" strokeWidth={2} dot={{ r: 3 }} />
+                            <Line type="monotone" dataKey="valore" stroke="var(--primary)" strokeWidth={2} dot={{ r: 3 }} />
                           </LineChart>
                         </ResponsiveContainer>
                       </div>
@@ -362,19 +406,19 @@ function ItemDetailModal({ item, onClose, onEdit, onDelete }) {
                   }} />
 
                   <div>
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
                       <Clock className="w-3.5 h-3.5" /> Movimenti recenti
                     </p>
                     {movements.length === 0 ? (
                       <p className="text-sm text-muted-foreground">Nessun movimento registrato</p>
                     ) : (
-                      <div className="space-y-1.5">
+                      <div className="divide-y divide-border">
                         {movements.map((m) => (
-                          <div key={m.id} className="flex items-center justify-between text-sm py-2 border-b border-border last:border-0">
-                            <div className="flex items-center gap-2">
-                              <span className={`w-2 h-2 rounded-full shrink-0 ${m.action === 'checkout' ? 'bg-blue-400' : 'bg-emerald-400'}`} />
-                              <span className="font-medium">{m.action === 'checkout' ? 'Uscita' : 'Rientro'}</span>
-                              {m.sets?.name && <span className="text-muted-foreground">· {m.sets.name}</span>}
+                          <div key={m.id} className="flex items-center justify-between py-2.5">
+                            <div className="flex items-center gap-2.5">
+                              <span className={`w-2 h-2 rounded-full shrink-0 ${m.action === 'checkout' ? 'bg-blue-500' : 'bg-emerald-500'}`} />
+                              <span className="text-sm font-medium">{m.action === 'checkout' ? 'Uscita' : 'Rientro'}</span>
+                              {m.sets?.name && <span className="text-sm text-muted-foreground">· {m.sets.name}</span>}
                             </div>
                             <span className="text-xs text-muted-foreground">
                               {format(new Date(m.created_at), 'd MMM yy', { locale: it })}
@@ -389,7 +433,7 @@ function ItemDetailModal({ item, onClose, onEdit, onDelete }) {
             </TabsContent>
 
             {/* ── Appartenenza ── */}
-            <TabsContent value="appartenenza" className="px-5 pb-5 pt-4 space-y-5">
+            <TabsContent value="appartenenza" className="px-5 pb-5 pt-5 space-y-5 mt-0">
               {loading ? (
                 <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
               ) : (
@@ -436,9 +480,9 @@ function ItemDetailModal({ item, onClose, onEdit, onDelete }) {
 
 function DetailField({ label, value, mono = false, valueClass = '', fallback = '—' }) {
   return (
-    <div className="space-y-0.5">
-      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{label}</p>
-      <p className={`text-sm font-medium ${valueClass || 'text-foreground'} ${mono ? 'font-mono' : ''} ${!value ? 'text-muted-foreground' : ''}`}>
+    <div className="space-y-1">
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      <p className={`text-sm font-semibold ${valueClass || 'text-foreground'} ${mono ? 'font-mono tracking-wide' : ''} ${!value ? 'text-muted-foreground font-normal' : ''}`}>
         {value || fallback}
       </p>
     </div>
@@ -448,15 +492,18 @@ function DetailField({ label, value, mono = false, valueClass = '', fallback = '
 function MembershipSection({ title, icon, items, emptyLabel }) {
   return (
     <div>
-      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
         {icon} {title}
+        <span className="ml-1 text-[10px] font-medium bg-muted px-1.5 py-0.5 rounded-full">
+          {items.length}
+        </span>
       </p>
       {items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{emptyLabel}</p>
+        <p className="text-sm text-muted-foreground italic">{emptyLabel}</p>
       ) : (
-        <div className="space-y-1">
+        <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
           {items.map((item) => (
-            <div key={item.id} className="flex items-center justify-between text-sm py-1.5 border-b border-border last:border-0">
+            <div key={item.id} className="flex items-center justify-between text-sm px-3 py-2.5 bg-card hover:bg-muted/30 transition-colors">
               <span className="font-medium">{item.name}</span>
               {item.sub && <span className="text-xs text-muted-foreground">{item.sub}</span>}
             </div>

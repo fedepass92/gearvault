@@ -3,10 +3,12 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
+import { useTheme } from 'next-themes'
 import { getSupabase } from '@/lib/supabase'
 import {
   Camera, LayoutDashboard, Package, Tag, Briefcase, FileText,
-  Users, LogOut, Menu, X, ChevronRight, Box, History, Layers, Settings, Loader2, Search, Wrench, BarChart2,
+  Users, LogOut, Menu, X, Box, History, Layers, Settings, Loader2,
+  Search, Wrench, BarChart2, HelpCircle, Moon, Sun, Plus,
 } from 'lucide-react'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -17,23 +19,26 @@ import { Label } from '@/components/ui/label'
 import CommandPalette from '@/components/CommandPalette'
 import { toast } from 'sonner'
 
-const NAV_ITEMS = [
+const NAV_MAIN = [
   { href: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/inventario', icon: Package, label: 'Inventario' },
   { href: '/set', icon: Briefcase, label: 'Set Manager', badgeKey: 'overdueSets' },
   { href: '/case', icon: Box, label: 'Case' },
   { href: '/kit', icon: Layers, label: 'Kit' },
+  { href: '/statistiche', icon: BarChart2, label: 'Statistiche' },
+]
+
+const NAV_DOCS = [
   { href: '/etichette', icon: Tag, label: 'Etichette' },
   { href: '/report', icon: FileText, label: 'Report Assicurativo' },
   { href: '/storico', icon: History, label: 'Storico movimenti' },
   { href: '/manutenzione', icon: Wrench, label: 'Manutenzione', badgeKey: 'maintenance' },
-  { href: '/statistiche', icon: BarChart2, label: 'Statistiche' },
-  { href: '/utenti', icon: Users, label: 'Utenti', adminOnly: true },
 ]
 
 export default function Sidebar({ user, profile }) {
   const pathname = usePathname()
   const router = useRouter()
+  const { theme, setTheme } = useTheme()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
@@ -103,87 +108,125 @@ export default function Sidebar({ user, profile }) {
       <Link
         href={item.href}
         onClick={() => setMobileOpen(false)}
-        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all group ${
+        className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm transition-colors group ${
           active
-            ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
-            : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+            ? 'bg-primary text-primary-foreground font-medium'
+            : 'text-muted-foreground hover:text-foreground hover:bg-accent'
         }`}
       >
-        <item.icon className={`w-4 h-4 flex-shrink-0 ${active ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-foreground'}`} />
-        <span className="flex-1">{item.label}</span>
-        {badgeCount > 0 && !active && (
-          <span className="flex-shrink-0 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1">
+        <item.icon className="w-4 h-4 flex-shrink-0" />
+        <span className="flex-1 truncate">{item.label}</span>
+        {badgeCount > 0 && (
+          <span className={`flex-shrink-0 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold px-1 ${
+            active ? 'bg-white/20 text-white' : 'bg-destructive text-white'
+          }`}>
             {badgeCount > 99 ? '99+' : badgeCount}
           </span>
         )}
-        {active && <ChevronRight className="ml-auto w-3.5 h-3.5 opacity-60" />}
       </Link>
     )
   }
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-sidebar border-r border-sidebar-border">
       {/* Logo */}
-      <div className="flex items-center gap-3 px-4 py-5 border-b border-border">
-        <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-primary shadow-lg shadow-primary/30">
-          <Camera className="w-5 h-5 text-primary-foreground" />
+      <div className="flex items-center gap-2 px-4 h-14 border-b border-sidebar-border">
+        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-foreground">
+          <Camera className="w-3.5 h-3.5 text-background" />
         </div>
-        <div>
-          <div className="text-sm font-bold leading-tight">GearVault</div>
-          <div className="text-xs text-muted-foreground leading-tight">Brain Digital</div>
-        </div>
+        <span className="text-sm font-semibold text-sidebar-foreground">GearVault</span>
       </div>
 
-      {/* Search */}
-      <div className="px-3 pb-2">
+      {/* Quick create + search */}
+      <div className="px-3 py-3 space-y-1 border-b border-sidebar-border">
         <button
           onClick={() => setSearchOpen(true)}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted/50 transition border border-border/60"
+          className="w-full flex items-center gap-2 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition"
         >
-          <Search className="w-3.5 h-3.5 flex-shrink-0" />
-          <span className="flex-1 text-left text-xs">Cerca…</span>
-          <kbd className="hidden sm:inline-flex items-center gap-0.5 text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono">⌘K</kbd>
+          <Plus className="w-4 h-4" />
+          Quick Search
+          <kbd className="ml-auto hidden sm:inline-flex items-center text-[10px] opacity-60 font-mono">⌘K</kbd>
         </button>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto">
-        {NAV_ITEMS.map((item) => (
-          <NavLink key={item.href} item={item} />
-        ))}
+      {/* Nav main */}
+      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
+        <div className="space-y-0.5">
+          {NAV_MAIN.map((item) => (
+            <NavLink key={item.href} item={item} />
+          ))}
+        </div>
+
+        <div>
+          <p className="px-2 pb-1 text-xs font-medium text-sidebar-muted uppercase tracking-wider">
+            Documenti
+          </p>
+          <div className="space-y-0.5">
+            {NAV_DOCS.map((item) => (
+              <NavLink key={item.href} item={item} />
+            ))}
+          </div>
+        </div>
+
+        {isAdmin && (
+          <div>
+            <p className="px-2 pb-1 text-xs font-medium text-sidebar-muted uppercase tracking-wider">
+              Admin
+            </p>
+            <NavLink item={{ href: '/utenti', icon: Users, label: 'Utenti' }} />
+          </div>
+        )}
       </nav>
 
-      {/* User footer */}
-      <div className="border-t border-border px-3 py-4">
+      {/* Bottom links */}
+      <div className="px-3 py-2 border-t border-sidebar-border space-y-0.5">
+        <button
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition"
+        >
+          {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          <span>{theme === 'dark' ? 'Tema chiaro' : 'Tema scuro'}</span>
+        </button>
         <button
           onClick={() => { setProfileName(profile?.full_name || ''); setProfileError(''); setProfileOpen(true) }}
-          className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-muted/50 transition group"
+          className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition"
         >
-          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-            <span className="text-xs font-semibold text-muted-foreground">
+          <Settings className="w-4 h-4" />
+          <span>Impostazioni</span>
+        </button>
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition"
+        >
+          <LogOut className="w-4 h-4" />
+          <span>Esci</span>
+        </button>
+      </div>
+
+      {/* User */}
+      <div className="px-3 py-3 border-t border-sidebar-border">
+        <button
+          onClick={() => { setProfileName(profile?.full_name || ''); setProfileError(''); setProfileOpen(true) }}
+          className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-accent transition group"
+        >
+          <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center flex-shrink-0 border border-border">
+            <span className="text-xs font-semibold text-foreground">
               {(profile?.full_name || user?.email || 'U')[0].toUpperCase()}
             </span>
           </div>
           <div className="flex-1 min-w-0 text-left">
-            <div className="text-xs font-medium truncate">
+            <div className="text-xs font-medium truncate text-sidebar-foreground">
               {profile?.full_name || user?.email?.split('@')[0] || 'Utente'}
             </div>
-            <div className="flex items-center gap-1 mt-0.5">
-              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                isAdmin ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'
-              }`}>
-                {isAdmin ? 'Admin' : 'Operatore'}
-              </span>
+            <div className="text-[10px] truncate text-sidebar-muted">
+              {user?.email}
             </div>
           </div>
-          <Settings className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition flex-shrink-0" />
-        </button>
-        <button
-          onClick={handleLogout}
-          className="mt-1 w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted/50 transition"
-        >
-          <LogOut className="w-4 h-4" />
-          <span>Esci</span>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${
+            isAdmin ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+          }`}>
+            {isAdmin ? 'Admin' : 'Op'}
+          </span>
         </button>
       </div>
     </div>
@@ -192,25 +235,27 @@ export default function Sidebar({ user, profile }) {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex flex-col w-56 bg-card border-r border-border h-screen sticky top-0 flex-shrink-0">
+      <aside className="hidden lg:flex flex-col w-56 h-screen sticky top-0 flex-shrink-0">
         <SidebarContent />
       </aside>
 
       {/* Mobile topbar */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-card border-b border-border flex items-center gap-3 px-4 py-3">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-sidebar border-b border-sidebar-border flex items-center gap-3 px-4 py-3">
         <button
           onClick={() => setMobileOpen(true)}
-          className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition"
+          className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition"
         >
           <Menu className="w-5 h-5" />
         </button>
         <div className="flex items-center gap-2 flex-1">
-          <Camera className="w-5 h-5 text-primary" />
-          <span className="text-sm font-bold">GearVault</span>
+          <div className="flex items-center justify-center w-5 h-5 rounded-full bg-foreground">
+            <Camera className="w-3 h-3 text-background" />
+          </div>
+          <span className="text-sm font-semibold">GearVault</span>
         </div>
         <button
           onClick={() => setSearchOpen(true)}
-          className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition"
+          className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition"
         >
           <Search className="w-5 h-5" />
         </button>
@@ -219,13 +264,13 @@ export default function Sidebar({ user, profile }) {
       {/* Mobile drawer */}
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
-          <aside className="relative w-64 bg-card h-full shadow-2xl border-r border-border">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
+          <aside className="relative w-64 h-full shadow-2xl">
             <button
               onClick={() => setMobileOpen(false)}
-              className="absolute top-4 right-4 p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition"
+              className="absolute top-4 right-3 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition z-10"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
             <SidebarContent />
           </aside>
@@ -259,12 +304,12 @@ export default function Sidebar({ user, profile }) {
             <div className="space-y-1.5">
               <Label>Ruolo</Label>
               <div className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
-                isAdmin ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'
+                isAdmin ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
               }`}>
                 {isAdmin ? 'Amministratore' : 'Operatore'}
               </div>
             </div>
-            {profileError && <p className="text-xs text-red-400">{profileError}</p>}
+            {profileError && <p className="text-xs text-destructive">{profileError}</p>}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setProfileOpen(false)} disabled={profileSaving}>Annulla</Button>

@@ -1,5 +1,6 @@
 import './globals.css'
 import { ScannerProvider } from '@/components/ScannerContext'
+import { ThemeProvider } from '@/components/ThemeProvider'
 
 export const metadata = {
   title: 'GearVault – Brain Digital',
@@ -7,24 +8,26 @@ export const metadata = {
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'black-translucent',
+    statusBarStyle: 'default',
     title: 'GearVault',
   },
 }
 
 export const viewport = {
-  themeColor: '#0f172a',
+  themeColor: '#ffffff',
 }
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="it" className="h-full dark">
+    <html lang="it" className="h-full" suppressHydrationWarning>
       <head>
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className="h-full bg-background text-foreground antialiased">
-        <ScannerProvider>{children}</ScannerProvider>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+          <ScannerProvider>{children}</ScannerProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

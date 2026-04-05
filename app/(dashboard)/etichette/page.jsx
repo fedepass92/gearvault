@@ -2,16 +2,35 @@
 
 import { useState, useEffect } from 'react'
 import { getSupabase } from '@/lib/supabase'
-import LabelCard from '@/components/LabelCard'
-import { Search, Printer, QrCode, Barcode, CheckSquare, Square, Loader2, Package, Box, Layers } from 'lucide-react'
+import LabelCard, { LABEL_FORMATS } from '@/components/LabelCard'
+import { Search, Printer, CheckSquare, Square, Loader2, Package, Box, Layers, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 const TABS = [
   { id: 'equipment', label: 'Attrezzatura', icon: Package },
   { id: 'cases', label: 'Case', icon: Box },
   { id: 'kits', label: 'Kit', icon: Layers },
 ]
+
+// Print grid columns per format
+const FORMAT_PRINT_COLS = {
+  standard: 3,
+  small: 5,
+  xs: 8,
+  cable: 2,
+}
+
+// Preview grid min-width per format
+const FORMAT_MIN_WIDTH = {
+  standard: '72mm',
+  small: '44mm',
+  xs: '30mm',
+  cable: '88mm',
+}
 
 export default function EtichettePage() {
   const [tab, setTab] = useState('equipment')
@@ -21,7 +40,10 @@ export default function EtichettePage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(new Set())
-  const [labelTypes, setLabelTypes] = useState({})
+  // Per-item format: { [id]: 'standard' | 'small' | 'xs' | 'cable' }
+  const [itemFormats, setItemFormats] = useState({})
+  // Global default format for newly selected items
+  const [globalFormat, setGlobalFormat] = useState('standard')
 
   useEffect(() => {
     setSelected(new Set())
@@ -54,31 +76,61 @@ export default function EtichettePage() {
   }, [tab, search])
 
   const items = tab === 'equipment' ? equipment : tab === 'kits' ? kits : cases
+  const isCase = tab === 'cases'
+  const isKit = tab === 'kits'
 
   function toggleSelect(id) {
     setSelected((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
-      else next.add(id)
+      else {
+        next.add(id)
+        // Assign global format to newly selected item
+        setItemFormats((f) => ({ ...f, [id]: f[id] || globalFormat }))
+      }
       return next
     })
   }
 
   function toggleAll() {
-    setSelected(selected.size === items.length ? new Set() : new Set(items.map((e) => e.id)))
+    if (selected.size === items.length) {
+      setSelected(new Set())
+    } else {
+      const newSelected = new Set(items.map((e) => e.id))
+      setSelected(newSelected)
+      setItemFormats((f) => {
+        const next = { ...f }
+        items.forEach((e) => { if (!next[e.id]) next[e.id] = globalFormat })
+        return next
+      })
+    }
   }
 
-  function setLabelType(id, type) {
-    setLabelTypes((prev) => ({ ...prev, [id]: type }))
+  function setItemFormat(id, fmt) {
+    setItemFormats((prev) => ({ ...prev, [id]: fmt }))
+  }
+
+  // Apply global format to all selected
+  function applyGlobalFormat(fmt) {
+    setGlobalFormat(fmt)
+    setItemFormats((prev) => {
+      const next = { ...prev }
+      selected.forEach((id) => { next[id] = fmt })
+      return next
+    })
+  }
+
+  function getFormat(id) {
+    return itemFormats[id] || 'standard'
   }
 
   const selectedItems = items.filter((e) => selected.has(e.id))
-  const isCase = tab === 'cases'
-  const isKit = tab === 'kits'
 
   function handlePrint() {
     setTimeout(() => window.print(), 100)
   }
+
+  const globalFormatInfo = LABEL_FORMATS.find((f) => f.id === globalFormat)
 
   return (
     <div className="space-y-5">
@@ -89,10 +141,35 @@ export default function EtichettePage() {
             {selected.size > 0 ? `${selected.size} selezionati` : 'Seleziona gli elementi da etichettare'}
           </p>
         </div>
-        <Button size="sm" onClick={handlePrint} disabled={selected.size === 0}>
-          <Printer className="w-4 h-4" />
-          Stampa {selected.size > 0 ? `(${selected.size})` : ''}
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* Global format picker */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5">
+                <span className="font-medium">{globalFormatInfo?.label}</span>
+                <span className="text-muted-foreground text-xs">{globalFormatInfo?.size}</span>
+                <ChevronDown className="w-3.5 h-3.5 text-muted-foreground ml-0.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              {LABEL_FORMATS.map((f) => (
+                <DropdownMenuItem
+                  key={f.id}
+                  onClick={() => applyGlobalFormat(f.id)}
+                  className={globalFormat === f.id ? 'font-semibold' : ''}
+                >
+                  <span className="flex-1">{f.label}</span>
+                  <span className="text-xs text-muted-foreground">{f.size}</span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Button size="sm" onClick={handlePrint} disabled={selected.size === 0}>
+            <Printer className="w-4 h-4" />
+            Stampa {selected.size > 0 ? `(${selected.size})` : ''}
+          </Button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -116,11 +193,12 @@ export default function EtichettePage() {
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder={`Cerca ${isCase ? 'case' : 'attrezzatura'}…`}
+          placeholder={`Cerca ${isCase ? 'case' : isKit ? 'kit' : 'attrezzatura'}…`}
           className="pl-8"
         />
       </div>
 
+      {/* Item list */}
       <div className="bg-card rounded-xl border border-border overflow-hidden">
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
           <button onClick={toggleAll} className="text-muted-foreground hover:text-foreground transition">
@@ -128,9 +206,14 @@ export default function EtichettePage() {
               ? <CheckSquare className="w-4 h-4 text-primary" />
               : <Square className="w-4 h-4" />}
           </button>
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex-1">
             Seleziona tutto ({items.length})
           </span>
+          {selected.size > 0 && (
+            <span className="text-xs text-muted-foreground">
+              Formato predefinito applicato a {selected.size} selezionati
+            </span>
+          )}
         </div>
 
         {loading ? (
@@ -143,11 +226,12 @@ export default function EtichettePage() {
           <div className="divide-y divide-border/50">
             {items.map((item) => {
               const isSelected = selected.has(item.id)
-              const labelType = labelTypes[item.id] || 'qr'
+              const fmt = getFormat(item.id)
+              const fmtInfo = LABEL_FORMATS.find((f) => f.id === fmt)
               return (
                 <div
                   key={item.id}
-                  className={`flex items-center gap-4 px-4 py-3 transition ${isSelected ? 'bg-primary/5' : 'hover:bg-muted/30'}`}
+                  className={`flex items-center gap-3 px-4 py-2.5 transition ${isSelected ? 'bg-primary/5' : 'hover:bg-muted/30'}`}
                 >
                   <button onClick={() => toggleSelect(item.id)} className="text-muted-foreground hover:text-foreground transition flex-shrink-0">
                     {isSelected ? <CheckSquare className="w-4 h-4 text-primary" /> : <Square className="w-4 h-4" />}
@@ -161,23 +245,30 @@ export default function EtichettePage() {
                       }
                     </div>
                   </div>
-                  {!isCase && !isKit && (
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <button
-                        onClick={() => setLabelType(item.id, 'qr')}
-                        title="QR Code"
-                        className={`p-1.5 rounded-lg transition ${labelType === 'qr' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
-                      >
-                        <QrCode className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => setLabelType(item.id, 'barcode')}
-                        title="Barcode"
-                        className={`p-1.5 rounded-lg transition ${labelType === 'barcode' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
-                      >
-                        <Barcode className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+
+                  {/* Per-item format selector (visible only when selected) */}
+                  {isSelected && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className="flex items-center gap-1 text-xs px-2 py-1 rounded-md border border-border bg-muted/50 hover:bg-muted transition flex-shrink-0">
+                          <span className="font-medium">{fmtInfo?.label}</span>
+                          <span className="text-muted-foreground hidden sm:inline">{fmtInfo?.size}</span>
+                          <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-40">
+                        {LABEL_FORMATS.map((f) => (
+                          <DropdownMenuItem
+                            key={f.id}
+                            onClick={() => setItemFormat(item.id, f.id)}
+                            className={fmt === f.id ? 'font-semibold' : ''}
+                          >
+                            <span className="flex-1">{f.label}</span>
+                            <span className="text-xs text-muted-foreground">{f.size}</span>
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
                 </div>
               )
@@ -186,17 +277,47 @@ export default function EtichettePage() {
         )}
       </div>
 
+      {/* Preview + print area */}
       {selectedItems.length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-            Anteprima etichette
-          </h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+              Anteprima ({selectedItems.length})
+            </h2>
+          </div>
+
           <div id="print-area">
-            <div className="grid gap-4 print:grid-cols-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(90mm, 1fr))' }}>
-              {selectedItems.map((item) => (
-                <LabelCard key={item.id} item={item} type={(isCase || isKit) ? 'qr' : (labelTypes[item.id] || 'qr')} isCase={isCase} isKit={isKit} />
-              ))}
-            </div>
+            {/* Group by format for adaptive grid */}
+            {LABEL_FORMATS.map((f) => {
+              const group = selectedItems.filter((it) => getFormat(it.id) === f.id)
+              if (group.length === 0) return null
+              return (
+                <div key={f.id} className="mb-6 print:mb-0">
+                  {/* Format label — screen only */}
+                  <p className="text-xs text-muted-foreground mb-2 print:hidden">
+                    {f.label} · {f.size} — {group.length} etichett{group.length === 1 ? 'a' : 'e'}
+                  </p>
+                  <div
+                    className={`print:grid-cols-[repeat(${FORMAT_PRINT_COLS[f.id]},auto)]`}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: `repeat(auto-fill, minmax(${FORMAT_MIN_WIDTH[f.id]}, auto))`,
+                      gap: f.id === 'xs' || f.id === 'cable' ? '6px' : '10px',
+                    }}
+                  >
+                    {group.map((item) => (
+                      <LabelCard
+                        key={item.id}
+                        item={item}
+                        format={f.id}
+                        isCase={isCase}
+                        isKit={isKit}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
