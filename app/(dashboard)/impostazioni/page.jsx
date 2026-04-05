@@ -483,33 +483,6 @@ export default function ImpostazioniPage() {
               </div>
             </Section>
 
-            <Separator />
-
-            <Section title="Schema database" description="SQL per creare la tabella app_settings su Supabase">
-              <div className="rounded-lg border border-border bg-muted/50 p-4 overflow-x-auto">
-                <pre className="text-xs font-mono text-muted-foreground whitespace-pre">{`CREATE TABLE app_settings (
-  key        TEXT PRIMARY KEY,
-  value      JSONB,
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
--- RLS: solo admin può modificare
-ALTER TABLE app_settings ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "read_settings" ON app_settings
-  FOR SELECT TO authenticated USING (true);
-
-CREATE POLICY "admin_write_settings" ON app_settings
-  FOR ALL TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM profiles
-      WHERE profiles.id = auth.uid()
-      AND profiles.role = 'admin'
-    )
-  );`}</pre>
-              </div>
-            </Section>
           </div>
         </TabsContent>
       </Tabs>
