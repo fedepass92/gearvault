@@ -14,7 +14,9 @@
       "Bash(ls /Users/federicopassaro/Documents/gearvault/.env*)",
       "Bash(ls /Users/federicopassaro/Documents/gearvault/components/ui/sonner*)",
       "Bash(ls /Users/federicopassaro/Documents/gearvault/components/ui/toast*)",
-      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); deps={**d.get\\('dependencies',{}\\), **d.get\\('devDependencies',{}\\)}; print\\('\\\\n'.join\\(f'{k}: {v}' for k,v in deps.items\\(\\)\\)\\)\")"
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); deps={**d.get\\('dependencies',{}\\), **d.get\\('devDependencies',{}\\)}; print\\('\\\\n'.join\\(f'{k}: {v}' for k,v in deps.items\\(\\)\\)\\)\")",
+      "Bash(node -e \"require\\('resend'\\); console.log\\('ok'\\)\")",
+      "Bash(node -e \"require\\('recharts'\\); console.log\\('ok'\\)\")"
     ]
   }
 }

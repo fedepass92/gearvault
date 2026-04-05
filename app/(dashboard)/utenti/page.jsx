@@ -64,20 +64,46 @@ export default function UtentiPage() {
     setInviteError('')
     setInviteSuccess('')
 
+    // 1. Create the user account in Supabase Auth
     const supabase = getSupabase()
-    const { error } = await supabase.auth.signUp({
+    const tempPassword = Math.random().toString(36).slice(-12) + 'Aa1!'
+    const loginUrl = `${window.location.origin}/login`
+    const { data: { user: newUser }, error: signUpError } = await supabase.auth.signUp({
       email: inviteEmail,
-      password: Math.random().toString(36).slice(-12) + 'Aa1!',
-      options: { emailRedirectTo: `${window.location.origin}/login` },
+      password: tempPassword,
+      options: { emailRedirectTo: loginUrl },
     })
 
-    if (error) {
-      setInviteError(error.message)
-    } else {
-      setInviteSuccess(`Invito inviato a ${inviteEmail}`)
-      setInviteEmail('')
-      setShowInvite(false)
+    if (signUpError) {
+      setInviteError(signUpError.message)
+      setInviting(false)
+      return
     }
+
+    // 2. Get current user's name for the invite email
+    const { data: { user: me } } = await supabase.auth.getUser()
+    const { data: myProfile } = await supabase.from('profiles').select('full_name').eq('id', me.id).single()
+
+    // 3. Send branded invite email via Resend
+    try {
+      await fetch('/api/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'invite',
+          to: inviteEmail,
+          inviteeEmail: inviteEmail,
+          inviterName: myProfile?.full_name || null,
+          loginUrl,
+        }),
+      })
+    } catch (_) {
+      // Email failure is non-blocking — account was created successfully
+    }
+
+    setInviteSuccess(`Invito inviato a ${inviteEmail}`)
+    setInviteEmail('')
+    setShowInvite(false)
     setInviting(false)
   }
 

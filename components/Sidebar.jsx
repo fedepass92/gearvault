@@ -10,7 +10,7 @@ import {
   Camera, LayoutDashboard, Package, Tag, Briefcase, FileText,
   Users, LogOut, Menu, X, Box, History, Layers, Settings, Loader2,
   Search, Wrench, BarChart2, Moon, Sun, Plus, Upload, Eye, EyeOff,
-  Calendar, ChevronRight,
+  Calendar, ChevronRight, TrendingDown,
 } from 'lucide-react'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -62,8 +62,9 @@ const NAV_SECTIONS = [
     id: 'analisi',
     label: 'Analisi',
     items: [
-      { href: '/statistiche', icon: BarChart2, label: 'Statistiche' },
-      { href: '/manutenzione',icon: Wrench,    label: 'Manutenzione', badgeKey: 'maintenance' },
+      { href: '/statistiche',  icon: BarChart2,    label: 'Statistiche' },
+      { href: '/manutenzione', icon: Wrench,       label: 'Manutenzione', badgeKey: 'maintenance' },
+      { href: '/ammortamento', icon: TrendingDown, label: 'Ammortamento' },
     ],
   },
 ]
