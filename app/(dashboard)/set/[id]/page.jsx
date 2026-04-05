@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { getSupabase } from '@/lib/supabase'
-import { exportSetInsurancePDF, exportSetChecklist } from '@/lib/pdf'
+import { exportSetInsurancePDF, exportSetChecklist, exportCheckoutAgreement, exportATACarnet } from '@/lib/pdf'
 import { toast } from 'sonner'
 import { useScannerListener } from '@/components/ScannerContext'
 import CameraScanner from '@/components/CameraScanner'
@@ -103,6 +103,8 @@ export default function SetDetailPage({ params }) {
   const [confirmScan, setConfirmScan] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(false)
   const [checklistLoading, setChecklistLoading] = useState(false)
+  const [agreementLoading, setAgreementLoading] = useState(false)
+  const [ataLoading, setAtaLoading] = useState(false)
   const [showCamera, setShowCamera] = useState(false)
   const [batteryPopover, setBatteryPopover] = useState(null) // equipment_id
   const [groupByCategory, setGroupByCategory] = useState(false)
@@ -409,6 +411,31 @@ export default function SetDetailPage({ params }) {
     }
   }
 
+  async function handleExportAgreement() {
+    setAgreementLoading(true)
+    try {
+      const supabase = getSupabase()
+      const { data: { user } } = await supabase.auth.getUser()
+      let operator = {}
+      if (user) {
+        const { data: profile } = await supabase.from('profiles').select('full_name, avatar_url').eq('id', user.id).single()
+        operator = { full_name: profile?.full_name || '', email: user.email || '', avatar_url: profile?.avatar_url || null }
+      }
+      await exportCheckoutAgreement(set, items, operator)
+    } finally {
+      setAgreementLoading(false)
+    }
+  }
+
+  async function handleExportATA() {
+    setAtaLoading(true)
+    try {
+      await exportATACarnet(set, items)
+    } finally {
+      setAtaLoading(false)
+    }
+  }
+
   async function handleEditSave(e) {
     e.preventDefault()
     setEditSaving(true)
@@ -577,6 +604,24 @@ export default function SetDetailPage({ params }) {
           >
             {pdfLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
             <span className="hidden sm:inline">PDF</span>
+          </button>
+          <button
+            onClick={handleExportAgreement}
+            disabled={agreementLoading || items.length === 0}
+            className="flex items-center gap-2 px-3 py-2 bg-muted hover:bg-muted/70 disabled:opacity-40 text-muted-foreground rounded-lg text-sm font-medium transition"
+            title="Accordo di Checkout"
+          >
+            {agreementLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+            <span className="hidden sm:inline">Accordo</span>
+          </button>
+          <button
+            onClick={handleExportATA}
+            disabled={ataLoading || items.length === 0}
+            className="flex items-center gap-2 px-3 py-2 bg-muted hover:bg-muted/70 disabled:opacity-40 text-muted-foreground rounded-lg text-sm font-medium transition"
+            title="ATA Carnet"
+          >
+            {ataLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+            <span className="hidden sm:inline">ATA Carnet</span>
           </button>
         </div>
       </div>

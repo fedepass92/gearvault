@@ -9,7 +9,7 @@ import {
   Download, Upload, Battery, BatteryLow, BatteryCharging,
   Minus, AlertTriangle, CheckCircle2, Package, MapPin, Clock,
   Layers, Box, TrendingUp, ArrowUpDown, ChevronRight,
-  Square, CheckSquare, X, Briefcase, Tag,
+  Square, CheckSquare, X, Briefcase, Tag, LayoutGrid, List,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format, differenceInDays } from 'date-fns'
@@ -528,6 +528,78 @@ function MembershipSection({ title, icon, items, emptyLabel }) {
   )
 }
 
+const CATEGORY_ICONS = {
+  camera: '📷', lens: '🔭', drone: '🚁', audio: '🎙️',
+  lighting: '💡', support: '🎬', accessory: '🔧', altro: '📦',
+}
+
+function EquipmentGridCard({ item, isOut, onClick }) {
+  const maintenance = needsMaintenance(item)
+  const availBadge = item.condition === 'repair'
+    ? { label: 'Manutenzione', cls: 'bg-red-500/20 text-red-400 border-red-500/30' }
+    : isOut
+    ? { label: 'In uso', cls: 'bg-amber-500/20 text-amber-400 border-amber-500/30' }
+    : { label: 'Disponibile', cls: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' }
+
+  return (
+    <div
+      className="group relative bg-card border border-border rounded-xl overflow-hidden cursor-pointer hover:border-primary/40 hover:shadow-md transition-all duration-150"
+      onClick={onClick}
+    >
+      {/* Photo */}
+      <div className="relative h-40 bg-muted overflow-hidden">
+        {item.photo_url ? (
+          <Image src={item.photo_url} alt={item.name} fill className="object-cover" />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center gap-2 select-none">
+            <span className="text-4xl opacity-20">{CATEGORY_ICONS[item.category] || '📦'}</span>
+            <span className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider">
+              {CATEGORY_LABELS[item.category] || 'Attrezzatura'}
+            </span>
+          </div>
+        )}
+
+        {/* Availability badge */}
+        <div className={`absolute top-2 left-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold border backdrop-blur-sm ${availBadge.cls}`}>
+          <span className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
+          {availBadge.label}
+        </div>
+
+        {/* Maintenance dot */}
+        {maintenance && (
+          <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-card" title="Da controllare" />
+        )}
+
+        {/* Hover overlay */}
+        <div className="absolute inset-0 bg-black/55 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+          <span className="text-white text-sm font-semibold px-5 py-2 rounded-lg border border-white/25 backdrop-blur-sm">
+            Dettagli
+          </span>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="p-3">
+        <p className="font-semibold text-sm text-foreground leading-tight truncate">{item.name}</p>
+        <p className="text-xs text-muted-foreground truncate mt-0.5">
+          {[item.brand, item.model].filter(Boolean).join(' · ') || <span className="italic">Nessuna marca</span>}
+        </p>
+        <div className="flex items-center justify-between mt-2">
+          <p className="text-[10px] font-mono text-muted-foreground truncate max-w-[55%]">
+            {item.serial_number ? item.serial_number : '—'}
+          </p>
+          {item.location && (
+            <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium border ${LOCATION_BADGE[item.location] || 'bg-muted text-muted-foreground border-border'}`}>
+              <MapPin className="w-2.5 h-2.5" />
+              {LOCATION_LABEL[item.location] || item.location}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function SortHeader({ label, field, sortField, sortDir, onSort, align = 'left' }) {
   const active = sortField === field
   return (
@@ -775,6 +847,7 @@ export default function InventarioPage() {
   const [setsList, setSetsList] = useState([])
   const [targetSetId, setTargetSetId] = useState('')
   const [addingToSet, setAddingToSet] = useState(false)
+  const [viewMode, setViewMode] = useState('list') // 'list' | 'grid'
 
   const fetchEquipment = useCallback(async () => {
     setSelectedIds(new Set())
@@ -954,6 +1027,24 @@ export default function InventarioPage() {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {/* View toggle */}
+          <div className="flex items-center rounded-lg border border-border overflow-hidden">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`px-2.5 py-1.5 transition ${viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+              title="Vista lista"
+            >
+              <List className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`px-2.5 py-1.5 transition ${viewMode === 'grid' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+              title="Vista griglia"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+          </div>
+
           <Button variant="outline" size="sm" onClick={() => exportCSV(equipment)} disabled={equipment.length === 0}>
             <Download className="w-4 h-4" />
             <span className="hidden sm:inline">Esporta CSV</span>
@@ -1075,7 +1166,29 @@ export default function InventarioPage() {
         </div>
       )}
 
+      {/* Grid view */}
+      {!loading && viewMode === 'grid' && (
+        displayEquipment.length === 0 ? (
+          <div className="text-center py-20 text-muted-foreground">
+            <Package className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <p className="text-sm">Nessuna attrezzatura trovata</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {displayEquipment.map((item) => (
+              <EquipmentGridCard
+                key={item.id}
+                item={item}
+                isOut={outEquipmentIds.has(item.id)}
+                onClick={() => setDetailItem(item)}
+              />
+            ))}
+          </div>
+        )
+      )}
+
       {/* Table */}
+      {(loading || viewMode === 'list') && (
       <div className="bg-card rounded-xl border border-border overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-20">
@@ -1244,6 +1357,7 @@ export default function InventarioPage() {
           </div>
         )}
       </div>
+      )}
 
       {/* Item Detail Modal */}
       {detailItem && (
