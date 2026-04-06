@@ -10,7 +10,9 @@ import {
   Minus, AlertTriangle, CheckCircle2, Package, MapPin, Clock,
   Layers, Box, TrendingUp, ArrowUpDown, ChevronRight,
   Square, CheckSquare, X, Briefcase, Tag, LayoutGrid, List,
+  QrCode, Printer,
 } from 'lucide-react'
+import { QRCodeCanvas } from 'qrcode.react'
 import { toast } from 'sonner'
 import { format, differenceInDays } from 'date-fns'
 import { it } from 'date-fns/locale'
@@ -167,6 +169,107 @@ function parseCSVRow(row) {
 
 // ─── Item Detail Modal ─────────────────────────────────────────────────────────
 
+const PUBLIC_BASE = 'https://gear.braindigital.it'
+
+function QRCodeTab({ item }) {
+  const url = `${PUBLIC_BASE}/item/${item.id}`
+
+  function downloadQR() {
+    const canvas = document.getElementById(`qr-canvas-${item.id}`)
+    if (!canvas) return
+    const link = document.createElement('a')
+    link.download = `qr-${item.name.replace(/\s+/g, '-').toLowerCase()}.png`
+    link.href = canvas.toDataURL('image/png')
+    link.click()
+  }
+
+  function printQR() {
+    const canvas = document.getElementById(`qr-canvas-${item.id}`)
+    if (!canvas) return
+    const dataUrl = canvas.toDataURL('image/png')
+    const win = window.open('', '_blank', 'width=400,height=500')
+    win.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>QR Code — ${item.name}</title>
+        <style>
+          body { margin: 0; display: flex; flex-direction: column; align-items: center;
+                 justify-content: center; min-height: 100vh; font-family: system-ui, sans-serif;
+                 background: #fff; padding: 32px; box-sizing: border-box; }
+          img  { width: 220px; height: 220px; display: block; margin-bottom: 16px; }
+          h2   { font-size: 16px; font-weight: 700; margin: 0 0 4px; color: #0f172a; text-align: center; }
+          p    { font-size: 11px; color: #64748b; margin: 0; text-align: center; }
+        </style>
+      </head>
+      <body>
+        <img src="${dataUrl}" />
+        <h2>${item.name}</h2>
+        ${item.serial_number ? `<p>S/N: ${item.serial_number}</p>` : ''}
+        <p style="margin-top:8px;font-size:10px;color:#94a3b8;">gear.braindigital.it</p>
+        <script>window.onload = () => { window.print(); window.close(); }</script>
+      </body>
+      </html>
+    `)
+    win.document.close()
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-6 py-4">
+      {/* QR card */}
+      <div className="flex flex-col items-center gap-4 bg-white rounded-2xl p-6 shadow-sm">
+        <QRCodeCanvas
+          id={`qr-canvas-${item.id}`}
+          value={url}
+          size={200}
+          bgColor="#ffffff"
+          fgColor="#0f172a"
+          level="M"
+          includeMargin={false}
+        />
+        <div className="text-center">
+          <p className="text-xs font-semibold text-gray-800">{item.name}</p>
+          {item.serial_number && (
+            <p className="text-[10px] text-gray-400 mt-0.5 font-mono">S/N: {item.serial_number}</p>
+          )}
+        </div>
+      </div>
+
+      {/* URL preview */}
+      <div className="w-full max-w-xs">
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 text-center">
+          URL pubblico
+        </p>
+        <div className="bg-muted/50 rounded-lg px-3 py-2 text-xs font-mono text-muted-foreground text-center break-all border border-border">
+          {url}
+        </div>
+      </div>
+
+      {/* Action buttons */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={downloadQR}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition"
+        >
+          <Download className="w-4 h-4" />
+          Scarica PNG
+        </button>
+        <button
+          onClick={printQR}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-muted text-foreground text-sm font-medium hover:bg-muted/70 transition border border-border"
+        >
+          <Printer className="w-4 h-4" />
+          Stampa
+        </button>
+      </div>
+
+      <p className="text-xs text-muted-foreground text-center max-w-xs leading-relaxed">
+        Scannerizzando questo QR viene aperta una scheda pubblica con le informazioni dell&apos;item e le istruzioni per la restituzione.
+      </p>
+    </div>
+  )
+}
+
 function ItemDetailModal({ item, onClose, onEdit, onDelete }) {
   const [priceHistory, setPriceHistory] = useState([])
   const [movements, setMovements] = useState([])
@@ -279,6 +382,7 @@ function ItemDetailModal({ item, onClose, onEdit, onDelete }) {
                   { value: 'dettagli', label: 'Dettagli' },
                   { value: 'storico', label: 'Storico' },
                   { value: 'appartenenza', label: 'Appartenenza' },
+                  { value: 'qrcode', label: 'QR Code' },
                 ].map(({ value, label }) => (
                   <TabsTrigger
                     key={value}
@@ -444,6 +548,11 @@ function ItemDetailModal({ item, onClose, onEdit, onDelete }) {
                   </div>
                 </>
               )}
+            </TabsContent>
+
+            {/* ── QR Code ── */}
+            <TabsContent value="qrcode" className="px-5 pb-5 pt-5 mt-0">
+              <QRCodeTab item={item} />
             </TabsContent>
 
             {/* ── Appartenenza ── */}
