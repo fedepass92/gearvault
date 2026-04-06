@@ -18,7 +18,8 @@
       "Bash(node -e \"require\\('resend'\\); console.log\\('ok'\\)\")",
       "Bash(node -e \"require\\('recharts'\\); console.log\\('ok'\\)\")",
       "Bash(node -e \"require\\('react-qr-code'\\); console.log\\('ok'\\)\")",
-      "Bash(node -e \"require\\('qrcode.react'\\); console.log\\('ok'\\)\")"
+      "Bash(node -e \"require\\('qrcode.react'\\); console.log\\('ok'\\)\")",
+      "Bash(ls /Users/federicopassaro/Documents/gearvault/eslint*)"
     ]
   }
 }

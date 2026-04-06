@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { resend, FROM_EMAIL, FROM_NAME, inviteTemplate, resetPasswordTemplate, maintenanceAlertTemplate, setConfirmTemplate } from '@/lib/resend'
+import { getResendClient, FROM_EMAIL, FROM_NAME, inviteTemplate, resetPasswordTemplate, maintenanceAlertTemplate, setConfirmTemplate } from '@/lib/resend'
 
 function getAdminClient() {
   return createClient(
@@ -54,7 +54,7 @@ export async function POST(request) {
       // Send branded email with the setup link
       ;({ subject, html } = inviteTemplate({ inviteeEmail: to, inviterName: data.inviterName || null, loginUrl: setupUrl }))
 
-      const { data: result, error } = await resend.emails.send({
+      const { data: result, error } = await getResendClient().emails.send({
         from: `${FROM_NAME} <${FROM_EMAIL}>`,
         to: [to],
         subject,
@@ -82,7 +82,7 @@ export async function POST(request) {
 
       ;({ subject, html } = resetPasswordTemplate({ resetUrl }))
 
-      const { data: result, error } = await resend.emails.send({
+      const { data: result, error } = await getResendClient().emails.send({
         from: `${FROM_NAME} <${FROM_EMAIL}>`,
         to: [email],
         subject,
@@ -102,7 +102,7 @@ export async function POST(request) {
       return NextResponse.json({ error: `Unknown email type: ${type}` }, { status: 400 })
     }
 
-    const { data: result, error } = await resend.emails.send({
+    const { data: result, error } = await getResendClient().emails.send({
       from: `${FROM_NAME} <${FROM_EMAIL}>`,
       to: Array.isArray(to) ? to : [to],
       subject,

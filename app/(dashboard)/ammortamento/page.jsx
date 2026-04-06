@@ -110,7 +110,7 @@ export default function AmmortamentoPage() {
       <div>
         <h1 className="text-xl font-bold">Ammortamento</h1>
         <p className="text-muted-foreground text-sm mt-0.5">
-          Valore residuo dell'attrezzatura calcolato con metodo a quote costanti (5 anni)
+          Valore residuo dell&apos;attrezzatura calcolato con metodo a quote costanti (5 anni)
         </p>
       </div>
 
@@ -118,7 +118,7 @@ export default function AmmortamentoPage() {
       {!loading && itemsWithData.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="bg-card border border-border rounded-xl p-4">
-            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Valore d'acquisto</div>
+            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Valore d&apos;acquisto</div>
             <div className="text-2xl font-bold">€{totalPurchase.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</div>
             <div className="text-xs text-muted-foreground mt-0.5">{itemsWithData.length} item</div>
           </div>
@@ -148,7 +148,7 @@ export default function AmmortamentoPage() {
             <TrendingDown className="w-10 h-10 text-muted-foreground/30" />
             <div className="text-center">
               <p className="text-muted-foreground text-sm font-medium">Nessun dato</p>
-              <p className="text-muted-foreground/60 text-xs mt-1">Aggiungi un prezzo d'acquisto agli item dell'inventario</p>
+              <p className="text-muted-foreground/60 text-xs mt-1">Aggiungi un prezzo d&apos;acquisto agli item dell&apos;inventario</p>
             </div>
           </div>
         ) : (
