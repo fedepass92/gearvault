@@ -10,7 +10,7 @@ import {
   Camera, LayoutDashboard, Package, Tag, Briefcase, FileText,
   Users, LogOut, Menu, X, Box, History, Layers, Settings, Loader2,
   Search, Wrench, BarChart2, Moon, Sun, Plus, Upload, Eye, EyeOff,
-  Calendar, ChevronRight, TrendingDown,
+  Calendar, ChevronRight, TrendingDown, HandHelping, Receipt,
 } from 'lucide-react'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -37,9 +37,10 @@ const NAV_SECTIONS = [
     id: 'attrezzatura',
     label: 'Attrezzatura',
     items: [
-      { href: '/inventario', icon: Package, label: 'Inventario' },
-      { href: '/case',       icon: Box,     label: 'Case' },
-      { href: '/kit',        icon: Layers,  label: 'Kit' },
+      { href: '/inventario', icon: Package,     label: 'Inventario' },
+      { href: '/case',       icon: Box,         label: 'Case' },
+      { href: '/kit',        icon: Layers,      label: 'Kit' },
+      { href: '/prestiti',   icon: HandHelping, label: 'Prestiti', badgeKey: 'overdueLoans' },
     ],
   },
   {
@@ -54,8 +55,9 @@ const NAV_SECTIONS = [
     id: 'documenti',
     label: 'Documenti',
     items: [
-      { href: '/etichette', icon: Tag,      label: 'Etichette' },
-      { href: '/report',    icon: FileText, label: 'Report Assicurativo' },
+      { href: '/preventivi', icon: Receipt,  label: 'Preventivi' },
+      { href: '/etichette',  icon: Tag,      label: 'Etichette' },
+      { href: '/report',     icon: FileText, label: 'Report Assicurativo' },
     ],
   },
   {
@@ -86,7 +88,7 @@ export default function Sidebar({ user, profile }) {
   const [profileName, setProfileName] = useState(profile?.full_name || '')
   const [profileSaving, setProfileSaving] = useState(false)
   const [profileError, setProfileError] = useState('')
-  const [badges, setBadges] = useState({ maintenance: 0, overdueSets: 0 })
+  const [badges, setBadges] = useState({ maintenance: 0, overdueSets: 0, overdueLoans: 0 })
   // Avatar
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || null)
   const [avatarUploading, setAvatarUploading] = useState(false)
@@ -103,16 +105,21 @@ export default function Sidebar({ user, profile }) {
     async function fetchBadges() {
       const supabase = getSupabase()
       const today = new Date().toISOString().slice(0, 10)
-      const [{ data: equipment }, { data: overdue }] = await Promise.all([
+      const [{ data: equipment }, { data: overdue }, { data: overdueLoans }] = await Promise.all([
         supabase.from('equipment').select('last_checked_at').neq('condition', 'retired'),
         supabase.from('sets').select('id', { count: 'exact', head: false })
           .eq('status', 'out').lt('job_date', today),
+        supabase.from('loans').select('id').is('actual_return', null).lt('expected_return', today),
       ])
       const maintenanceCount = (equipment || []).filter((e) => {
         if (!e.last_checked_at) return true
         return Math.floor((Date.now() - new Date(e.last_checked_at).getTime()) / 86400000) > 90
       }).length
-      setBadges({ maintenance: maintenanceCount, overdueSets: (overdue || []).length })
+      setBadges({
+        maintenance: maintenanceCount,
+        overdueSets: (overdue || []).length,
+        overdueLoans: (overdueLoans || []).length,
+      })
     }
     fetchBadges()
   }, [])

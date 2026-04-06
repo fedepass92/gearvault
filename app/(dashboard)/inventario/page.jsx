@@ -642,10 +642,12 @@ const CATEGORY_ICONS = {
   lighting: '💡', support: '🎬', accessory: '🔧', altro: '📦',
 }
 
-function EquipmentGridCard({ item, isOut, onClick }) {
+function EquipmentGridCard({ item, isOut, isLoaned, onClick }) {
   const maintenance = needsMaintenance(item)
   const availBadge = item.condition === 'repair'
     ? { label: 'Manutenzione', cls: 'bg-red-500/20 text-red-400 border-red-500/30' }
+    : isLoaned
+    ? { label: 'In prestito', cls: 'bg-purple-500/20 text-purple-400 border-purple-500/30' }
     : isOut
     ? { label: 'In uso', cls: 'bg-amber-500/20 text-amber-400 border-amber-500/30' }
     : { label: 'Disponibile', cls: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' }
@@ -946,7 +948,8 @@ export default function InventarioPage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [recentlyChecked, setRecentlyChecked] = useState({}) // { [id]: true }
-  const [outEquipmentIds, setOutEquipmentIds] = useState(new Set())
+  const [outEquipmentIds, setOutEquipmentIds]     = useState(new Set())
+  const [loanedEquipmentIds, setLoanedEquipmentIds] = useState(new Set())
   const [availabilityFilter, setAvailabilityFilter] = useState('all') // 'all' | 'free' | 'in_use'
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [bulkLoading, setBulkLoading] = useState(false)
@@ -966,12 +969,15 @@ export default function InventarioPage() {
     if (conditionFilter !== 'all') q = q.eq('condition', conditionFilter)
     if (locationFilter !== 'all') q = q.eq('location', locationFilter)
     if (search) q = q.or(`name.ilike.%${search}%,serial_number.ilike.%${search}%,brand.ilike.%${search}%`)
-    const [{ data }, { data: outItems }] = await Promise.all([
+    const today = new Date().toISOString().slice(0, 10)
+    const [{ data }, { data: outItems }, { data: loanedItems }] = await Promise.all([
       q,
       supabase.from('set_items').select('equipment_id').eq('status', 'out'),
+      supabase.from('loans').select('item_id').is('actual_return', null),
     ])
     setEquipment(data || [])
     setOutEquipmentIds(new Set((outItems || []).map((r) => r.equipment_id)))
+    setLoanedEquipmentIds(new Set((loanedItems || []).map((r) => r.item_id)))
     setLoading(false)
   }, [search, categoryFilter, conditionFilter, locationFilter])
 
@@ -1289,6 +1295,7 @@ export default function InventarioPage() {
                 key={item.id}
                 item={item}
                 isOut={outEquipmentIds.has(item.id)}
+                isLoaned={loanedEquipmentIds.has(item.id)}
                 onClick={() => setDetailItem(item)}
               />
             ))}
@@ -1344,7 +1351,8 @@ export default function InventarioPage() {
                   const BattIcon = BATTERY_ICON[item.battery_status] || Minus
                   const maintenance = needsMaintenance(item)
                   const justChecked = recentlyChecked[item.id]
-                  const isOut = outEquipmentIds.has(item.id)
+                  const isOut    = outEquipmentIds.has(item.id)
+                  const isLoaned = loanedEquipmentIds.has(item.id)
 
                   return (
                     <tr
@@ -1377,6 +1385,11 @@ export default function InventarioPage() {
                           {isOut && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20 flex-shrink-0">
                               In uso
+                            </span>
+                          )}
+                          {isLoaned && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 border border-purple-500/20 flex-shrink-0">
+                              In prestito
                             </span>
                           )}
                         </div>
