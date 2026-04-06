@@ -5,7 +5,7 @@ import { getSupabase } from '@/lib/supabase'
 import { getSettings, saveSettings, saveSetting, SETTINGS_DEFAULTS } from '@/lib/settings'
 import {
   Building2, Bell, Package, Tag, FileText, Shield,
-  Loader2, Plus, X, Upload, Check, RefreshCw, Image as ImageIcon,
+  Loader2, Plus, X, Upload, Check, RefreshCw, Image as ImageIcon, Eye, EyeOff,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -104,6 +104,29 @@ function TagList({ items, onAdd, onRemove, placeholder }) {
   )
 }
 
+// ── Password input with show/hide toggle ──────────────────────────────────────
+function PasswordInput({ value, onChange, placeholder }) {
+  const [show, setShow] = useState(false)
+  return (
+    <div className="relative">
+      <Input
+        type={show ? 'text' : 'password'}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="h-8 text-sm pr-8"
+      />
+      <button
+        type="button"
+        onClick={() => setShow((v) => !v)}
+        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition"
+      >
+        {show ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+      </button>
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function ImpostazioniPage() {
   const [settings, setSettings] = useState(null)
@@ -112,7 +135,12 @@ export default function ImpostazioniPage() {
   const [logoUploading, setLogoUploading] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [pwdLoading, setPwdLoading] = useState(false)
-  const [sessions, setSessions] = useState([])
+  const [currentEmail, setCurrentEmail] = useState('')
+  // Change password form
+  const [currentPwd, setCurrentPwd] = useState('')
+  const [newPwd, setNewPwd] = useState('')
+  const [confirmPwd, setConfirmPwd] = useState('')
+  const [changePwdLoading, setChangePwdLoading] = useState(false)
   const logoInputRef = useRef(null)
 
   useEffect(() => {
@@ -120,6 +148,7 @@ export default function ImpostazioniPage() {
       const supabase = getSupabase()
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
+        setCurrentEmail(user.email || '')
         const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
         setIsAdmin(profile?.role === 'admin')
       }
@@ -166,12 +195,44 @@ export default function ImpostazioniPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (user?.email) {
       const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
-        redirectTo: `${window.location.origin}/login`,
+        redirectTo: `${window.location.origin}/imposta-password`,
       })
       if (error) toast.error('Errore invio email')
       else toast.success('Email di reset inviata')
     }
     setPwdLoading(false)
+  }
+
+  async function handleChangePassword(e) {
+    e.preventDefault()
+    if (!currentPwd) { toast.error('Inserisci la password attuale'); return }
+    if (newPwd.length < 8) { toast.error('La nuova password deve essere di almeno 8 caratteri'); return }
+    if (newPwd !== confirmPwd) { toast.error('Le password non coincidono'); return }
+
+    setChangePwdLoading(true)
+    const supabase = getSupabase()
+
+    // Verify current password by re-authenticating
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: currentEmail,
+      password: currentPwd,
+    })
+    if (signInError) {
+      toast.error('Password attuale non corretta')
+      setChangePwdLoading(false)
+      return
+    }
+
+    const { error } = await supabase.auth.updateUser({ password: newPwd })
+    setChangePwdLoading(false)
+    if (error) {
+      toast.error(error.message)
+    } else {
+      toast.success('Password aggiornata')
+      setCurrentPwd('')
+      setNewPwd('')
+      setConfirmPwd('')
+    }
   }
 
   if (loading) {
@@ -451,17 +512,59 @@ export default function ImpostazioniPage() {
         {/* ── Sicurezza ────────────────────────────────────────────────────── */}
         <TabsContent value="sicurezza" className="mt-6">
           <div className="bg-card border border-border rounded-xl p-6 space-y-6">
-            <Section title="Password" description="Gestione della password di accesso">
+
+            {/* Reset via email */}
+            <Section title="Reset password" description="Ricevi un link via email per impostare una nuova password">
               <div className="flex items-center justify-between p-4 rounded-lg border border-border bg-muted/30">
                 <div>
-                  <p className="text-sm font-medium">Reset password via email</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Ricevi un link di reset all&apos;email del tuo account</p>
+                  <p className="text-sm font-medium">Reset via email</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Ricevi un link all&apos;indirizzo <span className="font-mono">{currentEmail}</span>
+                  </p>
                 </div>
                 <Button size="sm" variant="outline" onClick={handlePasswordReset} disabled={pwdLoading}>
                   {pwdLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                   Invia email reset
                 </Button>
               </div>
+            </Section>
+
+            <Separator />
+
+            {/* Change password */}
+            <Section title="Cambia password" description="Imposta una nuova password partendo da quella attuale">
+              <form onSubmit={handleChangePassword} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label className="text-sm">Password attuale</Label>
+                  <PasswordInput
+                    value={currentPwd}
+                    onChange={setCurrentPwd}
+                    placeholder="La tua password attuale"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm">Nuova password</Label>
+                  <PasswordInput
+                    value={newPwd}
+                    onChange={setNewPwd}
+                    placeholder="Minimo 8 caratteri"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm">Conferma nuova password</Label>
+                  <PasswordInput
+                    value={confirmPwd}
+                    onChange={setConfirmPwd}
+                    placeholder="Ripeti la nuova password"
+                  />
+                </div>
+                <div className="flex justify-end pt-1">
+                  <Button type="submit" size="sm" disabled={changePwdLoading || !currentPwd || !newPwd || !confirmPwd}>
+                    {changePwdLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    Aggiorna password
+                  </Button>
+                </div>
+              </form>
             </Section>
 
             <Separator />

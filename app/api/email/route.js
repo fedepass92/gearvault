@@ -22,9 +22,9 @@ export async function POST(request) {
     let subject, html
     if (type === 'invite') {
       const admin = getAdminClient()
-      const loginUrl = data.loginUrl || `${request.headers.get('origin') || ''}/login`
+      const origin = request.headers.get('origin') || ''
 
-      // Create user via admin API (no email confirmation required)
+      // Create user via admin API (email pre-confirmed, no Supabase confirmation email)
       const { data: created, error: createError } = await admin.auth.admin.createUser({
         email: to,
         password: Math.random().toString(36).slice(-12) + 'Aa1!',
@@ -41,8 +41,16 @@ export async function POST(request) {
         { onConflict: 'id' }
       )
 
-      // Send branded email
-      ;({ subject, html } = inviteTemplate({ inviteeEmail: to, inviterName: data.inviterName || null, loginUrl }))
+      // Generate a recovery link that redirects to /imposta-password
+      const { data: linkData } = await admin.auth.admin.generateLink({
+        type: 'recovery',
+        email: to,
+        options: { redirectTo: `${origin}/imposta-password` },
+      })
+      const setupUrl = linkData?.properties?.action_link || `${origin}/imposta-password`
+
+      // Send branded email with the setup link
+      ;({ subject, html } = inviteTemplate({ inviteeEmail: to, inviterName: data.inviterName || null, loginUrl: setupUrl }))
 
       const { data: result, error } = await resend.emails.send({
         from: `${FROM_NAME} <${FROM_EMAIL}>`,
@@ -52,7 +60,6 @@ export async function POST(request) {
       })
       if (error) {
         console.error('[email route] Resend error:', error)
-        // User was created — return success with warning
         return NextResponse.json({ id: null, warning: 'User created but email failed' })
       }
       return NextResponse.json({ id: result?.id })
