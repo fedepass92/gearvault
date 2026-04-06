@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { resend, FROM_EMAIL, FROM_NAME, inviteTemplate, maintenanceAlertTemplate, setConfirmTemplate } from '@/lib/resend'
+import { resend, FROM_EMAIL, FROM_NAME, inviteTemplate, resetPasswordTemplate, maintenanceAlertTemplate, setConfirmTemplate } from '@/lib/resend'
 
 function getAdminClient() {
   return createClient(
@@ -15,8 +15,10 @@ export async function POST(request) {
     const body = await request.json()
     const { type, to, ...data } = body
 
-    if (!type || !to) {
-      return NextResponse.json({ error: 'Missing required fields: type, to' }, { status: 400 })
+    // 'reset' uses email field instead of to
+    const email = to || body.email
+    if (!type || !email) {
+      return NextResponse.json({ error: 'Missing required fields: type, to/email' }, { status: 400 })
     }
 
     let subject, html
@@ -61,6 +63,34 @@ export async function POST(request) {
       if (error) {
         console.error('[email route] Resend error:', error)
         return NextResponse.json({ id: null, warning: 'User created but email failed' })
+      }
+      return NextResponse.json({ id: result?.id })
+
+    } else if (type === 'reset') {
+      const admin = getAdminClient()
+      const origin = request.headers.get('origin') || ''
+
+      const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
+        type: 'recovery',
+        email,
+        options: { redirectTo: `${origin}/imposta-password` },
+      })
+      if (linkError) {
+        return NextResponse.json({ error: linkError.message }, { status: 400 })
+      }
+      const resetUrl = linkData?.properties?.action_link || `${origin}/imposta-password`
+
+      ;({ subject, html } = resetPasswordTemplate({ resetUrl }))
+
+      const { data: result, error } = await resend.emails.send({
+        from: `${FROM_NAME} <${FROM_EMAIL}>`,
+        to: [email],
+        subject,
+        html,
+      })
+      if (error) {
+        console.error('[email route] Resend error:', error)
+        return NextResponse.json({ error: error.message }, { status: 500 })
       }
       return NextResponse.json({ id: result?.id })
 

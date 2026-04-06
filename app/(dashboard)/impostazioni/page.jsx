@@ -191,15 +191,15 @@ export default function ImpostazioniPage() {
 
   async function handlePasswordReset() {
     setPwdLoading(true)
-    const supabase = getSupabase()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user?.email) {
-      const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
-        redirectTo: `${window.location.origin}/imposta-password`,
-      })
-      if (error) toast.error('Errore invio email')
-      else toast.success('Email di reset inviata')
-    }
+    if (!currentEmail) { toast.error('Email non trovata'); setPwdLoading(false); return }
+    const res = await fetch('/api/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'reset', email: currentEmail }),
+    })
+    const json = await res.json()
+    if (!res.ok) toast.error(json.error || 'Errore invio email')
+    else toast.success('Email di reset inviata')
     setPwdLoading(false)
   }
 
