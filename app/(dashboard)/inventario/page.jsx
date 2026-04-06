@@ -311,7 +311,7 @@ function ItemDetailModal({ item, onClose, onEdit, onDelete }) {
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0">
+      <DialogContent className="max-w-3xl w-full max-h-[90vh] flex flex-col p-0 gap-0">
 
         {/* ── Hero photo banner ── */}
         {item.photo_url ? (
@@ -376,8 +376,8 @@ function ItemDetailModal({ item, onClose, onEdit, onDelete }) {
         <ScrollArea className="flex-1 overflow-y-auto">
           <Tabs defaultValue="dettagli" className="w-full">
             {/* ── Tabs header ── */}
-            <div className="sticky top-0 z-10 bg-background border-b border-border px-5 pt-3 pb-0">
-              <TabsList className="h-auto bg-transparent p-0 gap-0 w-full justify-start rounded-none">
+            <div className="sticky top-0 z-10 bg-background border-b border-border px-5 pt-3 pb-0 overflow-x-auto">
+              <TabsList className="h-auto bg-transparent p-0 gap-0 min-w-max justify-start rounded-none">
                 {[
                   { value: 'dettagli', label: 'Dettagli' },
                   { value: 'storico', label: 'Storico' },
@@ -387,7 +387,7 @@ function ItemDetailModal({ item, onClose, onEdit, onDelete }) {
                   <TabsTrigger
                     key={value}
                     value={value}
-                    className="relative rounded-none bg-transparent px-4 pb-3 pt-1 font-medium text-sm text-muted-foreground shadow-none transition-colors hover:text-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-t-full data-[state=active]:after:bg-primary"
+                    className="relative rounded-none bg-transparent px-4 pb-3 pt-1 font-medium text-sm text-muted-foreground shadow-none transition-colors hover:text-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-t-full data-[state=active]:after:bg-primary whitespace-nowrap"
                   >
                     {label}
                   </TabsTrigger>
@@ -398,19 +398,23 @@ function ItemDetailModal({ item, onClose, onEdit, onDelete }) {
             {/* ── Dettagli ── */}
             <TabsContent value="dettagli" className="px-5 pb-5 pt-5 space-y-5 mt-0">
               {/* Identificazione */}
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Identificazione</p>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2.5">
+                  <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500 shrink-0">Identificazione</p>
+                  <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+                </div>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-4">
                   <DetailField label="Numero seriale" value={item.serial_number} mono />
                   <DetailField label="Categoria" value={CATEGORY_LABELS[item.category] || item.category} />
                 </div>
               </div>
 
-              <Separator />
-
               {/* Valori */}
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Valori economici</p>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2.5">
+                  <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500 shrink-0">Valori economici</p>
+                  <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+                </div>
                 <div className="grid grid-cols-3 gap-x-4 gap-y-4">
                   <DetailField label="Prezzo acquisto" value={fmtEur(item.purchase_price)} />
                   <DetailField label="Valore di mercato" value={fmtEur(item.market_value)} />
@@ -420,11 +424,12 @@ function ItemDetailModal({ item, onClose, onEdit, onDelete }) {
                 </div>
               </div>
 
-              <Separator />
-
               {/* Stato */}
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Stato operativo</p>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2.5">
+                  <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500 shrink-0">Stato operativo</p>
+                  <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+                </div>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-4">
                   <DetailField
                     label="Stato batteria"
@@ -442,9 +447,11 @@ function ItemDetailModal({ item, onClose, onEdit, onDelete }) {
 
               {depr && (
                 <>
-                  <Separator />
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Ammortamento</p>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2.5">
+                      <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500 shrink-0">Ammortamento</p>
+                      <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+                    </div>
                     <div className="rounded-lg border border-border bg-muted/40 p-4 space-y-3">
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-muted-foreground">Deprezzamento accumulato</span>
@@ -466,27 +473,27 @@ function ItemDetailModal({ item, onClose, onEdit, onDelete }) {
               )}
 
               {item.label_note && (
-                <>
-                  <Separator />
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2.5">
+                    <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500 shrink-0 flex items-center gap-1.5">
                       <Tag className="w-3 h-3" /> Nota etichetta
                     </p>
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-800 dark:text-amber-300 text-sm font-medium">
-                      {item.label_note}
-                    </div>
+                    <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
                   </div>
-                </>
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-800 dark:text-amber-300 text-sm font-medium">
+                    {item.label_note}
+                  </div>
+                </div>
               )}
 
               {item.notes && (
-                <>
-                  <Separator />
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Note</p>
-                    <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{item.notes}</p>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2.5">
+                    <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500 shrink-0">Note</p>
+                    <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
                   </div>
-                </>
+                  <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{item.notes}</p>
+                </div>
               )}
             </TabsContent>
 
@@ -497,10 +504,13 @@ function ItemDetailModal({ item, onClose, onEdit, onDelete }) {
               ) : (
                 <>
                   {chartData.length > 1 && (
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                        <TrendingUp className="w-3.5 h-3.5" /> Andamento valore
-                      </p>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2.5">
+                        <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500 shrink-0 flex items-center gap-1.5">
+                          <TrendingUp className="w-3 h-3" /> Andamento valore
+                        </p>
+                        <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+                      </div>
                       <div className="rounded-lg border border-border bg-muted/20 p-3">
                         <ResponsiveContainer width="100%" height={160}>
                           <LineChart data={chartData}>
@@ -523,10 +533,13 @@ function ItemDetailModal({ item, onClose, onEdit, onDelete }) {
                       .then(({ data }) => { if (data) setPriceHistory(data) })
                   }} />
 
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5" /> Movimenti recenti
-                    </p>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2.5">
+                      <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500 shrink-0 flex items-center gap-1.5">
+                        <Clock className="w-3 h-3" /> Movimenti recenti
+                      </p>
+                      <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+                    </div>
                     {movements.length === 0 ? (
                       <p className="text-sm text-muted-foreground">Nessun movimento registrato</p>
                     ) : (
@@ -614,13 +627,16 @@ function DetailField({ label, value, mono = false, valueClass = '', fallback = '
 
 function MembershipSection({ title, icon, items, emptyLabel }) {
   return (
-    <div>
-      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
-        {icon} {title}
-        <span className="ml-1 text-[10px] font-medium bg-muted px-1.5 py-0.5 rounded-full">
-          {items.length}
-        </span>
-      </p>
+    <div className="space-y-3">
+      <div className="flex items-center gap-2.5">
+        <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500 shrink-0 flex items-center gap-1.5">
+          {icon} {title}
+          <span className="text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded-full">
+            {items.length}
+          </span>
+        </p>
+        <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+      </div>
       {items.length === 0 ? (
         <p className="text-sm text-muted-foreground italic">{emptyLabel}</p>
       ) : (
