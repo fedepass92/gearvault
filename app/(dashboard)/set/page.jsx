@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { getSupabase } from '@/lib/supabase'
 import {
   Plus, Briefcase, MapPin, Calendar, Loader2, ChevronRight, Copy,
   ChevronLeft, List, LayoutGrid, Search, X, BookmarkPlus, BookOpen,
-  Pencil, Trash2, Package, Check, ImageOff,
+  Pencil, Trash2, Package, Check, ImageOff, LayoutTemplate,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -118,6 +118,7 @@ function CalendarView({ sets }) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function SetPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   // Set state
   const [sets, setSets]       = useState([])
@@ -132,7 +133,7 @@ export default function SetPage() {
   const [statusFilter, setStatusFilter] = useState('all')
 
   // Template state
-  const [tab, setTab]                     = useState('sets') // 'sets' | 'templates'
+  const [tab, setTab]                     = useState(searchParams.get('tab') === 'template' ? 'templates' : 'sets')
   const [templates, setTemplates]         = useState([])
   const [templatesLoading, setTemplatesLoading] = useState(false)
   const [savingTemplate, setSavingTemplate]     = useState(null) // set.id being saved
@@ -151,6 +152,14 @@ export default function SetPage() {
   const [deleteTpl, setDeleteTpl]               = useState(null)
   const [deletingTpl, setDeletingTpl]           = useState(false)
 
+  // New template from scratch
+  const [showNewTplModal, setShowNewTplModal]   = useState(false)
+  const [newTplForm, setNewTplForm]             = useState({ name: '', description: '' })
+  const [newTplItems, setNewTplItems]           = useState([]) // array of equipment objects
+  const [showTplItemPicker, setShowTplItemPicker] = useState(false)
+  const [tplItemSearch, setTplItemSearch]       = useState('')
+  const [savingNewTpl, setSavingNewTpl]         = useState(false)
+
   // Edit set modal state
   const [editingSet, setEditingSet]           = useState(null)
   const [editForm, setEditForm]               = useState(EMPTY_SET)
@@ -163,10 +172,10 @@ export default function SetPage() {
 
   useEffect(() => { fetchSets() }, [])
 
-  // Fetch templates when switching to tab
+  // Fetch templates when switching to tab (or on initial load if already on templates tab)
   useEffect(() => {
     if (tab === 'templates' && templates.length === 0) fetchTemplates()
-  }, [tab])
+  }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Set fetching ─────────────────────────────────────────────────────────────
   async function fetchSets() {
@@ -371,6 +380,46 @@ export default function SetPage() {
     toast.success('Template eliminato')
   }
 
+  // ── Tab switcher (syncs URL) ──────────────────────────────────────────────────
+  function switchTab(newTab) {
+    setTab(newTab)
+    router.replace(newTab === 'templates' ? '/set?tab=template' : '/set', { scroll: false })
+  }
+
+  // ── New template from scratch ─────────────────────────────────────────────────
+  async function openNewTplModal() {
+    setNewTplForm({ name: '', description: '' })
+    setNewTplItems([])
+    setTplItemSearch('')
+    setShowNewTplModal(true)
+    if (allEquipment.length === 0) {
+      const supabase = getSupabase()
+      const { data } = await supabase.from('equipment').select('id, name, brand, model, photo_url, category').eq('condition', 'active').order('name')
+      setAllEquipment(data || [])
+    }
+  }
+
+  async function handleCreateNewTemplate(e) {
+    e.preventDefault()
+    if (!newTplForm.name.trim()) return
+    setSavingNewTpl(true)
+    const supabase = getSupabase()
+    const { data: { user } } = await supabase.auth.getUser()
+    const items = newTplItems.map((eq) => ({ item_id: eq.id, notes: '' }))
+    const { error } = await supabase.from('set_templates').insert({
+      user_id: user.id,
+      name: newTplForm.name.trim(),
+      description: newTplForm.description.trim() || null,
+      items,
+    })
+    setSavingNewTpl(false)
+    if (error) { toast.error('Errore nel salvataggio'); return }
+    toast.success(`Template "${newTplForm.name}" creato`)
+    setShowNewTplModal(false)
+    setTemplates([]) // force re-fetch on next render
+    if (tab === 'templates') fetchTemplates()
+  }
+
   // ── Edit set modal ────────────────────────────────────────────────────────────
   async function openEditModal(set, e) {
     e.preventDefault()
@@ -486,13 +535,19 @@ export default function SetPage() {
               </Button>
             </>
           )}
+          {tab === 'templates' && (
+            <Button size="sm" onClick={openNewTplModal}>
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Nuovo template</span>
+            </Button>
+          )}
         </div>
       </div>
 
       {/* Section tabs */}
       <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-0.5 border border-border/50 w-fit">
         <button
-          onClick={() => setTab('sets')}
+          onClick={() => switchTab('sets')}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition ${
             tab === 'sets' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
           }`}
@@ -501,12 +556,12 @@ export default function SetPage() {
           Set
         </button>
         <button
-          onClick={() => setTab('templates')}
+          onClick={() => switchTab('templates')}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition ${
             tab === 'templates' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
           }`}
         >
-          <BookOpen className="w-3.5 h-3.5" />
+          <LayoutTemplate className="w-3.5 h-3.5" />
           Template
           {templates.length > 0 && (
             <span className="ml-0.5 text-[10px] font-bold bg-primary/15 text-primary px-1.5 py-0.5 rounded-full">
@@ -645,11 +700,15 @@ export default function SetPage() {
             </div>
           ) : templates.length === 0 ? (
             <div className="bg-card rounded-xl border border-border p-12 text-center">
-              <BookOpen className="w-10 h-10 mx-auto mb-3 text-muted-foreground opacity-40" />
+              <LayoutTemplate className="w-10 h-10 mx-auto mb-3 text-muted-foreground opacity-40" />
               <p className="text-muted-foreground text-sm font-medium mb-1">Nessun template salvato</p>
-              <p className="text-muted-foreground/60 text-xs">
-                Clicca <BookmarkPlus className="w-3.5 h-3.5 inline mx-0.5" /> su un set per salvarlo come template
+              <p className="text-muted-foreground/60 text-xs mb-4">
+                Crea un template da zero oppure clicca <BookmarkPlus className="w-3.5 h-3.5 inline mx-0.5" /> su un set esistente
               </p>
+              <Button size="sm" onClick={openNewTplModal}>
+                <Plus className="w-4 h-4" />
+                Nuovo template
+              </Button>
             </div>
           ) : (
             templates.map((tpl) => (
@@ -1075,6 +1134,164 @@ export default function SetPage() {
               Salva modifiche
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── DIALOG: Nuovo template da zero ───────────────────────────────────── */}
+      <Dialog open={showNewTplModal} onOpenChange={(o) => { if (!o) setShowNewTplModal(false) }}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-5 py-4 border-b border-border">
+            <DialogTitle className="flex items-center gap-2">
+              <LayoutTemplate className="w-4 h-4" />
+              Nuovo template
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateNewTemplate} className="flex flex-col flex-1 overflow-hidden">
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+              <div className="space-y-1.5">
+                <Label>Nome template *</Label>
+                <Input
+                  value={newTplForm.name}
+                  onChange={(e) => setNewTplForm((f) => ({ ...f, name: e.target.value }))}
+                  required
+                  placeholder="Es. Set Video Completo"
+                  autoFocus
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Descrizione <span className="text-muted-foreground font-normal">(opzionale)</span></Label>
+                <Input
+                  value={newTplForm.description}
+                  onChange={(e) => setNewTplForm((f) => ({ ...f, description: e.target.value }))}
+                  placeholder="Es. Per shooting in studio"
+                />
+              </div>
+
+              {/* Attrezzatura */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2.5">
+                  <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500 shrink-0">
+                    Attrezzatura
+                    {newTplItems.length > 0 && (
+                      <span className="ml-1.5 text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded-full">
+                        {newTplItems.length}
+                      </span>
+                    )}
+                  </p>
+                  <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowTplItemPicker(true)}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-dashed border-border text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Aggiungi item
+                </button>
+                {newTplItems.length > 0 && (
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                    {newTplItems.map((eq) => (
+                      <div key={eq.id} className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-muted/40 border border-border/50">
+                        {eq.photo_url ? (
+                          <img src={eq.photo_url} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0 border border-border" />
+                        ) : (
+                          <div className="w-8 h-8 rounded bg-muted flex-shrink-0 border border-border flex items-center justify-center">
+                            <Package className="w-3.5 h-3.5 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{eq.name}</p>
+                          {(eq.brand || eq.model) && (
+                            <p className="text-xs text-muted-foreground truncate">{[eq.brand, eq.model].filter(Boolean).join(' · ')}</p>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setNewTplItems((prev) => prev.filter((i) => i.id !== eq.id))}
+                          className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition flex-shrink-0"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <DialogFooter className="px-5 py-3 border-t border-border bg-muted/20 gap-2">
+              <Button type="button" variant="outline" onClick={() => setShowNewTplModal(false)}>Annulla</Button>
+              <Button type="submit" disabled={savingNewTpl || !newTplForm.name.trim()}>
+                {savingNewTpl && <Loader2 className="w-4 h-4 animate-spin" />}
+                Salva template
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── DIALOG: Item picker per nuovo template ────────────────────────────── */}
+      <Dialog open={showTplItemPicker} onOpenChange={(o) => { if (!o) { setShowTplItemPicker(false); setTplItemSearch('') } }}>
+        <DialogContent className="sm:max-w-md max-h-[80vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-5 py-4 border-b border-border">
+            <DialogTitle>Aggiungi attrezzatura</DialogTitle>
+          </DialogHeader>
+          <div className="px-4 py-3 border-b border-border">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+              <Input
+                value={tplItemSearch}
+                onChange={(e) => setTplItemSearch(e.target.value)}
+                placeholder="Cerca per nome, marca, modello…"
+                className="pl-8 h-8 text-sm"
+                autoFocus
+              />
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            {(() => {
+              const addedIds = new Set(newTplItems.map((i) => i.id))
+              const results = allEquipment
+                .filter((e) => !addedIds.has(e.id))
+                .filter((e) => {
+                  if (!tplItemSearch) return true
+                  const q = tplItemSearch.toLowerCase()
+                  return [e.name, e.brand, e.model].some((v) => v?.toLowerCase().includes(q))
+                })
+              if (results.length === 0) {
+                return (
+                  <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
+                    {tplItemSearch ? 'Nessun risultato' : 'Tutto l\'inventario è già stato aggiunto'}
+                  </div>
+                )
+              }
+              return results.map((eq) => (
+                <button
+                  key={eq.id}
+                  onClick={() => {
+                    setNewTplItems((prev) => [...prev, eq])
+                    setShowTplItemPicker(false)
+                    setTplItemSearch('')
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-muted/60 transition text-left border-b border-border/30 last:border-0"
+                >
+                  {eq.photo_url ? (
+                    <img src={eq.photo_url} alt="" className="w-9 h-9 rounded object-cover flex-shrink-0 border border-border" />
+                  ) : (
+                    <div className="w-9 h-9 rounded bg-muted flex-shrink-0 border border-border flex items-center justify-center">
+                      <Package className="w-4 h-4 text-muted-foreground" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{eq.name}</p>
+                    {(eq.brand || eq.model) && (
+                      <p className="text-xs text-muted-foreground truncate">{[eq.brand, eq.model].filter(Boolean).join(' · ')}</p>
+                    )}
+                  </div>
+                  <Plus className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                </button>
+              ))
+            })()}
+          </div>
         </DialogContent>
       </Dialog>
 

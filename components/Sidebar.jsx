@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useState, useEffect, useRef } from 'react'
 import { useTheme } from 'next-themes'
 import { getSupabase } from '@/lib/supabase'
@@ -10,7 +10,7 @@ import {
   Camera, LayoutDashboard, Package, Tag, Briefcase, FileText,
   Users, LogOut, Menu, X, Box, History, Layers, Settings, Loader2,
   Search, Wrench, BarChart2, Moon, Sun, Plus, Upload, Eye, EyeOff,
-  Calendar, ChevronRight, TrendingDown, HandHelping, Receipt,
+  Calendar, ChevronRight, TrendingDown, HandHelping, Receipt, LayoutTemplate,
 } from 'lucide-react'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -47,8 +47,9 @@ const NAV_SECTIONS = [
     id: 'set',
     label: 'Set',
     items: [
-      { href: '/set',     icon: Briefcase, label: 'Set Manager',      badgeKey: 'overdueSets' },
-      { href: '/storico', icon: History,   label: 'Storico movimenti' },
+      { href: '/set',              icon: Briefcase,      label: 'Set Manager',      badgeKey: 'overdueSets' },
+      { href: '/set?tab=template', icon: LayoutTemplate, label: 'Template' },
+      { href: '/storico',          icon: History,        label: 'Storico movimenti' },
     ],
   },
   {
@@ -81,6 +82,7 @@ const NAV_ADMIN = [
 export default function Sidebar({ user, profile }) {
   const pathname = usePathname()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { theme, setTheme } = useTheme()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -196,7 +198,16 @@ export default function Sidebar({ user, profile }) {
 
   // ── NavLink ──────────────────────────────────────────────────────────────────
   const NavLink = ({ item }) => {
-    const active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
+    const [hrefPath, hrefQuery] = item.href.includes('?') ? item.href.split('?') : [item.href, null]
+    let active
+    if (hrefQuery) {
+      const params = new URLSearchParams(hrefQuery)
+      active = pathname === hrefPath && [...params.entries()].every(([k, v]) => searchParams.get(k) === v)
+    } else if (item.href === '/set') {
+      active = (pathname === '/set' || (pathname.startsWith('/set/') && pathname !== '/set/')) && searchParams.get('tab') !== 'template'
+    } else {
+      active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
+    }
     const badgeCount = item.badgeKey ? badges[item.badgeKey] : 0
     return (
       <Link
