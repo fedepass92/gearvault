@@ -65,18 +65,27 @@ function SettingRow({ label, hint, children }) {
 }
 
 // ── Tag list (categories/locations) ───────────────────────────────────────────
-function TagList({ items, onAdd, onRemove, placeholder }) {
+function TagList({ items, onAdd, onRemove, placeholder, defaultItems = [] }) {
   const [input, setInput] = useState('')
 
   function handleAdd() {
     const v = input.trim()
-    if (!v || items.includes(v)) return
+    if (!v || items.includes(v) || defaultItems.includes(v)) return
     onAdd(v)
     setInput('')
   }
 
   return (
     <div className="space-y-2">
+      {defaultItems.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {defaultItems.map((item) => (
+            <span key={item} className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted/50 text-xs font-medium border border-border text-muted-foreground">
+              {item}
+            </span>
+          ))}
+        </div>
+      )}
       <div className="flex flex-wrap gap-1.5">
         {items.map((item) => (
           <span key={item} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted text-xs font-medium border border-border">
@@ -86,7 +95,7 @@ function TagList({ items, onAdd, onRemove, placeholder }) {
             </button>
           </span>
         ))}
-        {items.length === 0 && <span className="text-xs text-muted-foreground italic">Nessun elemento personalizzato</span>}
+        {items.length === 0 && defaultItems.length === 0 && <span className="text-xs text-muted-foreground italic">Nessun elemento personalizzato</span>}
       </div>
       <div className="flex gap-2">
         <Input
@@ -105,7 +114,7 @@ function TagList({ items, onAdd, onRemove, placeholder }) {
 }
 
 // ── Password input with show/hide toggle ──────────────────────────────────────
-function PasswordInput({ value, onChange, placeholder }) {
+function PasswordInput({ value, onChange, placeholder, autoComplete }) {
   const [show, setShow] = useState(false)
   return (
     <div className="relative">
@@ -114,6 +123,7 @@ function PasswordInput({ value, onChange, placeholder }) {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        autoComplete={autoComplete}
         className="h-8 text-sm pr-8"
       />
       <button
@@ -169,8 +179,12 @@ export default function ImpostazioniPage() {
     keys.forEach((k) => { obj[k] = settings[k] })
     const ok = await saveSettings(obj)
     setSaving(false)
-    if (ok) toast.success('Impostazioni salvate')
-    else toast.error('Errore nel salvataggio')
+    if (ok) {
+      toast.success('Impostazioni salvate')
+    } else {
+      toast.error('Errore nel salvataggio — verifica che la tabella app_settings esista nel database')
+      console.error('[impostazioni] saveSettings failed — run the v3 migration in supabase/schema.sql')
+    }
   }
 
   async function handleLogoUpload(e) {
@@ -305,6 +319,7 @@ export default function ImpostazioniPage() {
                     </Button>
                     <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
                   </div>
+                  <p className="text-[11px] text-muted-foreground">PNG o SVG con sfondo trasparente, min. 200×200px. Il logo viene salvato automaticamente al caricamento.</p>
                 </div>
               </SettingRow>
 
@@ -394,23 +409,25 @@ export default function ImpostazioniPage() {
         {/* ── Inventario ───────────────────────────────────────────────────── */}
         <TabsContent value="inventario" className="mt-6">
           <div className="bg-card border border-border rounded-xl p-6 space-y-6">
-            <Section title="Categorie personalizzate" description="Aggiungi categorie oltre a quelle predefinite (Camera, Obiettivo, ecc.)">
+            <Section title="Categorie" description="Le categorie predefinite sono fisse. Aggiungi categorie personalizzate con il ✕ per rimuoverle.">
               <TagList
                 items={settings.custom_categories}
                 placeholder="Es. Gimbal, Monitor…"
                 onAdd={(v) => set('custom_categories', [...settings.custom_categories, v])}
                 onRemove={(v) => set('custom_categories', settings.custom_categories.filter((x) => x !== v))}
+                defaultItems={['Camera', 'Obiettivo', 'Drone', 'Audio', 'Illuminazione', 'Supporto', 'Accessorio', 'Altro']}
               />
             </Section>
 
             <Separator />
 
-            <Section title="Location personalizzate" description="Aggiungi location oltre a Studio, Campo e Prestito">
+            <Section title="Location" description="Le location predefinite sono fisse. Aggiungi location personalizzate con il ✕ per rimuoverle.">
               <TagList
                 items={settings.custom_locations}
                 placeholder="Es. Magazzino, Noleggio…"
                 onAdd={(v) => set('custom_locations', [...settings.custom_locations, v])}
                 onRemove={(v) => set('custom_locations', settings.custom_locations.filter((x) => x !== v))}
+                defaultItems={['Studio', 'Campo', 'Prestito']}
               />
             </Section>
 
@@ -540,6 +557,7 @@ export default function ImpostazioniPage() {
                     value={currentPwd}
                     onChange={setCurrentPwd}
                     placeholder="La tua password attuale"
+                    autoComplete="current-password"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -548,6 +566,7 @@ export default function ImpostazioniPage() {
                     value={newPwd}
                     onChange={setNewPwd}
                     placeholder="Minimo 8 caratteri"
+                    autoComplete="new-password"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -556,6 +575,7 @@ export default function ImpostazioniPage() {
                     value={confirmPwd}
                     onChange={setConfirmPwd}
                     placeholder="Ripeti la nuova password"
+                    autoComplete="new-password"
                   />
                 </div>
                 <div className="flex justify-end pt-1">

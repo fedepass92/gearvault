@@ -19,9 +19,6 @@ import { Badge } from '@/components/ui/badge'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { exportQuotePDF } from '@/lib/pdf'
 
@@ -75,6 +72,8 @@ export default function PreventiviPage() {
 
   // PDF export loading
   const [exportingId, setExportingId] = useState(null)
+  const [showItemPicker, setShowItemPicker] = useState(false)
+  const [itemPickerSearch, setItemPickerSearch] = useState('')
 
   // ── Fetch ────────────────────────────────────────────────────────────────────
   const fetchQuotes = useCallback(async () => {
@@ -632,21 +631,17 @@ export default function PreventiviPage() {
                 <span className="text-xs text-muted-foreground">{quoteItems.length} item selezionati</span>
               </div>
 
-              {/* Add item select */}
-              <Select value="" onValueChange={addItem}>
-                <SelectTrigger className="h-8 text-sm">
-                  <SelectValue placeholder="Aggiungi un item dall'inventario…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {equipment
-                    .filter((eq) => !quoteItems.find((i) => i.item_id === eq.id))
-                    .map((eq) => (
-                      <SelectItem key={eq.id} value={eq.id}>
-                        {eq.name}{eq.brand ? ` — ${eq.brand}` : ''}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+              {/* Add item button */}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 w-full border-dashed"
+                onClick={() => { setItemPickerSearch(''); setShowItemPicker(true) }}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Aggiungi item
+              </Button>
 
               {/* Items list */}
               {quoteItems.length > 0 && (
@@ -732,6 +727,67 @@ export default function PreventiviPage() {
               Elimina
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Item picker dialog */}
+      <Dialog open={showItemPicker} onOpenChange={(o) => { if (!o) setShowItemPicker(false) }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="w-4 h-4" /> Aggiungi attrezzatura
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              <Input
+                value={itemPickerSearch}
+                onChange={(e) => setItemPickerSearch(e.target.value)}
+                placeholder="Cerca per nome, marca…"
+                className="pl-8 h-8 text-sm"
+                autoFocus
+              />
+            </div>
+            <div className="max-h-72 overflow-y-auto divide-y divide-border/50 rounded-lg border border-border">
+              {equipment
+                .filter((eq) => !quoteItems.find((i) => i.item_id === eq.id))
+                .filter((eq) => {
+                  if (!itemPickerSearch) return true
+                  const s = itemPickerSearch.toLowerCase()
+                  return eq.name?.toLowerCase().includes(s) || eq.brand?.toLowerCase().includes(s) || eq.model?.toLowerCase().includes(s)
+                })
+                .map((eq) => (
+                  <button
+                    key={eq.id}
+                    onClick={() => { addItem(eq.id); setShowItemPicker(false) }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/40 transition text-left"
+                  >
+                    {eq.photo_url ? (
+                      <img src={eq.photo_url} alt="" className="w-9 h-9 rounded-lg object-cover border border-border flex-shrink-0" />
+                    ) : (
+                      <div className="w-9 h-9 rounded-lg bg-muted border border-border flex-shrink-0 flex items-center justify-center">
+                        <Package className="w-4 h-4 text-muted-foreground" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{eq.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {[eq.brand, eq.model].filter(Boolean).join(' · ')}
+                        {eq.market_value ? ` · € ${parseFloat(eq.market_value).toLocaleString('it-IT')}` : ''}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              {equipment.filter((eq) => !quoteItems.find((i) => i.item_id === eq.id)).filter((eq) => {
+                if (!itemPickerSearch) return true
+                const s = itemPickerSearch.toLowerCase()
+                return eq.name?.toLowerCase().includes(s) || eq.brand?.toLowerCase().includes(s) || eq.model?.toLowerCase().includes(s)
+              }).length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-8">Nessun item trovato</p>
+              )}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

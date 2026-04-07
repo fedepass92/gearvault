@@ -4,13 +4,16 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { getSupabase } from '@/lib/supabase'
 import { exportInsuranceReport } from '@/lib/pdf'
-import { FileDown, Filter, Loader2, Download, AlertTriangle, ShieldCheck, ShieldAlert } from 'lucide-react'
+import { FileDown, Filter, Loader2, Download, AlertTriangle, ShieldCheck, ShieldAlert, CheckSquare, Square } from 'lucide-react'
 import { format } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from '@/components/ui/dialog'
 
 const CATEGORIES = [
   { value: 'all', label: 'Tutte le categorie' },
@@ -71,6 +74,9 @@ export default function ReportPage() {
   const [conditionFilter, setConditionFilter] = useState('active')
   const [exportLoading, setExportLoading] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [showCoverageSelect, setShowCoverageSelect] = useState(false)
+  const [coverageSelected, setCoverageSelected] = useState(new Set())
+  const [coverageExportLoading, setCoverageExportLoading] = useState(false)
 
   useEffect(() => {
     async function checkRole() {
@@ -105,6 +111,22 @@ export default function ReportPage() {
       await exportInsuranceReport(equipment, categoryFilter !== 'all' ? categoryFilter : null)
     } finally {
       setExportLoading(false)
+    }
+  }
+
+  function openCoverageSelect() {
+    setCoverageSelected(new Set(equipment.map((e) => e.id)))
+    setShowCoverageSelect(true)
+  }
+
+  async function handleCoverageExport() {
+    setCoverageExportLoading(true)
+    try {
+      const selected = allEquipment.filter((e) => coverageSelected.has(e.id))
+      await exportInsuranceReport(selected, null)
+    } finally {
+      setCoverageExportLoading(false)
+      setShowCoverageSelect(false)
     }
   }
 
@@ -147,10 +169,16 @@ export default function ReportPage() {
             <span className="hidden sm:inline">CSV</span>
           </Button>
           {isAdmin && (
-            <Button size="sm" onClick={handleExport} disabled={exportLoading || equipment.length === 0}>
-              {exportLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
-              Esporta PDF
-            </Button>
+            <>
+              <Button size="sm" variant="outline" onClick={openCoverageSelect} disabled={equipment.length === 0}>
+                <CheckSquare className="w-4 h-4" />
+                <span className="hidden sm:inline">PDF copertura</span>
+              </Button>
+              <Button size="sm" onClick={handleExport} disabled={exportLoading || equipment.length === 0}>
+                {exportLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+                <span className="hidden sm:inline">Esporta PDF</span>
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -335,6 +363,71 @@ export default function ReportPage() {
           </div>
         )}
       </div>
+      {/* PDF copertura — item selection dialog */}
+      <Dialog open={showCoverageSelect} onOpenChange={(o) => { if (!o) setShowCoverageSelect(false) }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckSquare className="w-4 h-4" />
+              PDF copertura — seleziona item
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">{coverageSelected.size} di {equipment.length} selezionati</span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCoverageSelected(new Set(equipment.map((e) => e.id)))}
+                  className="text-xs text-primary hover:underline"
+                >Tutti</button>
+                <span className="text-xs text-muted-foreground">·</span>
+                <button
+                  onClick={() => setCoverageSelected(new Set())}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >Nessuno</button>
+              </div>
+            </div>
+            <div className="max-h-72 overflow-y-auto divide-y divide-border/50 rounded-lg border border-border">
+              {equipment.map((item) => {
+                const sel = coverageSelected.has(item.id)
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setCoverageSelected((prev) => {
+                      const next = new Set(prev)
+                      if (next.has(item.id)) next.delete(item.id)
+                      else next.add(item.id)
+                      return next
+                    })}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/40 transition text-left ${sel ? 'bg-primary/5' : ''}`}
+                  >
+                    {sel
+                      ? <CheckSquare className="w-4 h-4 text-primary flex-shrink-0" />
+                      : <Square className="w-4 h-4 text-muted-foreground flex-shrink-0" />}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{item.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {[item.brand, item.model].filter(Boolean).join(' · ')}
+                        {item.insured_value ? ` · Assicurato: ${fmtEur(item.insured_value)}` : ' · Non assicurato'}
+                      </p>
+                    </div>
+                    {item.market_value && (
+                      <span className="text-xs text-muted-foreground flex-shrink-0">{fmtEur(item.market_value)}</span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowCoverageSelect(false)}>Annulla</Button>
+            <Button onClick={handleCoverageExport} disabled={coverageExportLoading || coverageSelected.size === 0}>
+              {coverageExportLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+              Esporta PDF ({coverageSelected.size})
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

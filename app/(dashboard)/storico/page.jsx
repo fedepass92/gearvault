@@ -13,7 +13,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 
-function exportCSV(logs) {
+function exportCSV(logs, usersList) {
   const headers = ['Data', 'Ora', 'Azione', 'Attrezzatura', 'Seriale', 'Set', 'Utente']
   const rows = logs.map((l) => [
     format(new Date(l.created_at), 'd MMM yyyy', { locale: it }),
@@ -22,7 +22,7 @@ function exportCSV(logs) {
     l.equipment?.name || '',
     l.equipment?.serial_number || '',
     l.sets?.name || '',
-    l.profiles?.full_name || '',
+    usersList.find((u) => u.id === l.user_id)?.full_name || '',
   ])
   const csv = [headers, ...rows].map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
@@ -74,7 +74,7 @@ export default function StoricoPage() {
     const supabase = getSupabase()
     let q = supabase
       .from('movement_log')
-      .select('*, equipment(id, name, brand, serial_number), sets(id, name), profiles(full_name)')
+      .select('*, equipment(id, name, brand, serial_number), sets(id, name)')
       .order('created_at', { ascending: false })
 
     if (equipmentFilter !== 'all') q = q.eq('equipment_id', equipmentFilter)
@@ -120,7 +120,7 @@ export default function StoricoPage() {
           <h1 className="text-xl font-bold">Storico movimenti</h1>
           <p className="text-muted-foreground text-sm mt-0.5">{logs.length} movimenti{!hasDateFilter ? ' (ultimi 500)' : ''}</p>
         </div>
-        <Button size="sm" variant="outline" onClick={() => exportCSV(logs)} disabled={logs.length === 0}>
+        <Button size="sm" variant="outline" onClick={() => exportCSV(logs, usersList)} disabled={logs.length === 0}>
           <Download className="w-4 h-4" />
           <span className="hidden sm:inline">CSV</span>
         </Button>
@@ -266,7 +266,7 @@ export default function StoricoPage() {
                         )}
                       </td>
                       <td className="px-4 py-3 hidden lg:table-cell text-muted-foreground text-sm">
-                        {log.profiles?.full_name || '—'}
+                        {usersList.find((u) => u.id === log.user_id)?.full_name || '—'}
                       </td>
                     </tr>
                   )

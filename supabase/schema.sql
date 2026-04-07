@@ -257,3 +257,53 @@ CREATE POLICY "Authenticated can delete equipment photos" ON storage.objects FOR
 -- CREATE POLICY "Authenticated can manage case_kits" ON case_kits FOR ALL TO authenticated USING (true) WITH CHECK (true);
 -- CREATE POLICY "Authenticated can manage price_history" ON price_history FOR ALL TO authenticated USING (true) WITH CHECK (true);
 -- CREATE TRIGGER update_kits_updated_at BEFORE UPDATE ON kits FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+--
+-- ── v3 migrations (run these in the Supabase SQL Editor) ─────────────────────
+--
+-- 1. App settings table (required for Impostazioni page to save)
+-- CREATE TABLE IF NOT EXISTS app_settings (
+--   key TEXT PRIMARY KEY,
+--   value JSONB,
+--   updated_at TIMESTAMPTZ DEFAULT now()
+-- );
+-- ALTER TABLE app_settings ENABLE ROW LEVEL SECURITY;
+-- CREATE POLICY "Admin can manage app_settings" ON app_settings
+--   FOR ALL TO authenticated
+--   USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'))
+--   WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
+--
+-- 2. Settings storage bucket (for logo upload)
+-- INSERT INTO storage.buckets (id, name, public) VALUES ('settings', 'settings', true) ON CONFLICT DO NOTHING;
+-- CREATE POLICY "Public read for settings" ON storage.objects FOR SELECT USING (bucket_id = 'settings');
+-- CREATE POLICY "Admin can upload to settings" ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id = 'settings');
+-- CREATE POLICY "Admin can update settings objects" ON storage.objects FOR UPDATE TO authenticated USING (bucket_id = 'settings');
+--
+-- 3. end_date column on sets (for multi-day sets)
+-- ALTER TABLE sets ADD COLUMN IF NOT EXISTS end_date DATE;
+--
+-- 4. quotes and quote_items tables (for Preventivi page)
+-- CREATE TABLE IF NOT EXISTS quotes (
+--   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+--   user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+--   title TEXT NOT NULL,
+--   client_name TEXT,
+--   client_email TEXT,
+--   event_date DATE,
+--   notes TEXT,
+--   status TEXT DEFAULT 'draft', -- 'draft' | 'sent' | 'confirmed' | 'archived'
+--   created_at TIMESTAMPTZ DEFAULT now(),
+--   updated_at TIMESTAMPTZ DEFAULT now()
+-- );
+-- CREATE TABLE IF NOT EXISTS quote_items (
+--   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+--   quote_id UUID REFERENCES quotes(id) ON DELETE CASCADE,
+--   item_id UUID REFERENCES equipment(id) ON DELETE SET NULL,
+--   quantity INTEGER DEFAULT 1,
+--   daily_rate DECIMAL(10,2),
+--   notes TEXT,
+--   created_at TIMESTAMPTZ DEFAULT now()
+-- );
+-- ALTER TABLE quotes ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE quote_items ENABLE ROW LEVEL SECURITY;
+-- CREATE POLICY "Authenticated can manage quotes" ON quotes FOR ALL TO authenticated USING (true) WITH CHECK (true);
+-- CREATE POLICY "Authenticated can manage quote_items" ON quote_items FOR ALL TO authenticated USING (true) WITH CHECK (true);

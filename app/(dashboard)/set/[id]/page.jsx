@@ -141,7 +141,7 @@ export default function SetDetailPage({ params }) {
     const supabase = getSupabase()
     const { data } = await supabase
       .from('set_notes')
-      .select('*, profiles(full_name)')
+      .select('*')
       .eq('set_id', id)
       .order('created_at', { ascending: true })
     setNotes(data || [])
@@ -976,7 +976,6 @@ export default function SetDetailPage({ params }) {
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <span className="text-[10px] text-muted-foreground">
                             {format(new Date(note.created_at), 'd MMM yyyy HH:mm', { locale: it })}
-                            {note.profiles?.full_name ? ` · ${note.profiles.full_name}` : ''}
                           </span>
                           <button
                             onClick={() => deleteNote(note.id)}
