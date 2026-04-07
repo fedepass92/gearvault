@@ -11,17 +11,17 @@ import {
 import { it } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight, Loader2, Briefcase, CalendarDays } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import Link from 'next/link'
 
 const STATUS_CONFIG = {
-  planned:    { label: 'Pianificato', bg: 'bg-blue-500/20',    text: 'text-blue-400',    border: 'border-blue-500/30',    dot: 'bg-blue-400' },
-  out:        { label: 'In uscita',   bg: 'bg-amber-500/20',   text: 'text-amber-400',   border: 'border-amber-500/30',   dot: 'bg-amber-400' },
-  returned:   { label: 'Rientrato',   bg: 'bg-emerald-500/20', text: 'text-emerald-400', border: 'border-emerald-500/30', dot: 'bg-emerald-400' },
-  incomplete: { label: 'Incompleto',  bg: 'bg-red-500/20',     text: 'text-red-400',     border: 'border-red-500/30',     dot: 'bg-red-400' },
+  planned:    { label: 'Pianificato', bg: 'bg-blue-600',    pill: '#2563eb', text: 'text-white', border: 'border-blue-500/30',    dot: 'bg-blue-400' },
+  out:        { label: 'In uscita',   bg: 'bg-amber-500',   pill: '#f59e0b', text: 'text-white', border: 'border-amber-500/30',   dot: 'bg-amber-400' },
+  returned:   { label: 'Rientrato',   bg: 'bg-emerald-600', pill: '#059669', text: 'text-white', border: 'border-emerald-500/30', dot: 'bg-emerald-400' },
+  incomplete: { label: 'Incompleto',  bg: 'bg-red-600',     pill: '#dc2626', text: 'text-white', border: 'border-red-500/30',     dot: 'bg-red-400' },
 }
 
 const WEEKDAYS = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom']
@@ -194,19 +194,16 @@ export default function CalendarioPage() {
                       const isEnd    = isRangeEnd(s, day)
                       const isSingle = !s.end_date || s.end_date === s.job_date
 
-                      // Border radius: round only the caps
-                      const radius = isSingle
-                        ? '4px'
-                        : isStart && isEnd ? '4px'
-                        : isStart          ? '4px 0 0 4px'
-                        : isEnd            ? '0 4px 4px 0'
-                        :                    '0'
+                      const radius = isSingle || (isStart && isEnd)
+                        ? '5px'
+                        : isStart ? '5px 0 0 5px'
+                        : isEnd   ? '0 5px 5px 0'
+                        :           '0'
 
-                      // Bleed to cell edge on open sides, keep 4px padding on cap sides
-                      const marginLeft  = isSingle || isStart ? '2px' : '-1px'
-                      const marginRight = isSingle || isEnd   ? '2px' : '-1px'
-                      const paddingLeft  = isStart || isSingle ? '6px' : '0'
-                      const paddingRight = isEnd   || isSingle ? '6px' : '0'
+                      const marginLeft  = isSingle || isStart ? '2px' : '0px'
+                      const marginRight = isSingle || isEnd   ? '2px' : '0px'
+                      const paddingLeft  = isStart || isSingle ? '5px' : '0'
+                      const paddingRight = isEnd   || isSingle ? '5px' : '0'
 
                       return (
                         <div
@@ -218,11 +215,12 @@ export default function CalendarioPage() {
                             marginRight,
                             paddingLeft,
                             paddingRight,
+                            backgroundColor: cfg.pill,
                           }}
-                          className={`h-5 flex items-center text-[10px] font-semibold overflow-hidden ${cfg.bg} ${cfg.text}`}
+                          className="h-6 flex items-center overflow-hidden"
                         >
                           {(isStart || isSingle) && (
-                            <span className="truncate leading-none">{s.name}</span>
+                            <span className="truncate text-[10px] font-medium text-white leading-none">{s.name}</span>
                           )}
                         </div>
                       )
@@ -253,10 +251,10 @@ export default function CalendarioPage() {
             {selectedSets.map((s) => {
               const cfg = STATUS_CONFIG[s.status] || STATUS_CONFIG.planned
               return (
-                <div key={s.id} className={`rounded-lg border p-3 ${cfg.border} ${cfg.bg}`}>
+                <div key={s.id} className={`rounded-lg border p-3 ${cfg.border}`} style={{ backgroundColor: `${cfg.pill}18` }}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className={`text-sm font-semibold ${cfg.text} truncate`}>{s.name}</div>
+                      <div className="text-sm font-semibold text-foreground truncate">{s.name}</div>
                       <div className="text-xs text-muted-foreground mt-0.5">
                         {s.job_date && format(parseISO(s.job_date), 'd MMM yyyy', { locale: it })}
                         {s.end_date && s.end_date !== s.job_date && (
@@ -266,15 +264,18 @@ export default function CalendarioPage() {
                       {s.location && <div className="text-xs text-muted-foreground">{s.location}</div>}
                       {s.notes && <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{s.notes}</div>}
                     </div>
-                    <Badge variant="outline" className={`text-[10px] border flex-shrink-0 ${cfg.border} ${cfg.text}`}>
+                    <span
+                      className="text-[10px] font-semibold px-2 py-0.5 rounded-full text-white flex-shrink-0"
+                      style={{ backgroundColor: cfg.pill }}
+                    >
                       {cfg.label}
-                    </Badge>
+                    </span>
                   </div>
                   <div className="mt-2.5 flex justify-end">
                     <Link
                       href={`/set/${s.id}`}
                       onClick={() => setSelectedDay(null)}
-                      className={`text-xs font-medium ${cfg.text} hover:underline flex items-center gap-1`}
+                      className="text-xs font-medium text-primary hover:underline flex items-center gap-1"
                     >
                       <Briefcase className="w-3 h-3" />
                       Apri set

@@ -377,27 +377,47 @@ export default async function DashboardPage() {
                 return isWithinInterval(day, { start, end })
               })
               return (
-                <div key={day.toISOString()} className={`px-2 py-3 text-center min-w-0 ${daySets.length > 0 ? 'bg-primary/5' : ''}`}>
-                  <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                <div key={day.toISOString()} className={`py-2.5 text-center min-w-0 overflow-hidden ${daySets.length > 0 ? 'bg-primary/5' : ''}`}>
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wider px-1">
                     {format(day, 'EEE', { locale: it })}
                   </div>
-                  <div className={`text-sm font-semibold mt-0.5 ${daySets.length > 0 ? 'text-primary' : 'text-muted-foreground/50'}`}>
+                  <div className={`text-sm font-semibold mt-0.5 px-1 ${daySets.length > 0 ? 'text-primary' : 'text-muted-foreground/50'}`}>
                     {format(day, 'd')}
                   </div>
                   {daySets.length > 0 && (
-                    <div className="mt-1.5 space-y-1">
-                      {daySets.slice(0, 2).map((s) => (
-                        <Link
-                          key={s.id}
-                          href={`/set/${s.id}`}
-                          className="block text-[9px] leading-tight text-primary/80 hover:text-primary truncate px-0.5 py-0.5 rounded bg-primary/10 hover:bg-primary/20 transition"
-                          title={s.name}
-                        >
-                          {s.name}
-                        </Link>
-                      ))}
+                    <div className="mt-1.5 space-y-0.5">
+                      {daySets.slice(0, 2).map((s) => {
+                        const STATUS_PILL = { planned: '#2563eb', out: '#f59e0b', returned: '#059669', incomplete: '#dc2626' }
+                        const color   = STATUS_PILL[s.status] || '#2563eb'
+                        const isStart = !s.job_date ? false : isSameDay(parseISO(s.job_date), day)
+                        const isEnd   = !s.end_date ? false : isSameDay(parseISO(s.end_date), day)
+                        const isSingle = !s.end_date || s.end_date === s.job_date
+
+                        const radius = isSingle || (isStart && isEnd)
+                          ? '4px'
+                          : isStart ? '4px 0 0 4px'
+                          : isEnd   ? '0 4px 4px 0'
+                          :           '0'
+                        const ml = isSingle || isStart ? '2px' : '0'
+                        const mr = isSingle || isEnd   ? '2px' : '0'
+                        const pl = isStart || isSingle ? '5px' : '0'
+                        const pr = isEnd   || isSingle ? '5px' : '0'
+
+                        return (
+                          <Link key={s.id} href={`/set/${s.id}`} title={s.name}>
+                            <div
+                              style={{ backgroundColor: color, borderRadius: radius, marginLeft: ml, marginRight: mr, paddingLeft: pl, paddingRight: pr }}
+                              className="h-5 flex items-center overflow-hidden"
+                            >
+                              {(isStart || isSingle) && (
+                                <span className="text-[9px] font-medium text-white truncate leading-none">{s.name}</span>
+                              )}
+                            </div>
+                          </Link>
+                        )
+                      })}
                       {daySets.length > 2 && (
-                        <div className="text-[9px] text-muted-foreground">+{daySets.length - 2}</div>
+                        <div className="text-[9px] text-muted-foreground px-1">+{daySets.length - 2}</div>
                       )}
                     </div>
                   )}
