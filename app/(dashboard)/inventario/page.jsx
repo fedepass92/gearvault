@@ -311,7 +311,7 @@ function ItemDetailModal({ item, onClose, onEdit, onDelete }) {
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
-      <DialogContent className="max-w-3xl w-full max-h-[90vh] flex flex-col p-0 gap-0">
+      <DialogContent className="sm:max-w-3xl w-full max-h-[90vh] flex flex-col p-0 gap-0">
 
         {/* ── Hero photo banner ── */}
         {item.photo_url ? (
