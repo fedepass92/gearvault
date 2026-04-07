@@ -30,10 +30,11 @@ export default function KitPage() {
 
   async function fetchKits() {
     const supabase = getSupabase()
-    const { data } = await supabase
+    const { data, error: fetchErr } = await supabase
       .from('kits')
-      .select('*, kit_items(count, equipment(market_value))')
+      .select('*, kit_items(id, equipment(market_value))')
       .order('created_at', { ascending: false })
+    if (fetchErr) console.error('[kits] fetch error:', fetchErr)
     setKits(data || [])
     setLoading(false)
   }
@@ -120,7 +121,7 @@ export default function KitPage() {
                 <div className="text-sm font-semibold group-hover:text-primary transition truncate">{k.name}</div>
                 <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
                   {k.description && <span className="truncate max-w-xs">{k.description}</span>}
-                  <span>{k.kit_items?.[0]?.count ?? 0} item</span>
+                  <span>{k.kit_items?.length ?? 0} item</span>
                   {(() => {
                     const val = (k.kit_items || []).reduce((s, ki) => s + (parseFloat(ki.equipment?.market_value) || 0), 0)
                     return val > 0 ? <span>€ {val.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</span> : null

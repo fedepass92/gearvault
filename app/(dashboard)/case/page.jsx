@@ -29,10 +29,11 @@ export default function CasePage() {
 
   async function fetchCases() {
     const supabase = getSupabase()
-    const { data } = await supabase
+    const { data, error: fetchErr } = await supabase
       .from('cases')
-      .select('*, case_items(count, equipment(market_value)), case_kits(count)')
+      .select('*, case_items(id, equipment(market_value)), case_kits(id)')
       .order('created_at', { ascending: false })
+    if (fetchErr) console.error('[cases] fetch error:', fetchErr)
     setCases(data || [])
     setLoading(false)
   }
@@ -116,8 +117,8 @@ export default function CasePage() {
                 <div className="text-sm font-semibold group-hover:text-primary transition truncate">{c.name}</div>
                 <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
                   {c.description && <span className="truncate max-w-xs">{c.description}</span>}
-                  <span>{(c.case_items?.[0]?.count ?? 0)} item</span>
-                  <span>{(c.case_kits?.[0]?.count ?? 0)} kit</span>
+                  <span>{(c.case_items?.length ?? 0)} item</span>
+                  <span>{(c.case_kits?.length ?? 0)} kit</span>
                   {(() => {
                     const val = (c.case_items || []).reduce((s, ci) => s + (parseFloat(ci.equipment?.market_value) || 0), 0)
                     return val > 0 ? <span>€ {val.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</span> : null
