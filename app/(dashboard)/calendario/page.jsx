@@ -4,9 +4,9 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { getSupabase } from '@/lib/supabase'
 import {
-  startOfMonth, endOfMonth, eachDayOfInterval, getDay, format,
+  startOfMonth, endOfMonth, eachDayOfInterval, format,
   addMonths, subMonths, isSameDay, isSameMonth, isToday,
-  startOfWeek, endOfWeek,
+  startOfWeek, endOfWeek, parseISO, isWithinInterval,
 } from 'date-fns'
 import { it } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight, Loader2, Briefcase, CalendarDays } from 'lucide-react'
@@ -44,11 +44,10 @@ export default function CalendarioPage() {
       const to   = format(addMonths(currentMonth, 2), 'yyyy-MM-01')
       const { data } = await supabase
         .from('sets')
-        .select('id, name, status, job_date, location, notes')
-        .gte('job_date', from)
-        .lt('job_date', to)
+        .select('id, name, status, job_date, end_date, location, notes')
+        .or(`job_date.gte.${from},end_date.gte.${from}`)
         .order('job_date')
-      setSets(data || [])
+      setSets((data || []).filter((s) => s.job_date))
       setLoading(false)
     }
     fetchSets()
@@ -62,7 +61,24 @@ export default function CalendarioPage() {
   const allDays    = eachDayOfInterval({ start: gridStart, end: gridEnd })
 
   function setsOnDay(date) {
-    return sets.filter((s) => s.job_date && isSameDay(new Date(s.job_date), date))
+    return sets.filter((s) => {
+      if (!s.job_date) return false
+      const start = parseISO(s.job_date)
+      const end   = s.end_date ? parseISO(s.end_date) : start
+      return isWithinInterval(date, { start, end })
+    })
+  }
+
+  function isRangeStart(set, date) {
+    return set.job_date && isSameDay(parseISO(set.job_date), date)
+  }
+
+  function isRangeEnd(set, date) {
+    return set.end_date && isSameDay(parseISO(set.end_date), date)
+  }
+
+  function isMiddleOfRange(set, date) {
+    return set.end_date && !isRangeStart(set, date) && !isRangeEnd(set, date)
   }
 
   function handleDayClick(date, daySets) {
@@ -71,8 +87,14 @@ export default function CalendarioPage() {
     setSelectedSets(daySets)
   }
 
-  // Counts by status for the legend
-  const monthSets = sets.filter((s) => s.job_date && isSameMonth(new Date(s.job_date), currentMonth))
+  // Counts by status for the legend — include sets that overlap the current month
+  const monthSets = sets.filter((s) => {
+    if (!s.job_date) return false
+    const start = parseISO(s.job_date)
+    const end   = s.end_date ? parseISO(s.end_date) : start
+    return isSameMonth(start, currentMonth) || isSameMonth(end, currentMonth) ||
+      (start <= monthStart && end >= monthEnd)
+  })
   const statusCounts = Object.entries(STATUS_CONFIG).map(([key, cfg]) => ({
     key, cfg, count: monthSets.filter((s) => s.status === key).length,
   })).filter((x) => x.count > 0)
@@ -167,14 +189,26 @@ export default function CalendarioPage() {
                   {/* Events */}
                   <div className="space-y-0.5">
                     {daySets.slice(0, 3).map((s) => {
-                      const cfg = STATUS_CONFIG[s.status] || STATUS_CONFIG.planned
+                      const cfg    = STATUS_CONFIG[s.status] || STATUS_CONFIG.planned
+                      const start  = isRangeStart(s, day)
+                      const end    = isRangeEnd(s, day)
+                      const middle = isMiddleOfRange(s, day)
                       return (
                         <div
                           key={s.id}
-                          className={`text-[10px] font-medium px-1.5 py-0.5 rounded truncate ${cfg.bg} ${cfg.text} border ${cfg.border}`}
+                          className={`text-[10px] font-medium py-0.5 ${cfg.bg} ${cfg.text} border-y ${cfg.border}
+                            ${start && end ? 'px-1.5 rounded border-x' : ''}
+                            ${start && !end ? 'pl-1.5 pr-0 rounded-l border-l' : ''}
+                            ${end && !start ? 'pr-1.5 pl-0 rounded-r border-r' : ''}
+                            ${middle ? 'px-0' : ''}
+                          `}
                           title={s.name}
                         >
-                          {s.name}
+                          {(start || (!s.end_date)) ? (
+                            <span className="truncate block px-0.5">{s.name}</span>
+                          ) : (
+                            <span className="invisible text-[10px]">·</span>
+                          )}
                         </div>
                       )
                     })}
@@ -208,7 +242,13 @@ export default function CalendarioPage() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className={`text-sm font-semibold ${cfg.text} truncate`}>{s.name}</div>
-                      {s.location && <div className="text-xs text-muted-foreground mt-0.5">{s.location}</div>}
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        {s.job_date && format(parseISO(s.job_date), 'd MMM yyyy', { locale: it })}
+                        {s.end_date && s.end_date !== s.job_date && (
+                          <> → {format(parseISO(s.end_date), 'd MMM yyyy', { locale: it })}</>
+                        )}
+                      </div>
+                      {s.location && <div className="text-xs text-muted-foreground">{s.location}</div>}
                       {s.notes && <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{s.notes}</div>}
                     </div>
                     <Badge variant="outline" className={`text-[10px] border flex-shrink-0 ${cfg.border} ${cfg.text}`}>
