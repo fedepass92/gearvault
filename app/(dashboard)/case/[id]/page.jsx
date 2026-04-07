@@ -51,8 +51,8 @@ export default function CaseDetailPage({ params }) {
     setEditForm({ name: data.name, description: data.description || '' })
 
     const [{ data: itemsData }, { data: kitsData }] = await Promise.all([
-      supabase.from('case_items').select('*, equipment(*)').eq('case_id', id).order('added_at'),
-      supabase.from('case_kits').select('*, kits(*, kit_items(*, equipment(*)))').eq('case_id', id).order('added_at'),
+      supabase.from('case_items').select('*, equipment(*)').eq('case_id', id).order('created_at'),
+      supabase.from('case_kits').select('*, kits(*, kit_items(*, equipment(*)))').eq('case_id', id).order('created_at'),
     ])
     setItems(itemsData || [])
     setKits(kitsData || [])

@@ -275,6 +275,7 @@ function ItemDetailModal({ item, onClose, onEdit, onDelete }) {
   const [movements, setMovements] = useState([])
   const [memberships, setMemberships] = useState({ sets: [], kits: [], cases: [] })
   const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState('dettagli')
 
   useEffect(() => {
     if (!item) return
@@ -374,79 +375,83 @@ function ItemDetailModal({ item, onClose, onEdit, onDelete }) {
         </div>
 
         <ScrollArea className="flex-1 overflow-y-auto">
-          <Tabs defaultValue="dettagli" className="w-full">
-            {/* ── Tabs header ── */}
-            <div className="sticky top-0 z-10 bg-background border-b border-border px-5 pt-3 pb-0 overflow-x-auto">
-              <TabsList className="h-auto bg-transparent p-0 gap-0 min-w-max justify-start rounded-none">
+          <div className="w-full">
+            {/* ── Tab bar ── */}
+            <div className="sticky top-0 z-10 bg-background border-b border-slate-200 dark:border-slate-700 overflow-x-auto">
+              <div className="flex min-w-max px-5">
                 {[
                   { value: 'dettagli', label: 'Dettagli' },
                   { value: 'storico', label: 'Storico' },
                   { value: 'appartenenza', label: 'Appartenenza' },
                   { value: 'qrcode', label: 'QR Code' },
                 ].map(({ value, label }) => (
-                  <TabsTrigger
+                  <button
                     key={value}
-                    value={value}
-                    className="relative rounded-none bg-transparent px-4 pb-3 pt-1 font-medium text-sm text-muted-foreground shadow-none transition-colors hover:text-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-t-full data-[state=active]:after:bg-primary whitespace-nowrap"
+                    onClick={() => setActiveTab(value)}
+                    className={`px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors duration-150 border-b-2 -mb-px ${
+                      activeTab === value
+                        ? 'text-white border-blue-500'
+                        : 'text-slate-400 border-transparent hover:text-slate-200 hover:bg-white/5'
+                    }`}
                   >
                     {label}
-                  </TabsTrigger>
+                  </button>
                 ))}
-              </TabsList>
+              </div>
             </div>
 
             {/* ── Dettagli ── */}
-            <TabsContent value="dettagli" className="px-5 pb-5 pt-5 space-y-5 mt-0">
-              {/* Identificazione */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2.5">
-                  <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500 shrink-0">Identificazione</p>
-                  <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+            {activeTab === 'dettagli' && (
+              <div className="px-5 pb-5 pt-5 space-y-5">
+                {/* Identificazione */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2.5">
+                    <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500 shrink-0">Identificazione</p>
+                    <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                    <DetailField label="Numero seriale" value={item.serial_number} mono />
+                    <DetailField label="Categoria" value={CATEGORY_LABELS[item.category] || item.category} />
+                  </div>
                 </div>
-                <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-                  <DetailField label="Numero seriale" value={item.serial_number} mono />
-                  <DetailField label="Categoria" value={CATEGORY_LABELS[item.category] || item.category} />
-                </div>
-              </div>
 
-              {/* Valori */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2.5">
-                  <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500 shrink-0">Valori economici</p>
-                  <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+                {/* Valori */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2.5">
+                    <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500 shrink-0">Valori economici</p>
+                    <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+                  </div>
+                  <div className="grid grid-cols-3 gap-x-4 gap-y-4">
+                    <DetailField label="Prezzo acquisto" value={fmtEur(item.purchase_price)} />
+                    <DetailField label="Valore di mercato" value={fmtEur(item.market_value)} />
+                    <DetailField label="Valore assicurato" value={fmtEur(item.insured_value)} />
+                    <DetailField label="Data acquisto" value={item.purchase_date ? format(new Date(item.purchase_date), 'd MMM yyyy', { locale: it }) : null} />
+                    <DetailField label="Vita utile" value={item.useful_life_years ? `${item.useful_life_years} anni` : null} />
+                  </div>
                 </div>
-                <div className="grid grid-cols-3 gap-x-4 gap-y-4">
-                  <DetailField label="Prezzo acquisto" value={fmtEur(item.purchase_price)} />
-                  <DetailField label="Valore di mercato" value={fmtEur(item.market_value)} />
-                  <DetailField label="Valore assicurato" value={fmtEur(item.insured_value)} />
-                  <DetailField label="Data acquisto" value={item.purchase_date ? format(new Date(item.purchase_date), 'd MMM yyyy', { locale: it }) : null} />
-                  <DetailField label="Vita utile" value={item.useful_life_years ? `${item.useful_life_years} anni` : null} />
-                </div>
-              </div>
 
-              {/* Stato */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2.5">
-                  <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500 shrink-0">Stato operativo</p>
-                  <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+                {/* Stato */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2.5">
+                    <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500 shrink-0">Stato operativo</p>
+                    <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                    <DetailField
+                      label="Stato batteria"
+                      value={BATTERY_LABEL[item.battery_status] || '—'}
+                      valueClass={BATTERY_COLOR[item.battery_status]}
+                    />
+                    <DetailField
+                      label="Ultimo controllo"
+                      value={item.last_checked_at ? format(new Date(item.last_checked_at), 'd MMM yyyy', { locale: it }) : null}
+                      fallback="Mai controllato"
+                      valueClass={maintenance ? 'text-red-500 dark:text-red-400' : ''}
+                    />
+                  </div>
                 </div>
-                <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-                  <DetailField
-                    label="Stato batteria"
-                    value={BATTERY_LABEL[item.battery_status] || '—'}
-                    valueClass={BATTERY_COLOR[item.battery_status]}
-                  />
-                  <DetailField
-                    label="Ultimo controllo"
-                    value={item.last_checked_at ? format(new Date(item.last_checked_at), 'd MMM yyyy', { locale: it }) : null}
-                    fallback="Mai controllato"
-                    valueClass={maintenance ? 'text-red-500 dark:text-red-400' : ''}
-                  />
-                </div>
-              </div>
 
-              {depr && (
-                <>
+                {depr && (
                   <div className="space-y-3">
                     <div className="flex items-center gap-2.5">
                       <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500 shrink-0">Ammortamento</p>
@@ -458,10 +463,7 @@ function ItemDetailModal({ item, onClose, onEdit, onDelete }) {
                         <span className="font-semibold text-amber-600 dark:text-amber-400">{depr.pct}%</span>
                       </div>
                       <div className="w-full bg-border rounded-full h-2 overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-amber-500 transition-all"
-                          style={{ width: `${depr.pct}%` }}
-                        />
+                        <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: `${depr.pct}%` }} />
                       </div>
                       <div className="flex justify-between items-center text-sm pt-1">
                         <span className="text-muted-foreground">Valore residuo stimato</span>
@@ -469,134 +471,140 @@ function ItemDetailModal({ item, onClose, onEdit, onDelete }) {
                       </div>
                     </div>
                   </div>
-                </>
-              )}
+                )}
 
-              {item.label_note && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2.5">
-                    <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500 shrink-0 flex items-center gap-1.5">
-                      <Tag className="w-3 h-3" /> Nota etichetta
-                    </p>
-                    <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
-                  </div>
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-800 dark:text-amber-300 text-sm font-medium">
-                    {item.label_note}
-                  </div>
-                </div>
-              )}
-
-              {item.notes && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2.5">
-                    <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500 shrink-0">Note</p>
-                    <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
-                  </div>
-                  <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{item.notes}</p>
-                </div>
-              )}
-            </TabsContent>
-
-            {/* ── Storico ── */}
-            <TabsContent value="storico" className="px-5 pb-5 pt-5 space-y-5 mt-0">
-              {loading ? (
-                <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
-              ) : (
-                <>
-                  {chartData.length > 1 && (
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2.5">
-                        <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500 shrink-0 flex items-center gap-1.5">
-                          <TrendingUp className="w-3 h-3" /> Andamento valore
-                        </p>
-                        <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
-                      </div>
-                      <div className="rounded-lg border border-border bg-muted/20 p-3">
-                        <ResponsiveContainer width="100%" height={160}>
-                          <LineChart data={chartData}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                            <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} />
-                            <YAxis tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} tickFormatter={(v) => `€${v}`} width={55} />
-                            <Tooltip
-                              contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px' }}
-                              formatter={(v) => [`€ ${v.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`, 'Valore']}
-                            />
-                            <Line type="monotone" dataKey="valore" stroke="var(--primary)" strokeWidth={2} dot={{ r: 3 }} />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </div>
-                  )}
-
-                  <AddPriceForm itemId={item.id} onAdded={() => {
-                    getSupabase().from('price_history').select('*').eq('equipment_id', item.id).order('date')
-                      .then(({ data }) => { if (data) setPriceHistory(data) })
-                  }} />
-
+                {item.label_note && (
                   <div className="space-y-3">
                     <div className="flex items-center gap-2.5">
                       <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500 shrink-0 flex items-center gap-1.5">
-                        <Clock className="w-3 h-3" /> Movimenti recenti
+                        <Tag className="w-3 h-3" /> Nota etichetta
                       </p>
                       <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
                     </div>
-                    {movements.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">Nessun movimento registrato</p>
-                    ) : (
-                      <div className="divide-y divide-border">
-                        {movements.map((m) => (
-                          <div key={m.id} className="flex items-center justify-between py-2.5">
-                            <div className="flex items-center gap-2.5">
-                              <span className={`w-2 h-2 rounded-full shrink-0 ${m.action === 'checkout' ? 'bg-blue-500' : 'bg-emerald-500'}`} />
-                              <span className="text-sm font-medium">{m.action === 'checkout' ? 'Uscita' : 'Rientro'}</span>
-                              {m.sets?.name && <span className="text-sm text-muted-foreground">· {m.sets.name}</span>}
-                            </div>
-                            <span className="text-xs text-muted-foreground">
-                              {format(new Date(m.created_at), 'd MMM yy', { locale: it })}
-                            </span>
-                          </div>
-                        ))}
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-800 dark:text-amber-300 text-sm font-medium">
+                      {item.label_note}
+                    </div>
+                  </div>
+                )}
+
+                {item.notes && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2.5">
+                      <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500 shrink-0">Note</p>
+                      <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+                    </div>
+                    <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{item.notes}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Storico ── */}
+            {activeTab === 'storico' && (
+              <div className="px-5 pb-5 pt-5 space-y-5">
+                {loading ? (
+                  <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+                ) : (
+                  <>
+                    {chartData.length > 1 && (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2.5">
+                          <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500 shrink-0 flex items-center gap-1.5">
+                            <TrendingUp className="w-3 h-3" /> Andamento valore
+                          </p>
+                          <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+                        </div>
+                        <div className="rounded-lg border border-border bg-muted/20 p-3">
+                          <ResponsiveContainer width="100%" height={160}>
+                            <LineChart data={chartData}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                              <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} />
+                              <YAxis tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} tickFormatter={(v) => `€${v}`} width={55} />
+                              <Tooltip
+                                contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px' }}
+                                formatter={(v) => [`€ ${v.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`, 'Valore']}
+                              />
+                              <Line type="monotone" dataKey="valore" stroke="var(--primary)" strokeWidth={2} dot={{ r: 3 }} />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
                       </div>
                     )}
-                  </div>
-                </>
-              )}
-            </TabsContent>
+
+                    <AddPriceForm itemId={item.id} onAdded={() => {
+                      getSupabase().from('price_history').select('*').eq('equipment_id', item.id).order('date')
+                        .then(({ data }) => { if (data) setPriceHistory(data) })
+                    }} />
+
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2.5">
+                        <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500 shrink-0 flex items-center gap-1.5">
+                          <Clock className="w-3 h-3" /> Movimenti recenti
+                        </p>
+                        <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+                      </div>
+                      {movements.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">Nessun movimento registrato</p>
+                      ) : (
+                        <div className="divide-y divide-border">
+                          {movements.map((m) => (
+                            <div key={m.id} className="flex items-center justify-between py-2.5">
+                              <div className="flex items-center gap-2.5">
+                                <span className={`w-2 h-2 rounded-full shrink-0 ${m.action === 'checkout' ? 'bg-blue-500' : 'bg-emerald-500'}`} />
+                                <span className="text-sm font-medium">{m.action === 'checkout' ? 'Uscita' : 'Rientro'}</span>
+                                {m.sets?.name && <span className="text-sm text-muted-foreground">· {m.sets.name}</span>}
+                              </div>
+                              <span className="text-xs text-muted-foreground">
+                                {format(new Date(m.created_at), 'd MMM yy', { locale: it })}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* ── QR Code ── */}
-            <TabsContent value="qrcode" className="px-5 pb-5 pt-5 mt-0">
-              <QRCodeTab item={item} />
-            </TabsContent>
+            {activeTab === 'qrcode' && (
+              <div className="px-5 pb-5 pt-5">
+                <QRCodeTab item={item} />
+              </div>
+            )}
 
             {/* ── Appartenenza ── */}
-            <TabsContent value="appartenenza" className="px-5 pb-5 pt-5 space-y-5 mt-0">
-              {loading ? (
-                <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
-              ) : (
-                <>
-                  <MembershipSection
-                    title="Set" icon={<ArrowUpDown className="w-3.5 h-3.5" />}
-                    items={memberships.sets.map((s) => ({
-                      id: s.sets.id,
-                      name: s.sets.name,
-                      sub: s.sets.job_date ? format(new Date(s.sets.job_date), 'd MMM yyyy', { locale: it }) : null,
-                    }))}
-                    emptyLabel="Non assegnato a nessun set"
-                  />
-                  <MembershipSection
-                    title="Kit" icon={<Layers className="w-3.5 h-3.5" />}
-                    items={memberships.kits.map((k) => ({ id: k.kits.id, name: k.kits.name }))}
-                    emptyLabel="Non assegnato a nessun kit"
-                  />
-                  <MembershipSection
-                    title="Case" icon={<Box className="w-3.5 h-3.5" />}
-                    items={memberships.cases.map((c) => ({ id: c.cases.id, name: c.cases.name }))}
-                    emptyLabel="Non assegnato a nessun case"
-                  />
-                </>
-              )}
-            </TabsContent>
-          </Tabs>
+            {activeTab === 'appartenenza' && (
+              <div className="px-5 pb-5 pt-5 space-y-5">
+                {loading ? (
+                  <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+                ) : (
+                  <>
+                    <MembershipSection
+                      title="Set" icon={<ArrowUpDown className="w-3.5 h-3.5" />}
+                      items={memberships.sets.map((s) => ({
+                        id: s.sets.id,
+                        name: s.sets.name,
+                        sub: s.sets.job_date ? format(new Date(s.sets.job_date), 'd MMM yyyy', { locale: it }) : null,
+                      }))}
+                      emptyLabel="Non assegnato a nessun set"
+                    />
+                    <MembershipSection
+                      title="Kit" icon={<Layers className="w-3.5 h-3.5" />}
+                      items={memberships.kits.map((k) => ({ id: k.kits.id, name: k.kits.name }))}
+                      emptyLabel="Non assegnato a nessun kit"
+                    />
+                    <MembershipSection
+                      title="Case" icon={<Box className="w-3.5 h-3.5" />}
+                      items={memberships.cases.map((c) => ({ id: c.cases.id, name: c.cases.name }))}
+                      emptyLabel="Non assegnato a nessun case"
+                    />
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </ScrollArea>
 
         <DialogFooter className="px-5 py-3 border-t border-border bg-muted/30 rounded-b-xl flex-row gap-2 justify-end">
