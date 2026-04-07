@@ -7,7 +7,7 @@ import { getSupabase } from '@/lib/supabase'
 import {
   Plus, Briefcase, MapPin, Calendar, Loader2, ChevronRight, Copy,
   ChevronLeft, List, LayoutGrid, Search, X, BookmarkPlus, BookOpen,
-  Pencil, Trash2, Package, Check,
+  Pencil, Trash2, Package, Check, ImageOff,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -39,7 +39,7 @@ const STATUS_DOT = {
 }
 const STATUS_LABELS = { planned: 'Pianificato', out: 'In uscita', returned: 'Rientrato', incomplete: 'Incompleto' }
 
-const EMPTY_SET = { name: '', job_date: '', location: '', notes: '', status: 'planned' }
+const EMPTY_SET = { name: '', job_date: '', end_date: '', location: '', notes: '', status: 'planned' }
 const WEEKDAYS  = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom']
 
 // ── Calendar view (unchanged) ─────────────────────────────────────────────────
@@ -151,6 +151,16 @@ export default function SetPage() {
   const [deleteTpl, setDeleteTpl]               = useState(null)
   const [deletingTpl, setDeletingTpl]           = useState(false)
 
+  // Edit set modal state
+  const [editingSet, setEditingSet]           = useState(null)
+  const [editForm, setEditForm]               = useState(EMPTY_SET)
+  const [editSaving, setEditSaving]           = useState(false)
+  const [editSetItems, setEditSetItems]       = useState([])
+  const [editItemsLoading, setEditItemsLoading] = useState(false)
+  const [allEquipment, setAllEquipment]       = useState([])
+  const [editItemSearch, setEditItemSearch]   = useState('')
+  const [addingItem, setAddingItem]           = useState(null) // equipment.id being added
+
   useEffect(() => { fetchSets() }, [])
 
   // Fetch templates when switching to tab
@@ -177,6 +187,7 @@ export default function SetPage() {
     const { error: err } = await supabase.from('sets').insert({
       name: form.name,
       job_date: form.job_date || null,
+      end_date: form.end_date || null,
       location: form.location || null,
       notes: form.notes || null,
       status: 'planned',
@@ -360,6 +371,80 @@ export default function SetPage() {
     toast.success('Template eliminato')
   }
 
+  // ── Edit set modal ────────────────────────────────────────────────────────────
+  async function openEditModal(set, e) {
+    e.preventDefault()
+    e.stopPropagation()
+    setEditingSet(set)
+    setEditForm({
+      name: set.name || '',
+      job_date: set.job_date || '',
+      end_date: set.end_date || '',
+      location: set.location || '',
+      notes: set.notes || '',
+      status: set.status || 'planned',
+    })
+    setEditItemSearch('')
+    setEditSetItems([])
+    setEditItemsLoading(true)
+    const supabase = getSupabase()
+    const [{ data: items }, { data: equip }] = await Promise.all([
+      supabase.from('set_items').select('id, equipment_id, equipment(id, name, brand, model, photo_url, category)')
+        .eq('set_id', set.id).order('id'),
+      supabase.from('equipment').select('id, name, brand, model, photo_url, category').eq('condition', 'active').order('name'),
+    ])
+    setEditSetItems(items || [])
+    setAllEquipment(equip || [])
+    setEditItemsLoading(false)
+  }
+
+  function closeEditModal() {
+    setEditingSet(null)
+    setEditForm(EMPTY_SET)
+    setEditSetItems([])
+    setEditItemSearch('')
+  }
+
+  async function handleEditSave(e) {
+    e.preventDefault()
+    if (!editingSet) return
+    setEditSaving(true)
+    const supabase = getSupabase()
+    const { error } = await supabase.from('sets').update({
+      name: editForm.name,
+      job_date: editForm.job_date || null,
+      end_date: editForm.end_date || null,
+      location: editForm.location || null,
+      notes: editForm.notes || null,
+    }).eq('id', editingSet.id)
+    setEditSaving(false)
+    if (error) { toast.error('Errore nel salvataggio'); return }
+    toast.success('Set aggiornato')
+    closeEditModal()
+    fetchSets()
+  }
+
+  async function handleEditRemoveItem(setItemId) {
+    const supabase = getSupabase()
+    await supabase.from('set_items').delete().eq('id', setItemId)
+    setEditSetItems((prev) => prev.filter((i) => i.id !== setItemId))
+  }
+
+  async function handleEditAddItem(equipment) {
+    if (!editingSet) return
+    setAddingItem(equipment.id)
+    const supabase = getSupabase()
+    const { data, error } = await supabase
+      .from('set_items')
+      .insert({ set_id: editingSet.id, equipment_id: equipment.id, status: 'planned' })
+      .select('id, equipment_id, equipment(id, name, brand, model, photo_url, category)')
+      .single()
+    setAddingItem(null)
+    if (error) { toast.error('Errore nell\'aggiunta'); return }
+    setEditSetItems((prev) => [...prev, data])
+    setEditItemSearch('')
+  }
+
   // ── Filtered sets ─────────────────────────────────────────────────────────────
   const displaySets = sets.filter((s) => {
     if (statusFilter !== 'all' && s.status !== statusFilter) return false
@@ -515,6 +600,14 @@ export default function SetPage() {
                       })()}
                     </div>
                   </div>
+                  {/* Edit */}
+                  <button
+                    onClick={(e) => openEditModal(set, e)}
+                    title="Modifica set"
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition flex-shrink-0"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
                   {/* Save as template */}
                   <button
                     onClick={(e) => openSaveModal(set, e)}
@@ -620,13 +713,17 @@ export default function SetPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>Data lavoro</Label>
+                <Label>Data inizio</Label>
                 <Input type="date" value={form.job_date} onChange={(e) => setForm((f) => ({ ...f, job_date: e.target.value }))} />
               </div>
               <div className="space-y-1.5">
-                <Label>Location</Label>
-                <Input value={form.location} onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))} placeholder="Es. Studio Roma" />
+                <Label>Data fine</Label>
+                <Input type="date" value={form.end_date} onChange={(e) => setForm((f) => ({ ...f, end_date: e.target.value }))} />
               </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Location</Label>
+              <Input value={form.location} onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))} placeholder="Es. Studio Roma" />
             </div>
             <div className="space-y-1.5">
               <Label>Note</Label>
@@ -797,6 +894,187 @@ export default function SetPage() {
               <Button type="submit" disabled={!renameName.trim()}>Rinomina</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── DIALOG: Modifica set ─────────────────────────────────────────────── */}
+      <Dialog open={!!editingSet} onOpenChange={(o) => { if (!o) closeEditModal() }}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-5 py-4 border-b border-border">
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-4 h-4" />
+              Modifica set
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+            {/* ── Campi base ── */}
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label>Nome set *</Label>
+                <Input
+                  value={editForm.name}
+                  onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                  placeholder="Es. Shooting Milano 2024"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label>Data inizio</Label>
+                  <Input
+                    type="date"
+                    value={editForm.job_date}
+                    onChange={(e) => setEditForm((f) => ({ ...f, job_date: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Data fine</Label>
+                  <Input
+                    type="date"
+                    value={editForm.end_date}
+                    onChange={(e) => setEditForm((f) => ({ ...f, end_date: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Location</Label>
+                <Input
+                  value={editForm.location}
+                  onChange={(e) => setEditForm((f) => ({ ...f, location: e.target.value }))}
+                  placeholder="Es. Studio Roma"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Note</Label>
+                <Textarea
+                  value={editForm.notes}
+                  onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))}
+                  rows={2}
+                  placeholder="Note sul set…"
+                  className="resize-none"
+                />
+              </div>
+            </div>
+
+            {/* ── Attrezzatura ── */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2.5">
+                <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500 shrink-0">
+                  Attrezzatura
+                  {editSetItems.length > 0 && (
+                    <span className="ml-1.5 text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded-full">
+                      {editSetItems.length}
+                    </span>
+                  )}
+                </p>
+                <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+              </div>
+
+              {/* Cerca e aggiungi */}
+              {(() => {
+                const addedIds = new Set(editSetItems.map((i) => i.equipment_id))
+                const results = allEquipment
+                  .filter((e) => !addedIds.has(e.id))
+                  .filter((e) => {
+                    if (!editItemSearch) return false
+                    const q = editItemSearch.toLowerCase()
+                    return [e.name, e.brand, e.model].some((v) => v?.toLowerCase().includes(q))
+                  })
+                return (
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                    <Input
+                      value={editItemSearch}
+                      onChange={(e) => setEditItemSearch(e.target.value)}
+                      placeholder="Cerca attrezzatura da aggiungere…"
+                      className="pl-8 h-8 text-sm"
+                    />
+                    {editItemSearch && results.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-popover border border-border rounded-lg shadow-lg overflow-hidden max-h-44 overflow-y-auto">
+                        {results.map((eq) => (
+                          <button
+                            key={eq.id}
+                            onClick={() => handleEditAddItem(eq)}
+                            disabled={addingItem === eq.id}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-muted/60 transition disabled:opacity-50"
+                          >
+                            {eq.photo_url ? (
+                              <img src={eq.photo_url} alt="" className="w-7 h-7 rounded object-cover flex-shrink-0 border border-border" />
+                            ) : (
+                              <div className="w-7 h-7 rounded bg-muted flex-shrink-0 border border-border flex items-center justify-center">
+                                <ImageOff className="w-3 h-3 text-muted-foreground" />
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium truncate">{eq.name}</p>
+                              {(eq.brand || eq.model) && (
+                                <p className="text-xs text-muted-foreground truncate">{[eq.brand, eq.model].filter(Boolean).join(' · ')}</p>
+                              )}
+                            </div>
+                            {addingItem === eq.id
+                              ? <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground flex-shrink-0" />
+                              : <Plus className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {editItemSearch && results.length === 0 && !editItemsLoading && (
+                      <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-popover border border-border rounded-lg shadow-lg px-3 py-2.5">
+                        <p className="text-xs text-muted-foreground">Nessun item trovato</p>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+
+              {/* Lista item correnti */}
+              {editItemsLoading ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                </div>
+              ) : editSetItems.length === 0 ? (
+                <p className="text-sm text-muted-foreground italic">Nessun item nel set</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {editSetItems.map((si) => {
+                    const eq = si.equipment
+                    return (
+                      <div key={si.id} className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-muted/40 border border-border/50">
+                        {eq?.photo_url ? (
+                          <img src={eq.photo_url} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0 border border-border" />
+                        ) : (
+                          <div className="w-8 h-8 rounded bg-muted flex-shrink-0 border border-border flex items-center justify-center">
+                            <Package className="w-3.5 h-3.5 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{eq?.name || '—'}</p>
+                          {(eq?.brand || eq?.model) && (
+                            <p className="text-xs text-muted-foreground truncate">{[eq.brand, eq.model].filter(Boolean).join(' · ')}</p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleEditRemoveItem(si.id)}
+                          className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition flex-shrink-0"
+                          title="Rimuovi"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="px-5 py-3 border-t border-border bg-muted/20 gap-2">
+            <Button variant="outline" onClick={closeEditModal}>Annulla</Button>
+            <Button onClick={handleEditSave} disabled={editSaving || !editForm.name.trim()}>
+              {editSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+              Salva modifiche
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
