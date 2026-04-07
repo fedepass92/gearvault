@@ -22,7 +22,7 @@ function exportCSV(logs, usersList) {
     l.equipment?.name || '',
     l.equipment?.serial_number || '',
     l.sets?.name || '',
-    usersList.find((u) => u.id === l.user_id)?.full_name || '',
+    usersList.find((u) => u.id === l.performed_by)?.full_name || '',
   ])
   const csv = [headers, ...rows].map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
@@ -80,7 +80,7 @@ export default function StoricoPage() {
     if (equipmentFilter !== 'all') q = q.eq('equipment_id', equipmentFilter)
     if (setFilter !== 'all') q = q.eq('set_id', setFilter)
     if (actionFilter !== 'all') q = q.eq('action', actionFilter)
-    if (userFilter !== 'all') q = q.eq('user_id', userFilter)
+    if (userFilter !== 'all') q = q.eq('performed_by', userFilter)
     if (dateFrom) q = q.gte('created_at', startOfDay(parseISO(dateFrom)).toISOString())
     if (dateTo) q = q.lte('created_at', endOfDay(parseISO(dateTo)).toISOString())
 
@@ -96,7 +96,7 @@ export default function StoricoPage() {
         (l) =>
           l.equipment?.name?.toLowerCase().includes(s) ||
           l.sets?.name?.toLowerCase().includes(s) ||
-          l.profiles?.full_name?.toLowerCase().includes(s)
+          usersList.find((u) => u.id === l.performed_by)?.full_name?.toLowerCase().includes(s)
       )
     }
 
@@ -266,7 +266,7 @@ export default function StoricoPage() {
                         )}
                       </td>
                       <td className="px-4 py-3 hidden lg:table-cell text-muted-foreground text-sm">
-                        {usersList.find((u) => u.id === log.user_id)?.full_name || '—'}
+                        {usersList.find((u) => u.id === log.performed_by)?.full_name || '—'}
                       </td>
                     </tr>
                   )
