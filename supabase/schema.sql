@@ -100,7 +100,7 @@ CREATE TABLE set_notes (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   set_id UUID REFERENCES sets(id) ON DELETE CASCADE,
   type TEXT NOT NULL, -- 'pre' | 'post'
-  body TEXT,
+  note TEXT,
   photo_url TEXT,
   user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT now()

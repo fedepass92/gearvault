@@ -376,13 +376,22 @@ export default function SetDetailPage({ params }) {
     setNoteSaving(true)
     const supabase = getSupabase()
     const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('set_notes').insert({
+    const payload = {
       set_id: id,
       type: showNoteForm,
-      body: noteBody || null,
+      note: noteBody || null,
       photo_url: notePhotoUrl || null,
       user_id: user?.id || null,
-    })
+    }
+    console.log('[saveNote] saving:', payload)
+    const { data, error } = await supabase.from('set_notes').insert(payload).select()
+    console.log('[saveNote] result:', data, error)
+    if (error) {
+      console.error('[saveNote] insert error:', error)
+      toast.error(`Errore nel salvataggio nota: ${error.message}`)
+      setNoteSaving(false)
+      return
+    }
     setNoteBody(''); setNotePhotoUrl(''); setShowNoteForm(null); setNoteSaving(false)
     fetchNotes()
   }
@@ -984,7 +993,7 @@ export default function SetDetailPage({ params }) {
                             <Trash2 className="w-3 h-3" />
                           </button>
                         </div>
-                        {note.body && <p className="text-sm text-foreground">{note.body}</p>}
+                        {note.note && <p className="text-sm text-foreground">{note.note}</p>}
                         {note.photo_url && (
                           <div className="mt-2 rounded-lg overflow-hidden border border-border" style={{ maxWidth: 200 }}>
                             <Image src={note.photo_url} alt="nota" width={200} height={150} className="object-cover w-full" />
