@@ -89,9 +89,8 @@ CREATE TABLE movement_log (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   set_id UUID REFERENCES sets(id) ON DELETE SET NULL,
   equipment_id UUID REFERENCES equipment(id) ON DELETE SET NULL,
-  set_item_id UUID REFERENCES set_items(id) ON DELETE SET NULL,
   action TEXT NOT NULL, -- 'checkout' | 'checkin'
-  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  performed_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT now(),
   notes TEXT
 );

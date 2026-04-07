@@ -266,10 +266,12 @@ export default function SetDetailPage({ params }) {
     const { data: { user } } = await supabase.auth.getUser()
     const now = new Date().toISOString()
     const logs = equipmentIds.map((eqId) => {
-      const si = items.find((i) => i.equipment_id === eqId)
-      return { set_id: id, equipment_id: eqId, set_item_id: si?.id || null, action, user_id: user?.id || null, created_at: now }
+      return { set_id: id, equipment_id: eqId, action, performed_by: user?.id || null, created_at: now }
     })
-    if (logs.length > 0) await supabase.from('movement_log').insert(logs)
+    if (logs.length > 0) {
+      const { error } = await supabase.from('movement_log').insert(logs)
+      if (error) console.error('[logMovements] insert error:', error)
+    }
   }
 
   async function confirmOut() {
