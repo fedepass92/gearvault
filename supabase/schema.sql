@@ -102,7 +102,6 @@ CREATE TABLE set_notes (
   type TEXT NOT NULL, -- 'pre' | 'post'
   note TEXT,
   photo_url TEXT,
-  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 

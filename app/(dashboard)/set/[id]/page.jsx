@@ -375,13 +375,11 @@ export default function SetDetailPage({ params }) {
     if (!noteBody && !notePhotoUrl) return
     setNoteSaving(true)
     const supabase = getSupabase()
-    const { data: { user } } = await supabase.auth.getUser()
     const payload = {
       set_id: id,
       type: showNoteForm,
       note: noteBody || null,
       photo_url: notePhotoUrl || null,
-      user_id: user?.id || null,
     }
     console.log('[saveNote] saving:', payload)
     const { data, error } = await supabase.from('set_notes').insert(payload).select()
