@@ -193,7 +193,6 @@ export default function SetDetailPage({ params }) {
   async function addItem(equipment) {
     const supabase = getSupabase()
     await supabase.from('set_items').insert({ set_id: id, equipment_id: equipment.id, status: 'planned' })
-    setShowAddPicker(false)
     fetchSet()
   }
 
@@ -786,7 +785,7 @@ export default function SetDetailPage({ params }) {
             className="flex items-center gap-2 px-4 py-2 bg-muted hover:bg-muted/70 text-muted-foreground rounded-lg text-sm font-medium transition"
           >
             <Plus className="w-4 h-4" />
-            Aggiungi item
+            Aggiungi attrezzatura
           </button>
           {items.some((i) => i.status === 'planned') && (
             <>

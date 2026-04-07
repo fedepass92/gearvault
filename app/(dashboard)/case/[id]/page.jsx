@@ -90,14 +90,12 @@ export default function CaseDetailPage({ params }) {
   async function addEquipment(equipment) {
     const supabase = getSupabase()
     await supabase.from('case_items').insert({ case_id: id, equipment_id: equipment.id })
-    setShowAddPicker(false)
     fetchCase()
   }
 
   async function addKit(kit) {
     const supabase = getSupabase()
     await supabase.from('case_kits').insert({ case_id: id, kit_id: kit.id })
-    setShowAddPicker(false)
     fetchCase()
   }
 

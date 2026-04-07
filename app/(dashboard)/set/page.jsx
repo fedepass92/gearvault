@@ -1193,7 +1193,7 @@ export default function SetPage() {
                   className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-dashed border-border text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  Aggiungi item
+                  Aggiungi attrezzatura
                 </button>
                 {newTplItems.length > 0 && (
                   <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
@@ -1276,8 +1276,6 @@ export default function SetPage() {
                   key={eq.id}
                   onClick={() => {
                     setNewTplItems((prev) => [...prev, eq])
-                    setShowTplItemPicker(false)
-                    setTplItemSearch('')
                   }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-muted/60 transition text-left border-b border-border/30 last:border-0"
                 >

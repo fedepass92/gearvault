@@ -640,7 +640,7 @@ export default function PreventiviPage() {
                 onClick={() => { setItemPickerSearch(''); setShowItemPicker(true) }}
               >
                 <Plus className="w-3.5 h-3.5" />
-                Aggiungi item
+                Aggiungi attrezzatura
               </Button>
 
               {/* Items list */}
@@ -760,7 +760,7 @@ export default function PreventiviPage() {
                 .map((eq) => (
                   <button
                     key={eq.id}
-                    onClick={() => { addItem(eq.id); setShowItemPicker(false) }}
+                    onClick={() => { addItem(eq.id) }}
                     className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/40 transition text-left"
                   >
                     {eq.photo_url ? (

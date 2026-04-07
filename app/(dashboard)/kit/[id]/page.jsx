@@ -70,8 +70,6 @@ export default function KitDetailPage({ params }) {
   async function addItem(equipment) {
     const supabase = getSupabase()
     await supabase.from('kit_items').insert({ kit_id: id, equipment_id: equipment.id })
-    setShowAddPicker(false)
-    setPickerSearch('')
     fetchKit()
   }
 
