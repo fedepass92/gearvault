@@ -5,7 +5,7 @@ import {
   Package, TrendingUp, ArrowUpRight, Briefcase, Plus, Tag, FileText,
   AlertTriangle, Calendar, MapPin, Clock, LogOut, LogIn, Activity, QrCode, BatteryLow, Wrench,
 } from 'lucide-react'
-import { format, differenceInDays, isAfter, startOfDay, endOfDay, addDays, isSameDay, parseISO } from 'date-fns'
+import { format, differenceInDays, isAfter, startOfDay, endOfDay, addDays, isSameDay, parseISO, isWithinInterval } from 'date-fns'
 import { it } from 'date-fns/locale'
 
 const CATEGORY_LABELS = {
@@ -73,10 +73,10 @@ export default async function DashboardPage() {
       .select('id, action, created_at, equipment(name), sets(name), profiles(full_name)')
       .order('created_at', { ascending: false })
       .limit(6),
-    // Sets in the next 7 days (tomorrow to today+7)
-    supabase.from('sets').select('id, name, job_date, status, location')
-      .gt('job_date', todayEnd.toISOString())
-      .lte('job_date', endOfDay(addDays(now, 7)).toISOString())
+    // Sets in the next 7 days — include sets that START before the window but END within it
+    supabase.from('sets').select('id, name, job_date, end_date, status, location')
+      .or(`job_date.lte.${endOfDay(addDays(now, 7)).toISOString()},end_date.gte.${todayEnd.toISOString()}`)
+      .not('job_date', 'is', null)
       .order('job_date', { ascending: true }),
   ])
 
@@ -100,7 +100,8 @@ export default async function DashboardPage() {
   const hasBatteryData = Object.values(batteryBreakdown).some((v) => v > 0) && batteryBreakdown.na !== Object.values(batteryBreakdown).reduce((s, v) => s + v, 0)
 
   const categoryCounts = equipment?.reduce((acc, e) => {
-    acc[e.category] = (acc[e.category] || 0) + 1
+    const key = e.category || 'altro'
+    acc[key] = (acc[key] || 0) + 1
     return acc
   }, {}) ?? {}
 
@@ -356,7 +357,12 @@ export default async function DashboardPage() {
       )}
 
       {/* 7-day ahead strip */}
-      {weekDays.some((day) => (weekSets || []).some((s) => s.job_date && isSameDay(parseISO(s.job_date), day))) && (
+      {weekDays.some((day) => (weekSets || []).some((s) => {
+        if (!s.job_date) return false
+        const start = parseISO(s.job_date)
+        const end   = s.end_date ? parseISO(s.end_date) : start
+        return isWithinInterval(day, { start, end })
+      })) && (
         <div className="bg-card rounded-xl border border-border overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border">
             <Calendar className="w-4 h-4 text-muted-foreground" />
@@ -364,7 +370,12 @@ export default async function DashboardPage() {
           </div>
           <div className="grid grid-cols-7 divide-x divide-border/50">
             {weekDays.map((day) => {
-              const daySets = (weekSets || []).filter((s) => s.job_date && isSameDay(parseISO(s.job_date), day))
+              const daySets = (weekSets || []).filter((s) => {
+                if (!s.job_date) return false
+                const start = parseISO(s.job_date)
+                const end   = s.end_date ? parseISO(s.end_date) : start
+                return isWithinInterval(day, { start, end })
+              })
               return (
                 <div key={day.toISOString()} className={`px-2 py-3 text-center min-w-0 ${daySets.length > 0 ? 'bg-primary/5' : ''}`}>
                   <div className="text-[10px] text-muted-foreground uppercase tracking-wider">

@@ -142,7 +142,7 @@ export default function CalendarioPage() {
       )}
 
       {/* Calendar grid */}
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
+      <div className="bg-card border border-border rounded-xl">
         {/* Weekday headers */}
         <div className="grid grid-cols-7 border-b border-border">
           {WEEKDAYS.map((d) => (
@@ -189,25 +189,40 @@ export default function CalendarioPage() {
                   {/* Events */}
                   <div className="space-y-0.5">
                     {daySets.slice(0, 3).map((s) => {
-                      const cfg    = STATUS_CONFIG[s.status] || STATUS_CONFIG.planned
-                      const start  = isRangeStart(s, day)
-                      const end    = isRangeEnd(s, day)
-                      const middle = isMiddleOfRange(s, day)
+                      const cfg      = STATUS_CONFIG[s.status] || STATUS_CONFIG.planned
+                      const isStart  = isRangeStart(s, day)
+                      const isEnd    = isRangeEnd(s, day)
+                      const isSingle = !s.end_date || s.end_date === s.job_date
+
+                      // Border radius: round only the caps
+                      const radius = isSingle
+                        ? '4px'
+                        : isStart && isEnd ? '4px'
+                        : isStart          ? '4px 0 0 4px'
+                        : isEnd            ? '0 4px 4px 0'
+                        :                    '0'
+
+                      // Bleed to cell edge on open sides, keep 4px padding on cap sides
+                      const marginLeft  = isSingle || isStart ? '2px' : '-1px'
+                      const marginRight = isSingle || isEnd   ? '2px' : '-1px'
+                      const paddingLeft  = isStart || isSingle ? '6px' : '0'
+                      const paddingRight = isEnd   || isSingle ? '6px' : '0'
+
                       return (
                         <div
                           key={s.id}
-                          className={`text-[10px] font-medium py-0.5 ${cfg.bg} ${cfg.text} border-y ${cfg.border}
-                            ${start && end ? 'px-1.5 rounded border-x' : ''}
-                            ${start && !end ? 'pl-1.5 pr-0 rounded-l border-l' : ''}
-                            ${end && !start ? 'pr-1.5 pl-0 rounded-r border-r' : ''}
-                            ${middle ? 'px-0' : ''}
-                          `}
                           title={s.name}
+                          style={{
+                            borderRadius: radius,
+                            marginLeft,
+                            marginRight,
+                            paddingLeft,
+                            paddingRight,
+                          }}
+                          className={`h-5 flex items-center text-[10px] font-semibold overflow-hidden ${cfg.bg} ${cfg.text}`}
                         >
-                          {(start || (!s.end_date)) ? (
-                            <span className="truncate block px-0.5">{s.name}</span>
-                          ) : (
-                            <span className="invisible text-[10px]">·</span>
+                          {(isStart || isSingle) && (
+                            <span className="truncate leading-none">{s.name}</span>
                           )}
                         </div>
                       )
