@@ -172,7 +172,14 @@ export default function SetPage() {
 
   useEffect(() => { fetchSets() }, [])
 
-  // Fetch templates when switching to tab (or on initial load if already on templates tab)
+  // Sync tab state with URL searchParams (handles sidebar navigation without remount)
+  useEffect(() => {
+    const tabParam = searchParams.get('tab')
+    const targetTab = tabParam === 'template' ? 'templates' : 'sets'
+    setTab(targetTab)
+  }, [searchParams])
+
+  // Fetch templates when switching to template tab
   useEffect(() => {
     if (tab === 'templates' && templates.length === 0) fetchTemplates()
   }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
