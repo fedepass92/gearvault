@@ -163,7 +163,7 @@ export default function SetPage() {
     const supabase = getSupabase()
     const { data } = await supabase
       .from('sets')
-      .select('*, set_items(count, equipment(market_value))')
+      .select('*, set_items(id, equipment(market_value))')
       .order('job_date', { ascending: true, nullsFirst: false })
     setSets(data || [])
     setLoading(false)
@@ -508,7 +508,7 @@ export default function SetPage() {
                           {set.location}
                         </span>
                       )}
-                      <span>{set.set_items?.[0]?.count ?? 0} item</span>
+                      <span>{set.set_items?.length ?? 0} item</span>
                       {(() => {
                         const val = (set.set_items || []).reduce((s, si) => s + (parseFloat(si.equipment?.market_value) || 0), 0)
                         return val > 0 ? <span>€ {val.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</span> : null

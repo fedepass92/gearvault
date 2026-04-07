@@ -82,7 +82,7 @@ export default function PreventiviPage() {
     const supabase = getSupabase()
     const { data } = await supabase
       .from('quotes')
-      .select('*, quote_items(count)')
+      .select('*, quote_items(id)')
       .order('created_at', { ascending: false })
     setQuotes(data || [])
     setLoading(false)
@@ -550,7 +550,7 @@ export default function PreventiviPage() {
                   )}
                   <span className="flex items-center gap-1">
                     <Package className="w-3 h-3" />
-                    {quote.quote_items?.[0]?.count ?? 0} item
+                    {quote.quote_items?.length ?? 0} item
                   </span>
                 </div>
               </div>
