@@ -17,6 +17,7 @@ import { toast } from 'sonner'
 import { format, differenceInDays } from 'date-fns'
 import { it } from 'date-fns/locale'
 import Papa from 'papaparse'
+import { estimateMarketValue } from '@/lib/depreciation'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -457,7 +458,22 @@ function ItemDetailModal({ item, onClose, onEdit, onDelete }) {
                   </div>
                   <div className="grid grid-cols-3 gap-x-4 gap-y-4">
                     <DetailField label="Prezzo acquisto" value={fmtEur(item.purchase_price)} />
-                    <DetailField label="Valore di mercato" value={fmtEur(item.market_value)} />
+                    {(() => {
+                      const est = item.market_value == null ? estimateMarketValue(item) : null
+                      return (
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium text-muted-foreground">Valore di mercato</p>
+                          <p className="text-sm font-semibold text-foreground">
+                            {item.market_value != null ? fmtEur(item.market_value) : est != null ? fmtEur(est) : '—'}
+                          </p>
+                          {item.market_value != null
+                            ? <p className="text-[10px] text-muted-foreground/50">Valore impostato</p>
+                            : est != null
+                            ? <p className="text-[10px] text-muted-foreground/50">Stima automatica · basata su categoria e anzianità</p>
+                            : null}
+                        </div>
+                      )
+                    })()}
                     <DetailField label="Valore assicurato" value={fmtEur(item.insured_value)} />
                     <DetailField label="Data acquisto" value={item.purchase_date ? format(new Date(item.purchase_date), 'd MMM yyyy', { locale: it }) : null} />
                     <DetailField label="Vita utile" value={item.useful_life_years ? `${item.useful_life_years} anni` : null} />

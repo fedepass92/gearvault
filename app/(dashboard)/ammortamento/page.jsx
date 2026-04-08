@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { getSupabase } from '@/lib/supabase'
+import { estimateMarketValue } from '@/lib/depreciation'
 import { format, differenceInMonths, parseISO } from 'date-fns'
 import { it } from 'date-fns/locale'
 import { TrendingDown, Loader2, Info } from 'lucide-react'
@@ -84,7 +85,7 @@ export default function AmmortamentoPage() {
       const supabase = getSupabase()
       const { data } = await supabase
         .from('equipment')
-        .select('id, name, brand, model, purchase_price, purchase_date, photo_url, condition')
+        .select('id, name, brand, model, purchase_price, purchase_date, photo_url, condition, category')
         .neq('condition', 'retired')
         .neq('condition', 'sold')
         .not('purchase_price', 'is', null)
@@ -98,6 +99,7 @@ export default function AmmortamentoPage() {
   const itemsWithData = items.map((eq) => ({
     ...eq,
     dep: calcDepreciation(eq.purchase_price, eq.purchase_date),
+    estMarket: estimateMarketValue(eq),
   }))
 
   const totalPurchase = itemsWithData.reduce((s, e) => s + (e.purchase_price || 0), 0)
@@ -160,6 +162,7 @@ export default function AmmortamentoPage() {
                 <th className="text-right px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Acquisto</th>
                 <th className="text-right px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Data</th>
                 <th className="text-right px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Valore attuale</th>
+                <th className="text-right px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell">Stima mercato</th>
                 <th className="text-right px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Residuo</th>
                 <th className="text-center px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider w-10"></th>
               </tr>
@@ -195,6 +198,19 @@ export default function AmmortamentoPage() {
                     </td>
                     <td className="px-5 py-3.5 text-right font-semibold">
                       {d ? `€${d.currentValue.toLocaleString('it-IT')}` : <span className="text-muted-foreground/40">—</span>}
+                    </td>
+                    <td className="px-5 py-3.5 text-right hidden md:table-cell">
+                      {eq.estMarket != null ? (
+                        <div>
+                          <div className="font-semibold text-sm">€{eq.estMarket.toLocaleString('it-IT')}</div>
+                          {d && eq.estMarket !== d.currentValue && (
+                            <div className={`text-[10px] ${eq.estMarket > d.currentValue ? 'text-emerald-400' : 'text-amber-400'}`}>
+                              {eq.estMarket > d.currentValue ? '+' : ''}
+                              {(eq.estMarket - d.currentValue).toLocaleString('it-IT', { maximumFractionDigits: 0 })}
+                            </div>
+                          )}
+                        </div>
+                      ) : <span className="text-muted-foreground/40">—</span>}
                     </td>
                     <td className="px-5 py-3.5 text-right">
                       {d ? (
