@@ -428,10 +428,10 @@ function LabelCableWrap({ item, isCase, isKit, qrValue }) {
 // ── Main export ───────────────────────────────────────────────────────────────
 export default function LabelCard({ item, format = 'keytag', isCase = false, isKit = false }) {
   const qrValue = isCase
-    ? `${BASE}/scan/case/${item.id}`
+    ? `${BASE}/item/case/${item.id}`
     : isKit
-    ? `${BASE}/scan/kit/${item.id}`
-    : `${BASE}/scan/${item.id}`
+    ? `${BASE}/item/kit/${item.id}`
+    : `${BASE}/item/${item.id}`
 
   const props = { item, isCase, isKit, qrValue }
 
