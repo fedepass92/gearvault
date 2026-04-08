@@ -99,7 +99,7 @@ export default function ReportPage() {
   useEffect(() => { fetchEquipment() }, [fetchEquipment])
 
   useEffect(() => {
-    let filtered = allEquipment
+    let filtered = allEquipment.filter((e) => e.condition !== 'sold')
     if (conditionFilter !== 'all') filtered = filtered.filter((e) => e.condition === conditionFilter)
     if (categoryFilter !== 'all') filtered = filtered.filter((e) => e.category === categoryFilter)
     setEquipment(filtered)

@@ -54,6 +54,7 @@ const CONDITIONS = [
   { value: 'active', label: 'Attivo' },
   { value: 'repair', label: 'In riparazione' },
   { value: 'retired', label: 'Ritirato' },
+  { value: 'sold', label: 'Venduto' },
 ]
 
 const LOCATIONS = [
@@ -63,7 +64,7 @@ const LOCATIONS = [
   { value: 'prestito', label: 'Prestito' },
 ]
 
-const CONDITION_LABEL = { active: 'Attivo', repair: 'Riparazione', retired: 'Ritirato' }
+const CONDITION_LABEL = { active: 'Attivo', repair: 'Riparazione', retired: 'Ritirato', sold: 'Venduto' }
 const CATEGORY_LABELS = {
   camera: 'Camera', lens: 'Obiettivo', drone: 'Drone', audio: 'Audio',
   lighting: 'Illuminazione', support: 'Supporto', accessory: 'Accessorio', altro: 'Altro',
@@ -80,6 +81,39 @@ const LOCATION_BADGE = {
   prestito: 'bg-orange-500/15 text-orange-300 border-orange-500/20',
 }
 const LOCATION_LABEL = { studio: 'Studio', campo: 'Campo', prestito: 'Prestito' }
+
+// ─── Fuzzy search ─────────────────────────────────────────────────────────────
+
+function fuzzyMatch(str, query) {
+  let qi = 0
+  for (let i = 0; i < str.length && qi < query.length; i++) {
+    if (str[i] === query[qi]) qi++
+  }
+  return qi === query.length
+}
+
+function fuzzyScore(item, query) {
+  if (!query) return 1
+  const q = query.toLowerCase()
+  const fields = [
+    { value: item.name,          weight: 3 },
+    { value: item.brand,         weight: 2 },
+    { value: item.model,         weight: 2 },
+    { value: item.serial_number, weight: 1 },
+    { value: item.notes,         weight: 1 },
+    { value: item.category,      weight: 1 },
+  ]
+  let score = 0
+  for (const { value, weight } of fields) {
+    if (!value) continue
+    const v = value.toLowerCase()
+    if (v === q)               score += weight * 10
+    else if (v.startsWith(q)) score += weight * 5
+    else if (v.includes(q))   score += weight * 3
+    else if (fuzzyMatch(v, q)) score += weight * 1
+  }
+  return score
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -984,18 +1018,22 @@ export default function InventarioPage() {
   const [targetSetId, setTargetSetId] = useState('')
   const [addingToSet, setAddingToSet] = useState(false)
   const [viewMode, setViewMode] = useState('list') // 'list' | 'grid'
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const debounceRef = useRef(null)
+
+  // Debounce search input
+  useEffect(() => {
+    clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => setDebouncedSearch(search), 150)
+    return () => clearTimeout(debounceRef.current)
+  }, [search])
 
   const fetchEquipment = useCallback(async () => {
     setSelectedIds(new Set())
     const supabase = getSupabase()
-    let q = supabase.from('equipment').select('*').order('created_at', { ascending: false })
-    if (categoryFilter !== 'all') q = q.eq('category', categoryFilter)
-    if (conditionFilter !== 'all') q = q.eq('condition', conditionFilter)
-    if (locationFilter !== 'all') q = q.eq('location', locationFilter)
-    if (search) q = q.or(`name.ilike.%${search}%,serial_number.ilike.%${search}%,brand.ilike.%${search}%`)
     const today = new Date().toISOString().slice(0, 10)
     const [{ data }, { data: outItems }, { data: loanedItems }] = await Promise.all([
-      q,
+      supabase.from('equipment').select('*').order('created_at', { ascending: false }),
       supabase.from('set_items').select('equipment_id').eq('status', 'out'),
       supabase.from('loans').select('item_id').is('actual_return', null),
     ])
@@ -1003,7 +1041,7 @@ export default function InventarioPage() {
     setOutEquipmentIds(new Set((outItems || []).map((r) => r.equipment_id)))
     setLoanedEquipmentIds(new Set((loanedItems || []).map((r) => r.item_id)))
     setLoading(false)
-  }, [search, categoryFilter, conditionFilter, locationFilter])
+  }, [])
 
   useEffect(() => { fetchEquipment() }, [fetchEquipment])
 
@@ -1123,24 +1161,32 @@ export default function InventarioPage() {
 
   const maintenanceCount = equipment.filter(needsMaintenance).length
 
-  const filteredEquipment = availabilityFilter === 'free'
-    ? equipment.filter((e) => !outEquipmentIds.has(e.id))
-    : availabilityFilter === 'in_use'
-    ? equipment.filter((e) => outEquipmentIds.has(e.id))
-    : equipment
-
-  const displayEquipment = [...filteredEquipment].sort((a, b) => {
-    let av, bv
-    if (sortField === 'name') { av = (a.name || '').toLowerCase(); bv = (b.name || '').toLowerCase() }
-    else if (sortField === 'brand') { av = ([a.brand, a.model].filter(Boolean).join(' ') || '').toLowerCase(); bv = ([b.brand, b.model].filter(Boolean).join(' ') || '').toLowerCase() }
-    else if (sortField === 'market_value') { av = parseFloat(a.market_value) || 0; bv = parseFloat(b.market_value) || 0 }
-    else if (sortField === 'last_checked_at') { av = a.last_checked_at ? new Date(a.last_checked_at).getTime() : 0; bv = b.last_checked_at ? new Date(b.last_checked_at).getTime() : 0 }
-    else if (sortField === 'category') { av = (CATEGORY_LABELS[a.category] || a.category || '').toLowerCase(); bv = (CATEGORY_LABELS[b.category] || b.category || '').toLowerCase() }
-    else { av = ''; bv = '' }
-    if (av < bv) return sortDir === 'asc' ? -1 : 1
-    if (av > bv) return sortDir === 'asc' ? 1 : -1
-    return 0
+  const filteredEquipment = equipment.filter((e) => {
+    // Hide sold items unless explicitly filtering for them
+    if (conditionFilter === 'all' && e.condition === 'sold') return false
+    if (categoryFilter !== 'all' && e.category !== categoryFilter) return false
+    if (conditionFilter !== 'all' && e.condition !== conditionFilter) return false
+    if (locationFilter !== 'all' && e.location !== locationFilter) return false
+    if (availabilityFilter === 'free' && outEquipmentIds.has(e.id)) return false
+    if (availabilityFilter === 'in_use' && !outEquipmentIds.has(e.id)) return false
+    if (debouncedSearch) return fuzzyScore(e, debouncedSearch) > 0
+    return true
   })
+
+  const displayEquipment = debouncedSearch
+    ? [...filteredEquipment].sort((a, b) => fuzzyScore(b, debouncedSearch) - fuzzyScore(a, debouncedSearch))
+    : [...filteredEquipment].sort((a, b) => {
+        let av, bv
+        if (sortField === 'name') { av = (a.name || '').toLowerCase(); bv = (b.name || '').toLowerCase() }
+        else if (sortField === 'brand') { av = ([a.brand, a.model].filter(Boolean).join(' ') || '').toLowerCase(); bv = ([b.brand, b.model].filter(Boolean).join(' ') || '').toLowerCase() }
+        else if (sortField === 'market_value') { av = parseFloat(a.market_value) || 0; bv = parseFloat(b.market_value) || 0 }
+        else if (sortField === 'last_checked_at') { av = a.last_checked_at ? new Date(a.last_checked_at).getTime() : 0; bv = b.last_checked_at ? new Date(b.last_checked_at).getTime() : 0 }
+        else if (sortField === 'category') { av = (CATEGORY_LABELS[a.category] || a.category || '').toLowerCase(); bv = (CATEGORY_LABELS[b.category] || b.category || '').toLowerCase() }
+        else { av = ''; bv = '' }
+        if (av < bv) return sortDir === 'asc' ? -1 : 1
+        if (av > bv) return sortDir === 'asc' ? 1 : -1
+        return 0
+      })
 
   function toggleSort(field) {
     if (sortField === field) setSortDir((d) => d === 'asc' ? 'desc' : 'asc')
@@ -1155,7 +1201,7 @@ export default function InventarioPage() {
           <h1 className="text-xl font-bold">Inventario</h1>
           <div className="flex items-center gap-2 mt-0.5">
             <p className="text-muted-foreground text-sm">
-              {displayEquipment.length}{displayEquipment.length !== equipment.length ? ` / ${equipment.length}` : ''} attrezzature
+              {displayEquipment.length}{displayEquipment.length !== equipment.length ? ` / ${equipment.length}` : ''} attrezzatur{equipment.length === 1 ? 'a' : 'e'}
             </p>
             {maintenanceCount > 0 && (
               <Badge variant="outline" className="text-xs border bg-red-500/15 text-red-400 border-red-500/20">
@@ -1210,7 +1256,7 @@ export default function InventarioPage() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Cerca per nome, marca, seriale…"
+            placeholder="Cerca per nome, marca, modello, seriale, note…"
             className="pl-8 h-8"
           />
         </div>
@@ -1381,7 +1427,7 @@ export default function InventarioPage() {
                   return (
                     <tr
                       key={item.id}
-                      className={`hover:bg-muted/30 transition cursor-pointer ${selectedIds.has(item.id) ? 'bg-primary/5' : ''}`}
+                      className={`hover:bg-muted/30 transition cursor-pointer ${selectedIds.has(item.id) ? 'bg-primary/5' : ''} ${item.condition === 'sold' ? 'opacity-50' : ''}`}
                       onClick={() => setDetailItem(item)}
                     >
                       <td className="px-4 py-3" onClick={(e) => { e.stopPropagation(); toggleSelect(item.id) }}>
@@ -1460,6 +1506,7 @@ export default function InventarioPage() {
                         <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium border ${
                           item.condition === 'active' ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/20'
                           : item.condition === 'repair' ? 'bg-amber-500/15 text-amber-300 border-amber-500/20'
+                          : item.condition === 'sold' ? 'bg-slate-500/15 text-slate-400 border-slate-500/20'
                           : 'bg-muted text-muted-foreground border-border'
                         }`}>
                           {CONDITION_LABEL[item.condition] || item.condition}

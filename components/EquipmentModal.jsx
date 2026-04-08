@@ -31,6 +31,7 @@ const CONDITIONS = [
   { value: 'active', label: 'Attivo' },
   { value: 'repair', label: 'In riparazione' },
   { value: 'retired', label: 'Ritirato' },
+  { value: 'sold', label: 'Venduto' },
 ]
 
 const LOCATIONS = [
@@ -59,6 +60,7 @@ const EMPTY = {
   purchase_date: '', purchase_price: '', market_value: '', insured_value: '',
   condition: 'active', battery_status: 'na', last_checked_at: '',
   location: 'studio', useful_life_years: '', notes: '', label_note: '', photo_url: '',
+  sold_at: '', sold_price: '',
 }
 
 async function compressImage(file) {
@@ -101,6 +103,8 @@ export default function EquipmentModal({ item, onClose, onSaved }) {
       location: item.location || 'studio',
       useful_life_years: item.useful_life_years ?? '',
       category: item.category || '',
+      sold_at: item.sold_at ? item.sold_at.slice(0, 10) : '',
+      sold_price: item.sold_price ?? '',
     } : EMPTY
   )
   const [loading, setLoading] = useState(false)
@@ -186,6 +190,8 @@ export default function EquipmentModal({ item, onClose, onSaved }) {
       condition: form.condition,
       battery_status: form.battery_status || 'na',
       last_checked_at: form.last_checked_at ? new Date(form.last_checked_at).toISOString() : null,
+      sold_at: form.condition === 'sold' && form.sold_at ? new Date(form.sold_at).toISOString() : null,
+      sold_price: form.condition === 'sold' && form.sold_price !== '' ? parseFloat(form.sold_price) : null,
       location: form.location || null,
       useful_life_years: form.useful_life_years !== '' ? parseInt(form.useful_life_years) : null,
       notes: form.notes || null,
@@ -335,6 +341,18 @@ export default function EquipmentModal({ item, onClose, onSaved }) {
               </select>
             </Field>
           </div>
+
+          {/* Sold fields — shown only when condition is 'sold' */}
+          {form.condition === 'sold' && (
+            <div className="grid grid-cols-2 gap-4 rounded-lg border border-border bg-muted/30 px-4 py-3">
+              <Field label="Data vendita">
+                <Input type="date" value={form.sold_at} onChange={(e) => setField('sold_at', e.target.value)} />
+              </Field>
+              <Field label="Prezzo vendita (€)">
+                <Input type="number" step="0.01" min="0" value={form.sold_price} onChange={(e) => setField('sold_price', e.target.value)} placeholder="0.00" />
+              </Field>
+            </div>
+          )}
 
           {/* Useful life + Last checked */}
           <div className="grid grid-cols-2 gap-4">

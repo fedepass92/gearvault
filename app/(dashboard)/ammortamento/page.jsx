@@ -86,6 +86,7 @@ export default function AmmortamentoPage() {
         .from('equipment')
         .select('id, name, brand, model, purchase_price, purchase_date, photo_url, condition')
         .neq('condition', 'retired')
+        .neq('condition', 'sold')
         .not('purchase_price', 'is', null)
         .order('purchase_date', { ascending: false })
       setItems(data || [])

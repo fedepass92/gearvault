@@ -305,3 +305,9 @@ CREATE POLICY "Authenticated can delete equipment photos" ON storage.objects FOR
 -- ALTER TABLE quote_items ENABLE ROW LEVEL SECURITY;
 -- CREATE POLICY "Authenticated can manage quotes" ON quotes FOR ALL TO authenticated USING (true) WITH CHECK (true);
 -- CREATE POLICY "Authenticated can manage quote_items" ON quote_items FOR ALL TO authenticated USING (true) WITH CHECK (true);
+--
+-- ── v4 migrations ─────────────────────────────────────────────────────────────
+--
+-- 5. Sold status columns on equipment
+-- ALTER TABLE equipment ADD COLUMN IF NOT EXISTS sold_at TIMESTAMPTZ;
+-- ALTER TABLE equipment ADD COLUMN IF NOT EXISTS sold_price NUMERIC;

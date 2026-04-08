@@ -80,30 +80,31 @@ export default async function DashboardPage() {
       .order('job_date', { ascending: true }),
   ])
 
-  const totalValue = equipment?.reduce((s, e) => s + (parseFloat(e.market_value) || 0), 0) ?? 0
+  const activeEquipment = equipment?.filter((e) => e.condition !== 'sold') ?? []
+  const totalValue = activeEquipment.reduce((s, e) => s + (parseFloat(e.market_value) || 0), 0)
   const outCount = setItemsOut?.length ?? 0
 
-  const maintenanceItems = equipment?.filter((e) => {
+  const maintenanceItems = activeEquipment.filter((e) => {
     if (!e.last_checked_at) return true
     return differenceInDays(now, new Date(e.last_checked_at)) > 90
-  }) ?? []
+  })
 
-  const lowBatteryItems = equipment?.filter((e) => e.battery_status === 'low' && e.condition !== 'retired') ?? []
-  const repairItems = equipment?.filter((e) => e.condition === 'repair') ?? []
+  const lowBatteryItems = activeEquipment.filter((e) => e.battery_status === 'low' && e.condition !== 'retired')
+  const repairItems = activeEquipment.filter((e) => e.condition === 'repair')
 
-  const batteryBreakdown = equipment?.reduce((acc, e) => {
+  const batteryBreakdown = activeEquipment.reduce((acc, e) => {
     if (e.condition === 'retired') return acc
     const status = e.battery_status || 'na'
     acc[status] = (acc[status] || 0) + 1
     return acc
-  }, {}) ?? {}
+  }, {})
   const hasBatteryData = Object.values(batteryBreakdown).some((v) => v > 0) && batteryBreakdown.na !== Object.values(batteryBreakdown).reduce((s, v) => s + v, 0)
 
-  const categoryCounts = equipment?.reduce((acc, e) => {
+  const categoryCounts = activeEquipment.reduce((acc, e) => {
     const key = e.category || 'altro'
     acc[key] = (acc[key] || 0) + 1
     return acc
-  }, {}) ?? {}
+  }, {})
 
   // 7-day calendar strip: build days array
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(startOfDay(now), i + 1))
@@ -113,7 +114,7 @@ export default async function DashboardPage() {
   const leftTitle = upcomingSets?.length > 0 ? 'Prossimi lavori' : 'Ultimi set'
 
   const stats = [
-    { label: 'Attrezzature totali', value: equipment?.length ?? 0, icon: Package, color: 'blue' },
+    { label: 'Attrezzature totali', value: activeEquipment.length, icon: Package, color: 'blue' },
     { label: 'Valore di mercato', value: `€ ${totalValue.toLocaleString('it-IT', { minimumFractionDigits: 0 })}`, icon: TrendingUp, color: 'emerald' },
     { label: 'Item attualmente fuori', value: outCount, icon: ArrowUpRight, color: 'amber' },
     { label: 'Set creati', value: setsTotal ?? 0, icon: Briefcase, color: 'purple' },
@@ -525,7 +526,7 @@ export default async function DashboardPage() {
                 <div className="flex-1 bg-muted rounded-full h-1.5">
                   <div
                     className="bg-primary h-1.5 rounded-full transition-all"
-                    style={{ width: `${Math.round((count / (equipment?.length || 1)) * 100)}%` }}
+                    style={{ width: `${Math.round((count / (activeEquipment.length || 1)) * 100)}%` }}
                   />
                 </div>
                 <span className="text-xs font-medium w-6 text-right">{count}</span>
