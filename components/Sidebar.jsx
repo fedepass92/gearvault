@@ -10,7 +10,7 @@ import {
   Camera, LayoutDashboard, Package, Tag, Briefcase, FileText,
   Users, LogOut, Menu, X, Box, History, Layers, Settings, Loader2,
   Search, Wrench, BarChart2, Moon, Sun, Plus, Upload, Eye, EyeOff,
-  Calendar, ChevronRight, TrendingDown, HandHelping, Receipt, LayoutTemplate,
+  Calendar, ChevronRight, TrendingDown, HandHelping, Receipt, LayoutTemplate, ScanLine,
 } from 'lucide-react'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -41,6 +41,7 @@ const NAV_SECTIONS = [
       { href: '/case',       icon: Box,         label: 'Case' },
       { href: '/kit',        icon: Layers,      label: 'Kit' },
       { href: '/prestiti',   icon: HandHelping, label: 'Prestiti', badgeKey: 'overdueLoans' },
+      { href: '/scan',       icon: ScanLine,    label: 'Scansiona', accent: true },
     ],
   },
   {
@@ -209,6 +210,7 @@ export default function Sidebar({ user, profile }) {
       active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
     }
     const badgeCount = item.badgeKey ? badges[item.badgeKey] : 0
+    const isAccent = item.accent && !active
     return (
       <Link
         href={item.href}
@@ -216,10 +218,12 @@ export default function Sidebar({ user, profile }) {
         className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm transition-colors ${
           active
             ? 'bg-primary text-primary-foreground font-medium'
-            : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+            : isAccent
+              ? 'text-orange-400 hover:text-orange-300 hover:bg-orange-500/10 font-medium'
+              : 'text-muted-foreground hover:text-foreground hover:bg-accent'
         }`}
       >
-        <item.icon className="w-4 h-4 flex-shrink-0" />
+        <item.icon className={`w-4 h-4 flex-shrink-0 ${isAccent ? 'text-orange-400' : ''}`} />
         <span className="flex-1 truncate">{item.label}</span>
         {badgeCount > 0 && (
           <span className={`flex-shrink-0 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold px-1 ${
