@@ -203,13 +203,14 @@ export default function UtentiPage() {
                         <span className="text-primary font-medium">Admin</span>
                       </span>
                     ) : (
-                      <Select value={profile.role} onValueChange={(v) => changeRole(profile.id, v)}>
+                      <Select value={profile.role || 'operator'} onValueChange={(v) => changeRole(profile.id, v)}>
                         <SelectTrigger className="w-[130px] h-7 text-xs">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="admin">Admin</SelectItem>
                           <SelectItem value="operator">Operatore</SelectItem>
+                          <SelectItem value="viewer">Viewer</SelectItem>
                         </SelectContent>
                       </Select>
                     )}

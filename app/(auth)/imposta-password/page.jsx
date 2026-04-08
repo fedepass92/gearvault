@@ -119,11 +119,12 @@ export default function ImpostaPasswordPage() {
       return
     }
 
-    // Save full name on profile
+    // Save full name on profile (do not touch role — it was set by the admin during invite)
     if (fullName.trim()) {
       await supabase
         .from('profiles')
-        .upsert({ id: authUser.id, full_name: fullName.trim(), role: 'viewer' }, { onConflict: 'id' })
+        .update({ full_name: fullName.trim() })
+        .eq('id', authUser.id)
     }
 
     setSaving(false)
