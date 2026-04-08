@@ -71,7 +71,7 @@ export default function ImpostaPasswordPage() {
       const refreshToken = params.get('refresh_token')
 
       if (accessToken && !cancelled) {
-        const { data, error } = await supabase.auth.setSession({
+        const { data } = await supabase.auth.setSession({
           access_token: accessToken,
           refresh_token: refreshToken || '',
         })
@@ -79,7 +79,7 @@ export default function ImpostaPasswordPage() {
           await loadProfile(supabase, data.session.user)
           return
         }
-        if (error) console.error('[auth] setSession error:', error)
+
       }
 
       // 3. Nothing worked — show error after short delay
