@@ -120,7 +120,9 @@ export default function ImpostaPasswordPage() {
     const supabase = getSupabase()
 
     // Set password
+    console.log('[pwd] calling updateUser...')
     const { error: pwdError } = await supabase.auth.updateUser({ password })
+    console.log('[pwd] updateUser result — error:', pwdError)
     if (pwdError) {
       setError(pwdError.message)
       setSaving(false)
@@ -129,11 +131,14 @@ export default function ImpostaPasswordPage() {
 
     // Save full name on profile
     if (fullName.trim()) {
-      await supabase
+      console.log('[pwd] calling upsert profile...')
+      const { error: upsertErr } = await supabase
         .from('profiles')
         .upsert({ id: authUser.id, full_name: fullName.trim(), role: 'viewer' }, { onConflict: 'id' })
+      console.log('[pwd] upsert result — error:', upsertErr)
     }
 
+    console.log('[pwd] done! setting setDone(true)')
     setSaving(false)
     setDone(true)
 
