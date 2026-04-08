@@ -23,7 +23,9 @@
       "Bash(grep -r \"redirect\\\\|router\\\\.push\\\\|getUser\\\\|getSession\\\\|signIn\\\\|login\" /Users/federicopassaro/Documents/gearvault/components/ScannerContext*)",
       "Bash(ls /Users/federicopassaro/Documents/gearvault/app/item/[id]/)",
       "Bash(node -e \"const p = require\\('/Users/federicopassaro/Documents/gearvault/package.json'\\); console.log\\(p.dependencies?.next || p.devDependencies?.next\\)\")",
-      "Bash(node -e \"require\\('html5-qrcode'\\)\")"
+      "Bash(node -e \"require\\('html5-qrcode'\\)\")",
+      "Bash(node -e \"require\\('@zxing/browser'\\)\")",
+      "Bash(npm list:*)"
     ]
   }
 }
