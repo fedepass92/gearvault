@@ -3,16 +3,15 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { getSupabase } from '@/lib/supabase'
-import { Lock, Eye, EyeOff, Loader2, CheckCircle2 } from 'lucide-react'
+import { Lock, Eye, EyeOff, Loader2, CheckCircle2, Mail, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
-// Inline Brain Digital logo SVG
 function BrainLogo({ width = 120 }) {
   return (
-    <svg width={width} viewBox="0 0 723.29 271.79" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block' }}>
-      <g fill="#ffffff">
+    <svg width={width} viewBox="0 0 723.29 271.79" xmlns="http://www.w3.org/2000/svg" className="block">
+      <g fill="currentColor">
         <polygon points="16.75 238.09 16.75 256.69 33.22 256.69 35.34 254.61 35.34 240.22 33.22 238.09 16.75 238.09"/>
         <rect x="568.6" y="238.09" width="18.55" height="6.18"/>
         <path d="M0,223.49v48.3h723.29v-48.3H0ZM41.48,256.64l-6.18,6.18H10.56v-30.91h24.73l6.18,6.18v18.55ZM137.02,262.82h-6.18v-30.91h6.18v30.91ZM257.27,238.09h-24.73v18.55h18.55v-6.18h-12.36v-6.18h18.55v18.55h-30.91v-30.91h30.91v6.18ZM352.81,262.82h-6.18v-30.91h6.18v30.91ZM473.06,238.09h-12.36v24.73h-6.18v-24.73h-12.36v-6.18h30.91v6.18ZM593.33,262.82h-6.18v-12.36h-18.55v12.36h-6.18v-30.91h30.91v30.91ZM713.6,262.82h-30.91v-30.91h6.18v24.73h24.73v6.18Z"/>
@@ -79,7 +78,6 @@ export default function ImpostaPasswordPage() {
           await loadProfile(supabase, data.session.user)
           return
         }
-
       }
 
       // 3. Nothing worked — show error after short delay
@@ -135,162 +133,148 @@ export default function ImpostaPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: '#0f172a' }}>
-      <div className="w-full max-w-sm">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+      </div>
 
-        {/* Logo */}
-        <div className="flex justify-center mb-8">
-          <BrainLogo width={140} />
+      <div className="relative w-full max-w-sm">
+
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="flex justify-center mb-4 text-foreground">
+            <BrainLogo width={140} />
+          </div>
+          <p className="text-muted-foreground text-sm mt-1">Gestione Attrezzatura</p>
         </div>
 
-        <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 16, padding: 32 }}>
+        <div className="bg-card rounded-2xl shadow-2xl border border-border p-8">
 
           {loading ? (
             <div className="flex flex-col items-center gap-3 py-6">
-              <Loader2 className="w-7 h-7 animate-spin" style={{ color: '#2563eb' }} />
-              <p style={{ color: '#94a3b8', fontSize: 14 }}>Verifica del link in corso…</p>
+              <Loader2 className="w-7 h-7 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Verifica del link in corso…</p>
             </div>
           ) : done ? (
             <div className="flex flex-col items-center gap-3 py-6 text-center">
-              <CheckCircle2 className="w-10 h-10" style={{ color: '#10b981' }} />
-              <p style={{ color: '#ffffff', fontWeight: 700, fontSize: 18 }}>Password impostata!</p>
-              <p style={{ color: '#94a3b8', fontSize: 13 }}>Accesso in corso…</p>
+              <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+              <p className="text-lg font-bold">Password impostata!</p>
+              <p className="text-sm text-muted-foreground">Accesso in corso…</p>
             </div>
           ) : !authUser ? (
             <div className="text-center py-6">
-              <p style={{ color: '#f87171', fontSize: 14 }}>
+              <p className="text-sm text-destructive">
                 Link non valido o scaduto. Contatta un amministratore per ricevere un nuovo invito.
               </p>
             </div>
           ) : (
             <>
-              <div style={{ marginBottom: 24 }}>
-                <h1 style={{ color: '#ffffff', fontSize: 20, fontWeight: 800, margin: '0 0 4px' }}>
-                  Imposta la tua password
-                </h1>
-                <p style={{ color: '#94a3b8', fontSize: 13, margin: 0 }}>
+              <div className="mb-6">
+                <h2 className="text-xl font-semibold">Imposta la tua password</h2>
+                <p className="text-sm text-muted-foreground mt-1">
                   Benvenuto in GearVault. Completa il tuo profilo per accedere.
                 </p>
               </div>
 
-              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {/* Email — read only */}
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    value={authUser.email || ''}
-                    disabled
-                    style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: 8, padding: '8px 12px', color: '#64748b', fontSize: 14, boxSizing: 'border-box' }}
-                  />
+              <form onSubmit={handleSubmit} className="space-y-4">
+
+                {/* Email — readonly */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="email">Email</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                    <Input
+                      id="email"
+                      type="email"
+                      value={authUser.email || ''}
+                      disabled
+                      className="pl-8"
+                    />
+                  </div>
                 </div>
 
                 {/* Full name */}
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                    Nome completo
-                  </label>
-                  <input
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Mario Rossi"
-                    style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: 8, padding: '8px 12px', color: '#ffffff', fontSize: 14, boxSizing: 'border-box', outline: 'none' }}
-                    onFocus={(e) => { e.target.style.borderColor = '#2563eb' }}
-                    onBlur={(e) => { e.target.style.borderColor = '#334155' }}
-                  />
+                <div className="space-y-1.5">
+                  <Label htmlFor="fullname">Nome completo</Label>
+                  <div className="relative">
+                    <User className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                    <Input
+                      id="fullname"
+                      type="text"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Mario Rossi"
+                      className="pl-8"
+                    />
+                  </div>
                 </div>
 
                 {/* Password */}
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                    Nuova password
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <input
+                <div className="space-y-1.5">
+                  <Label htmlFor="password">Nuova password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                    <Input
+                      id="password"
                       type={showPwd ? 'text' : 'password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       placeholder="Minimo 8 caratteri"
-                      style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: 8, padding: '8px 40px 8px 12px', color: '#ffffff', fontSize: 14, boxSizing: 'border-box', outline: 'none' }}
-                      onFocus={(e) => { e.target.style.borderColor = '#2563eb' }}
-                      onBlur={(e) => { e.target.style.borderColor = '#334155' }}
+                      className="pl-8 pr-9"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPwd((v) => !v)}
-                      style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center' }}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition"
                     >
-                      {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
+                      {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
 
                 {/* Confirm password */}
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                    Conferma password
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <input
+                <div className="space-y-1.5">
+                  <Label htmlFor="confirm-password">Conferma password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                    <Input
+                      id="confirm-password"
                       type={showConfirm ? 'text' : 'password'}
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       required
                       placeholder="Ripeti la password"
-                      style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: 8, padding: '8px 40px 8px 12px', color: '#ffffff', fontSize: 14, boxSizing: 'border-box', outline: 'none' }}
-                      onFocus={(e) => { e.target.style.borderColor = '#2563eb' }}
-                      onBlur={(e) => { e.target.style.borderColor = '#334155' }}
+                      className="pl-8 pr-9"
                     />
                     <button
                       type="button"
                       onClick={() => setShowConfirm((v) => !v)}
-                      style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center' }}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition"
                     >
-                      {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                      {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
 
                 {error && (
-                  <div style={{ background: '#ef444420', border: '1px solid #ef444440', borderRadius: 8, padding: '10px 14px', color: '#f87171', fontSize: 13 }}>
+                  <div className="bg-destructive/10 border border-destructive/30 rounded-lg px-4 py-3 text-sm text-destructive">
                     {error}
                   </div>
                 )}
 
-                <button
-                  type="submit"
-                  disabled={saving}
-                  style={{
-                    width: '100%',
-                    background: saving ? '#1d4ed8' : '#2563eb',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: 8,
-                    padding: '10px 16px',
-                    fontSize: 14,
-                    fontWeight: 700,
-                    cursor: saving ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8,
-                    marginTop: 4,
-                  }}
-                >
-                  {saving && <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />}
+                <Button type="submit" disabled={saving} className="w-full mt-2">
+                  {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                   {saving ? 'Salvataggio…' : 'Accedi a GearVault →'}
-                </button>
+                </Button>
               </form>
             </>
           )}
         </div>
 
-        <p style={{ textAlign: 'center', fontSize: 11, color: '#334155', marginTop: 20 }}>
-          GearVault · Brain Digital
+        <p className="text-center text-xs text-muted-foreground/50 mt-6">
+          GearVault v1.0 · Brain Digital © {new Date().getFullYear()}
         </p>
       </div>
     </div>
