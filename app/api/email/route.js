@@ -116,7 +116,7 @@ export async function POST(request) {
       const { data: notifyData, error: notifyErr } = await resend.emails.send({
         from: `${FROM_NAME} <${FROM_EMAIL}>`,
         to: [notifyEmail],
-        subject: `✅ Preventivo inviato — ${quote.title}`,
+        subject: `Preventivo inviato - ${quote.title}`,
         html: notifyHtml,
         attachments: [pdfAttachment],
       })
