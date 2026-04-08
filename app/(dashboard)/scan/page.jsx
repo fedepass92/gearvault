@@ -53,7 +53,9 @@ export default function ScanPage() {
     if (!rawText) return
 
     // Extract UUID from URL pattern https://.../item/[uuid]
+    console.log('[QR] rawText:', rawText)
     const id = rawText.match(/item\/(?:(?:case|kit)\/)?([0-9a-f-]{36})/i)?.[1]
+    console.log('[QR] extracted id:', id)
     if (!id) {
       toast.error('QR non riconosciuto — codice non valido')
       setPhase('scanning')
