@@ -131,8 +131,7 @@ export default function ImpostaPasswordPage() {
     if (fullName.trim()) {
       await supabase
         .from('profiles')
-        .update({ full_name: fullName.trim() })
-        .eq('id', authUser.id)
+        .upsert({ id: authUser.id, full_name: fullName.trim(), role: 'viewer' }, { onConflict: 'id' })
     }
 
     setSaving(false)
