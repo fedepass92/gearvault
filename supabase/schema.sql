@@ -311,3 +311,6 @@ CREATE POLICY "Authenticated can delete equipment photos" ON storage.objects FOR
 -- 5. Sold status columns on equipment
 -- ALTER TABLE equipment ADD COLUMN IF NOT EXISTS sold_at TIMESTAMPTZ;
 -- ALTER TABLE equipment ADD COLUMN IF NOT EXISTS sold_price NUMERIC;
+--
+-- 6. Public read policy for equipment (required for /item/[id] public page)
+-- CREATE POLICY "Public can view equipment" ON equipment FOR SELECT TO anon USING (true);

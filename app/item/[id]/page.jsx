@@ -59,8 +59,8 @@ export default function PublicItemPage() {
     async function load() {
       const supabase = getAnonSupabase()
       const { data, error } = await supabase
-        .from('public_equipment')
-        .select('*')
+        .from('equipment')
+        .select('id, name, brand, model, serial_number, category, condition, location, battery_status, last_checked_at, notes, photo_url')
         .eq('id', id)
         .single()
 
