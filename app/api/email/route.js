@@ -151,12 +151,15 @@ export async function POST(request) {
         return NextResponse.json({ error: createError.message }, { status: 400 })
       }
 
-      // Set role on profile (trigger may have already created it)
+      // Create profile explicitly — don't rely on trigger which may fail
       const role = data.role || 'operator'
-      await admin.from('profiles').upsert(
-        { id: created.user.id, role },
+      const { error: profileError } = await admin.from('profiles').upsert(
+        { id: created.user.id, full_name: '', role },
         { onConflict: 'id' }
       )
+      if (profileError) {
+        console.error('[invite] profile upsert error:', profileError)
+      }
 
       // Generate a recovery link that redirects to /imposta-password
       const { data: linkData } = await admin.auth.admin.generateLink({
