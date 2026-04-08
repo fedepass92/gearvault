@@ -19,7 +19,10 @@
       "Bash(node -e \"require\\('recharts'\\); console.log\\('ok'\\)\")",
       "Bash(node -e \"require\\('react-qr-code'\\); console.log\\('ok'\\)\")",
       "Bash(node -e \"require\\('qrcode.react'\\); console.log\\('ok'\\)\")",
-      "Bash(ls /Users/federicopassaro/Documents/gearvault/eslint*)"
+      "Bash(ls /Users/federicopassaro/Documents/gearvault/eslint*)",
+      "Bash(grep -r \"redirect\\\\|router\\\\.push\\\\|getUser\\\\|getSession\\\\|signIn\\\\|login\" /Users/federicopassaro/Documents/gearvault/components/ScannerContext*)",
+      "Bash(ls /Users/federicopassaro/Documents/gearvault/app/item/[id]/)",
+      "Bash(node -e \"const p = require\\('/Users/federicopassaro/Documents/gearvault/package.json'\\); console.log\\(p.dependencies?.next || p.devDependencies?.next\\)\")"
     ]
   }
 }

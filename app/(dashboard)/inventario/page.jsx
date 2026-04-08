@@ -1162,8 +1162,6 @@ export default function InventarioPage() {
   const maintenanceCount = equipment.filter(needsMaintenance).length
 
   const filteredEquipment = equipment.filter((e) => {
-    // Hide sold items unless explicitly filtering for them
-    if (conditionFilter === 'all' && e.condition === 'sold') return false
     if (categoryFilter !== 'all' && e.category !== categoryFilter) return false
     if (conditionFilter !== 'all' && e.condition !== conditionFilter) return false
     if (locationFilter !== 'all' && e.location !== locationFilter) return false
@@ -1173,20 +1171,27 @@ export default function InventarioPage() {
     return true
   })
 
-  const displayEquipment = debouncedSearch
-    ? [...filteredEquipment].sort((a, b) => fuzzyScore(b, debouncedSearch) - fuzzyScore(a, debouncedSearch))
-    : [...filteredEquipment].sort((a, b) => {
-        let av, bv
-        if (sortField === 'name') { av = (a.name || '').toLowerCase(); bv = (b.name || '').toLowerCase() }
-        else if (sortField === 'brand') { av = ([a.brand, a.model].filter(Boolean).join(' ') || '').toLowerCase(); bv = ([b.brand, b.model].filter(Boolean).join(' ') || '').toLowerCase() }
-        else if (sortField === 'market_value') { av = parseFloat(a.market_value) || 0; bv = parseFloat(b.market_value) || 0 }
-        else if (sortField === 'last_checked_at') { av = a.last_checked_at ? new Date(a.last_checked_at).getTime() : 0; bv = b.last_checked_at ? new Date(b.last_checked_at).getTime() : 0 }
-        else if (sortField === 'category') { av = (CATEGORY_LABELS[a.category] || a.category || '').toLowerCase(); bv = (CATEGORY_LABELS[b.category] || b.category || '').toLowerCase() }
-        else { av = ''; bv = '' }
-        if (av < bv) return sortDir === 'asc' ? -1 : 1
-        if (av > bv) return sortDir === 'asc' ? 1 : -1
-        return 0
-      })
+  function sortItems(arr) {
+    if (debouncedSearch) return [...arr].sort((a, b) => fuzzyScore(b, debouncedSearch) - fuzzyScore(a, debouncedSearch))
+    return [...arr].sort((a, b) => {
+      let av, bv
+      if (sortField === 'name') { av = (a.name || '').toLowerCase(); bv = (b.name || '').toLowerCase() }
+      else if (sortField === 'brand') { av = ([a.brand, a.model].filter(Boolean).join(' ') || '').toLowerCase(); bv = ([b.brand, b.model].filter(Boolean).join(' ') || '').toLowerCase() }
+      else if (sortField === 'market_value') { av = parseFloat(a.market_value) || 0; bv = parseFloat(b.market_value) || 0 }
+      else if (sortField === 'last_checked_at') { av = a.last_checked_at ? new Date(a.last_checked_at).getTime() : 0; bv = b.last_checked_at ? new Date(b.last_checked_at).getTime() : 0 }
+      else if (sortField === 'category') { av = (CATEGORY_LABELS[a.category] || a.category || '').toLowerCase(); bv = (CATEGORY_LABELS[b.category] || b.category || '').toLowerCase() }
+      else { av = ''; bv = '' }
+      if (av < bv) return sortDir === 'asc' ? -1 : 1
+      if (av > bv) return sortDir === 'asc' ? 1 : -1
+      return 0
+    })
+  }
+
+  // Sold items always go last
+  const displayEquipment = [
+    ...sortItems(filteredEquipment.filter((e) => e.condition !== 'sold')),
+    ...sortItems(filteredEquipment.filter((e) => e.condition === 'sold')),
+  ]
 
   function toggleSort(field) {
     if (sortField === field) setSortDir((d) => d === 'asc' ? 'desc' : 'asc')
@@ -1427,7 +1432,7 @@ export default function InventarioPage() {
                   return (
                     <tr
                       key={item.id}
-                      className={`hover:bg-muted/30 transition cursor-pointer ${selectedIds.has(item.id) ? 'bg-primary/5' : ''} ${item.condition === 'sold' ? 'opacity-50' : ''}`}
+                      className={`hover:bg-muted/30 transition cursor-pointer ${selectedIds.has(item.id) ? 'bg-primary/5' : ''} ${item.condition === 'sold' ? 'opacity-40' : ''}`}
                       onClick={() => setDetailItem(item)}
                     >
                       <td className="px-4 py-3" onClick={(e) => { e.stopPropagation(); toggleSelect(item.id) }}>

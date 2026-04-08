@@ -1,8 +1,24 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 
+// Routes that are always public — no auth required
+const PUBLIC_PATHS = ['/login', '/item', '/imposta-password', '/offline']
+
+function isPublicPath(pathname) {
+  return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'))
+}
+
 export async function proxy(request) {
-  let supabaseResponse = NextResponse.next({ request })
+  const { pathname } = request.nextUrl
+
+  // Allow public paths through immediately
+  if (isPublicPath(pathname)) {
+    return NextResponse.next()
+  }
+
+  let response = NextResponse.next({
+    request: { headers: request.headers },
+  })
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -14,42 +30,36 @@ export async function proxy(request) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({ request })
+          response = NextResponse.next({ request: { headers: request.headers } })
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            response.cookies.set(name, value, options)
           )
         },
       },
     }
   )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // Refresh session if expired
+  const { data: { user } } = await supabase.auth.getUser()
 
-  const pathname = request.nextUrl.pathname
-  const isLoginPage = pathname === '/login'
-  const isPublicPath =
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/icons') ||
-    pathname === '/favicon.ico' ||
-    pathname === '/manifest.json' ||
-    pathname.startsWith('/sw') ||
-    pathname.startsWith('/workbox')
-
-  if (isPublicPath) return supabaseResponse
-
-  if (!user && !isLoginPage) {
+  // Redirect unauthenticated users trying to access protected routes
+  if (!user && !isPublicPath(pathname)) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  if (user && isLoginPage) {
-    return NextResponse.redirect(new URL('/', request.url))
-  }
-
-  return supabaseResponse
+  return response
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|manifest.json|icons|sw|workbox).*)'],
+  matcher: [
+    /*
+     * Match all paths except:
+     * - _next/static (static files)
+     * - _next/image  (image optimization)
+     * - favicon.ico
+     * - public assets (icons, manifest, images)
+     * - API routes (handled separately)
+     */
+    '/((?!_next/static|_next/image|favicon\\.ico|icons/|manifest\\.json|.*\\.png$|.*\\.svg$|.*\\.jpg$|.*\\.webp$|api/).*)',
+  ],
 }
