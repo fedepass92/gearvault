@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { getSupabase } from '@/lib/supabase'
 import { Lock, Eye, EyeOff, Loader2, CheckCircle2 } from 'lucide-react'
@@ -38,76 +38,58 @@ export default function ImpostaPasswordPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
-  const subscriptionRef = useRef(null)
 
   useEffect(() => {
     const supabase = getSupabase()
+    let cancelled = false
 
-    // onAuthStateChange picks up the recovery token from the URL hash automatically
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        setAuthUser(session.user)
-        // Pre-fill name from profile if it exists
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('full_name')
-          .eq('id', session.user.id)
-          .single()
+    async function loadProfile(client, user) {
+      setAuthUser(user)
+      const { data: profile } = await client
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .single()
+      if (!cancelled) {
         setFullName(profile?.full_name || '')
         setLoading(false)
       }
-    })
-    subscriptionRef.current = subscription
+    }
 
-    // Also try existing session (e.g. user reloads the page)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setAuthUser(session.user)
-        supabase
-          .from('profiles')
-          .select('full_name')
-          .eq('id', session.user.id)
-          .single()
-          .then(({ data: profile }) => {
-            setFullName(profile?.full_name || '')
-            setLoading(false)
-          })
-      } else {
-        // No session yet — try to extract tokens from URL hash manually
-        const hash = window.location.hash.substring(1)
-        const params = new URLSearchParams(hash)
-        const accessToken = params.get('access_token')
-        const refreshToken = params.get('refresh_token')
-
-        if (accessToken) {
-          supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken || '',
-          }).then(({ data, error: sessionErr }) => {
-            if (data?.session?.user) {
-              setAuthUser(data.session.user)
-              supabase
-                .from('profiles')
-                .select('full_name')
-                .eq('id', data.session.user.id)
-                .single()
-                .then(({ data: profile }) => {
-                  setFullName(profile?.full_name || '')
-                  setLoading(false)
-                })
-            } else {
-              console.warn('[imposta-password] setSession failed:', sessionErr)
-              setLoading(false)
-            }
-          })
-        } else {
-          // No token in hash either — wait for onAuthStateChange, then timeout
-          setTimeout(() => setLoading(false), 5000)
-        }
+    async function init() {
+      // 1. Try existing session first (page reload case)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user && !cancelled) {
+        await loadProfile(supabase, session.user)
+        return
       }
-    })
 
-    return () => subscriptionRef.current?.unsubscribe()
+      // 2. Extract token from URL hash (invite link case)
+      const hash = window.location.hash.substring(1)
+      const params = new URLSearchParams(hash)
+      const accessToken = params.get('access_token')
+      const refreshToken = params.get('refresh_token')
+
+      if (accessToken && !cancelled) {
+        const { data, error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken || '',
+        })
+        if (data?.session?.user && !cancelled) {
+          await loadProfile(supabase, data.session.user)
+          return
+        }
+        if (error) console.error('[auth] setSession error:', error)
+      }
+
+      // 3. Nothing worked — show error after short delay
+      if (!cancelled) {
+        setTimeout(() => { if (!cancelled) setLoading(false) }, 3000)
+      }
+    }
+
+    init()
+    return () => { cancelled = true }
   }, [])
 
   async function handleSubmit(e) {
@@ -121,11 +103,7 @@ export default function ImpostaPasswordPage() {
     setSaving(true)
     const supabase = getSupabase()
 
-    // Unsubscribe from onAuthStateChange to prevent interference with updateUser
-    subscriptionRef.current?.unsubscribe()
-
     // Set password — wrap in timeout to handle cases where the promise never resolves
-    console.log('[pwd] calling updateUser...')
     let pwdError = null
     try {
       const result = await Promise.race([
@@ -134,15 +112,10 @@ export default function ImpostaPasswordPage() {
       ])
       pwdError = result.error
     } catch (e) {
-      if (e.message === 'timeout') {
-        console.log('[pwd] updateUser timed out, proceeding anyway')
-      } else {
-        pwdError = e
-      }
+      if (e.message !== 'timeout') pwdError = e
     }
-    console.log('[pwd] updateUser result — error:', pwdError)
 
-    if (pwdError && pwdError.message !== 'timeout') {
+    if (pwdError) {
       setError(pwdError.message)
       setSaving(false)
       return
@@ -150,14 +123,11 @@ export default function ImpostaPasswordPage() {
 
     // Save full name on profile
     if (fullName.trim()) {
-      console.log('[pwd] calling upsert profile...')
-      const { error: upsertErr } = await supabase
+      await supabase
         .from('profiles')
         .upsert({ id: authUser.id, full_name: fullName.trim(), role: 'viewer' }, { onConflict: 'id' })
-      console.log('[pwd] upsert result — error:', upsertErr)
     }
 
-    console.log('[pwd] done! setting setDone(true)')
     setSaving(false)
     setDone(true)
 
