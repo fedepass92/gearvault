@@ -16,18 +16,14 @@ export async function POST(request) {
     const body = await request.json()
     const { type, to, ...data } = body
 
-    // 'reset' uses email field instead of to
-    const email = to || body.email
-    if (!type || !email) {
-      return NextResponse.json({ error: 'Missing required fields: type, to/email' }, { status: 400 })
-    }
-
-    // ── Quote email (handled separately — no generic `to` field) ──────────────
+    // ── Quote email (handled before generic `to` guard — no `to` field here) ───
     if (type === 'quote') {
       const { quote, items } = body
       if (!quote?.client_email) {
         return NextResponse.json({ error: 'Missing client_email on quote' }, { status: 400 })
       }
+
+      console.log('[quote] start — quote:', quote.id, 'to:', quote.client_email, 'items:', items?.length)
 
       const admin = getAdminClient()
 
@@ -36,14 +32,26 @@ export async function POST(request) {
       try {
         const { data } = await admin.from('app_settings').select('key, value')
         if (data) data.forEach(({ key, value }) => { settings[key] = value })
-      } catch (_) { /* use defaults */ }
+        console.log('[quote] app_settings loaded:', Object.keys(settings))
+      } catch (settingsErr) {
+        console.warn('[quote] app_settings fetch failed (using defaults):', settingsErr?.message)
+      }
 
       const companyName  = settings.company_name  || 'Brain Digital'
       const companyEmail = settings.company_email || 'info@braindigital.it'
       const notifyEmail  = settings.notification_email || companyEmail
 
       // Generate PDF buffer
-      const pdfBuffer = await generateQuotePDFBuffer(quote, items, settings)
+      console.log('[quote] generating PDF buffer...')
+      let pdfBuffer
+      try {
+        pdfBuffer = await generateQuotePDFBuffer(quote, items, settings)
+        console.log('[quote] PDF buffer size:', pdfBuffer?.length)
+      } catch (pdfErr) {
+        console.error('[quote] PDF generation failed:', pdfErr)
+        return NextResponse.json({ error: `PDF generation failed: ${pdfErr.message}` }, { status: 500 })
+      }
+
       const safeTitle = (quote.title || 'preventivo').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '')
       const dateStr = new Date().toISOString().split('T')[0]
       const pdfFilename = `Preventivo_${safeTitle}_${dateStr}.pdf`
@@ -90,31 +98,41 @@ export async function POST(request) {
       const resend = getResendClient()
 
       // Send to client
-      const { error: clientErr } = await resend.emails.send({
+      console.log('[quote] sending to client:', quote.client_email)
+      const { data: clientData, error: clientErr } = await resend.emails.send({
         from: `${FROM_NAME} <${FROM_EMAIL}>`,
         to: [quote.client_email],
         subject: `Preventivo ${quote.title} — ${companyName}`,
         html: clientHtml,
         attachments: [pdfAttachment],
       })
+      console.log('[quote] client send result:', { id: clientData?.id, error: clientErr })
       if (clientErr) {
-        console.error('[email/quote] client send error:', clientErr)
         return NextResponse.json({ error: clientErr.message }, { status: 500 })
       }
 
       // Send notification to company
-      await resend.emails.send({
+      console.log('[quote] sending notification to:', notifyEmail)
+      const { data: notifyData, error: notifyErr } = await resend.emails.send({
         from: `${FROM_NAME} <${FROM_EMAIL}>`,
         to: [notifyEmail],
         subject: `✅ Preventivo inviato — ${quote.title}`,
         html: notifyHtml,
         attachments: [pdfAttachment],
       })
+      console.log('[quote] notification result:', { id: notifyData?.id, error: notifyErr })
 
       // Advance status to 'sent'
       await admin.from('quotes').update({ status: 'sent', updated_at: new Date().toISOString() }).eq('id', quote.id)
+      console.log('[quote] done — status set to sent')
 
       return NextResponse.json({ success: true })
+    }
+
+    // 'reset' uses email field instead of to
+    const email = to || body.email
+    if (!type || !email) {
+      return NextResponse.json({ error: 'Missing required fields: type, to/email' }, { status: 400 })
     }
 
     let subject, html
