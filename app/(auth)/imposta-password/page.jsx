@@ -226,6 +226,7 @@ export default function ImpostaPasswordPage() {
                     />
                     <button
                       type="button"
+                      tabIndex={-1}
                       onClick={() => setShowPwd((v) => !v)}
                       className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition"
                     >
@@ -250,6 +251,7 @@ export default function ImpostaPasswordPage() {
                     />
                     <button
                       type="button"
+                      tabIndex={-1}
                       onClick={() => setShowConfirm((v) => !v)}
                       className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition"
                     >
