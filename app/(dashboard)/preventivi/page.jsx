@@ -72,6 +72,7 @@ export default function PreventiviPage() {
 
   // PDF export loading
   const [exportingId, setExportingId] = useState(null)
+  const [sendingEmail, setSendingEmail] = useState(false)
   const [showItemPicker, setShowItemPicker] = useState(false)
   const [itemPickerSearch, setItemPickerSearch] = useState('')
 
@@ -281,6 +282,38 @@ export default function PreventiviPage() {
     setExportingId(null)
   }
 
+  // ── Send email ────────────────────────────────────────────────────────────────
+  async function handleSendEmail(quote) {
+    if (!quote.client_email) return
+    setSendingEmail(true)
+    try {
+      const supabase = getSupabase()
+      let items = detailItems
+      if (!detailQuote || detailQuote.id !== quote.id || detailItems.length === 0) {
+        const { data } = await supabase
+          .from('quote_items')
+          .select('*, equipment(id, name, brand, model, category, market_value, photo_url)')
+          .eq('quote_id', quote.id)
+        items = data || []
+      }
+      const res = await fetch('/api/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'quote', quote, items }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Errore invio email')
+      toast.success(`Email inviata a ${quote.client_email}`)
+      // Reflect status update in local state
+      setQuotes((prev) => prev.map((q) => q.id === quote.id ? { ...q, status: 'sent' } : q))
+      setDetailQuote((q) => q ? { ...q, status: 'sent' } : q)
+    } catch (err) {
+      toast.error(err.message || 'Errore nell\'invio email')
+    } finally {
+      setSendingEmail(false)
+    }
+  }
+
   // ── Filter ────────────────────────────────────────────────────────────────────
   const displayQuotes = quotes.filter((q) => {
     if (statusFilter !== 'all' && q.status !== statusFilter) return false
@@ -327,6 +360,18 @@ export default function PreventiviPage() {
                 : <FileDown className="w-3.5 h-3.5" />}
               PDF
             </Button>
+            {detailQuote.client_email && !['confirmed', 'archived'].includes(detailQuote.status) && (
+              <Button
+                size="sm" variant="outline"
+                onClick={() => handleSendEmail(detailQuote)}
+                disabled={sendingEmail}
+              >
+                {sendingEmail
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <Mail className="w-3.5 h-3.5" />}
+                Invia email
+              </Button>
+            )}
             <Button size="sm" variant="outline" onClick={() => openEdit(detailQuote)}>
               <Pencil className="w-3.5 h-3.5" />
               Modifica

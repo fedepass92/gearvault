@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getResendClient, FROM_EMAIL, FROM_NAME, inviteTemplate, resetPasswordTemplate, maintenanceAlertTemplate, setConfirmTemplate } from '@/lib/resend'
+import { generateQuotePDFBuffer } from '@/lib/pdf'
 
 function getAdminClient() {
   return createClient(
@@ -19,6 +20,101 @@ export async function POST(request) {
     const email = to || body.email
     if (!type || !email) {
       return NextResponse.json({ error: 'Missing required fields: type, to/email' }, { status: 400 })
+    }
+
+    // ── Quote email (handled separately — no generic `to` field) ──────────────
+    if (type === 'quote') {
+      const { quote, items } = body
+      if (!quote?.client_email) {
+        return NextResponse.json({ error: 'Missing client_email on quote' }, { status: 400 })
+      }
+
+      const admin = getAdminClient()
+
+      // Load app_settings for branding + notification email
+      let settings = {}
+      try {
+        const { data } = await admin.from('app_settings').select('key, value')
+        if (data) data.forEach(({ key, value }) => { settings[key] = value })
+      } catch (_) { /* use defaults */ }
+
+      const companyName  = settings.company_name  || 'Brain Digital'
+      const companyEmail = settings.company_email || 'info@braindigital.it'
+      const notifyEmail  = settings.notification_email || companyEmail
+
+      // Generate PDF buffer
+      const pdfBuffer = await generateQuotePDFBuffer(quote, items, settings)
+      const safeTitle = (quote.title || 'preventivo').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '')
+      const dateStr = new Date().toISOString().split('T')[0]
+      const pdfFilename = `Preventivo_${safeTitle}_${dateStr}.pdf`
+      const pdfAttachment = { filename: pdfFilename, content: pdfBuffer }
+
+      const eventLine = quote.event_date
+        ? `<p style="margin:0 0 8px;">📅 Data evento: <strong>${new Date(quote.event_date).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}</strong></p>`
+        : ''
+
+      const clientHtml = `
+        <div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
+          <div style="background:#1e3a5f;padding:24px;border-radius:8px 8px 0 0;">
+            <h1 style="color:white;margin:0;font-size:20px;">${companyName}</h1>
+            <p style="color:#94a3b8;margin:4px 0 0;font-size:13px;">Preventivo attrezzatura</p>
+          </div>
+          <div style="padding:24px;background:#f8fafc;border:1px solid #e2e8f0;border-top:none;">
+            <p style="margin:0 0 12px;">Gentile <strong>${quote.client_name || 'Cliente'}</strong>,</p>
+            <p style="margin:0 0 8px;">Ti inviamo in allegato il preventivo <strong>${quote.title}</strong>.</p>
+            ${eventLine}
+            <p style="margin:0 0 8px;">In allegato trovi il PDF con il dettaglio dell&apos;attrezzatura.</p>
+            <p style="margin:0 0 16px;">Per qualsiasi informazione siamo a disposizione.</p>
+            <p style="margin:0;">${companyName}<br>
+            <a href="mailto:${companyEmail}" style="color:#1e3a5f;">${companyEmail}</a></p>
+          </div>
+          <div style="padding:12px 24px;background:#f1f5f9;border-radius:0 0 8px 8px;border:1px solid #e2e8f0;border-top:none;">
+            <p style="color:#94a3b8;font-size:12px;margin:0;">Questo preventivo è stato generato automaticamente da GearVault.</p>
+          </div>
+        </div>`
+
+      const notifyHtml = `
+        <div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
+          <div style="background:#1e3a5f;padding:24px;border-radius:8px 8px 0 0;">
+            <h1 style="color:white;margin:0;font-size:18px;">✅ Preventivo inviato</h1>
+          </div>
+          <div style="padding:24px;background:#f8fafc;border:1px solid #e2e8f0;border-top:none;">
+            <p style="margin:0 0 8px;"><strong>Titolo:</strong> ${quote.title}</p>
+            <p style="margin:0 0 8px;"><strong>Cliente:</strong> ${quote.client_name || '—'}</p>
+            <p style="margin:0 0 8px;"><strong>Email:</strong> ${quote.client_email}</p>
+            ${eventLine}
+            <p style="margin:0;">Il PDF è allegato a questa notifica.</p>
+          </div>
+        </div>`
+
+      const resend = getResendClient()
+
+      // Send to client
+      const { error: clientErr } = await resend.emails.send({
+        from: `${FROM_NAME} <${FROM_EMAIL}>`,
+        to: [quote.client_email],
+        subject: `Preventivo ${quote.title} — ${companyName}`,
+        html: clientHtml,
+        attachments: [pdfAttachment],
+      })
+      if (clientErr) {
+        console.error('[email/quote] client send error:', clientErr)
+        return NextResponse.json({ error: clientErr.message }, { status: 500 })
+      }
+
+      // Send notification to company
+      await resend.emails.send({
+        from: `${FROM_NAME} <${FROM_EMAIL}>`,
+        to: [notifyEmail],
+        subject: `✅ Preventivo inviato — ${quote.title}`,
+        html: notifyHtml,
+        attachments: [pdfAttachment],
+      })
+
+      // Advance status to 'sent'
+      await admin.from('quotes').update({ status: 'sent', updated_at: new Date().toISOString() }).eq('id', quote.id)
+
+      return NextResponse.json({ success: true })
     }
 
     let subject, html
