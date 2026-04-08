@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import Link from 'next/link'
 import Image from 'next/image'
 import { getSupabase } from '@/lib/supabase'
 import EquipmentModal from '@/components/EquipmentModal'
@@ -1261,9 +1262,17 @@ export default function InventarioPage() {
                 <Upload className="w-4 h-4" />
                 <span className="hidden sm:inline">Importa CSV</span>
               </Button>
-              <Button size="sm" onClick={() => setEditModal('new')}>
+              {/* Mobile: wizard page */}
+              <Link
+                href="/inventario/nuovo"
+                className="sm:hidden inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition"
+              >
                 <Plus className="w-4 h-4" />
-                <span className="hidden sm:inline">Nuova</span>
+              </Link>
+              {/* Desktop: modal */}
+              <Button size="sm" className="hidden sm:inline-flex" onClick={() => setEditModal('new')}>
+                <Plus className="w-4 h-4" />
+                Nuova
               </Button>
             </>
           )}

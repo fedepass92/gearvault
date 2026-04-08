@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import dynamic from 'next/dynamic'
+import Link from 'next/link'
 import { getSupabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import {
   ScanLine, CheckCircle2, ArrowLeftRight, Loader2, RotateCcw,
-  Package, MapPin, LogOut, LogIn, X, CameraOff, Smartphone,
+  Package, MapPin, LogOut, LogIn, X, CameraOff, Smartphone, Plus,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { it } from 'date-fns/locale'
@@ -149,13 +150,20 @@ export default function ScanPage() {
 
       {/* Header */}
       <div className="flex items-center gap-3 px-5 pt-5 pb-3">
-        <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center">
-          <ScanLine className="w-4.5 h-4.5 text-orange-400" />
+        <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center flex-shrink-0">
+          <ScanLine className="w-4 h-4 text-orange-400" />
         </div>
-        <div>
+        <div className="flex-1 min-w-0">
           <h1 className="text-base font-bold leading-tight">Scansione QR</h1>
           <p className="text-xs text-slate-400">Inquadra il codice sull&apos;attrezzatura</p>
         </div>
+        <Link
+          href="/inventario/nuovo"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 hover:border-orange-500/50 hover:bg-slate-700 text-xs font-medium text-slate-300 transition flex-shrink-0"
+        >
+          <Plus className="w-3.5 h-3.5 text-orange-400" />
+          Nuova
+        </Link>
       </div>
 
       <div className="flex-1 flex flex-col px-4 pb-6 gap-4">
