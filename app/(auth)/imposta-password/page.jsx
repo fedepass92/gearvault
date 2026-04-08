@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { getSupabase } from '@/lib/supabase'
 import { Lock, Eye, EyeOff, Loader2, CheckCircle2 } from 'lucide-react'
@@ -38,6 +38,7 @@ export default function ImpostaPasswordPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
+  const subscriptionRef = useRef(null)
 
   useEffect(() => {
     const supabase = getSupabase()
@@ -56,6 +57,7 @@ export default function ImpostaPasswordPage() {
         setLoading(false)
       }
     })
+    subscriptionRef.current = subscription
 
     // Also try existing session (e.g. user reloads the page)
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -105,7 +107,7 @@ export default function ImpostaPasswordPage() {
       }
     })
 
-    return () => subscription.unsubscribe()
+    return () => subscriptionRef.current?.unsubscribe()
   }, [])
 
   async function handleSubmit(e) {
@@ -119,11 +121,28 @@ export default function ImpostaPasswordPage() {
     setSaving(true)
     const supabase = getSupabase()
 
-    // Set password
+    // Unsubscribe from onAuthStateChange to prevent interference with updateUser
+    subscriptionRef.current?.unsubscribe()
+
+    // Set password — wrap in timeout to handle cases where the promise never resolves
     console.log('[pwd] calling updateUser...')
-    const { error: pwdError } = await supabase.auth.updateUser({ password })
+    let pwdError = null
+    try {
+      const result = await Promise.race([
+        supabase.auth.updateUser({ password }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000)),
+      ])
+      pwdError = result.error
+    } catch (e) {
+      if (e.message === 'timeout') {
+        console.log('[pwd] updateUser timed out, proceeding anyway')
+      } else {
+        pwdError = e
+      }
+    }
     console.log('[pwd] updateUser result — error:', pwdError)
-    if (pwdError) {
+
+    if (pwdError && pwdError.message !== 'timeout') {
       setError(pwdError.message)
       setSaving(false)
       return
