@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { getSupabase } from '@/lib/supabase'
-import { Users, Mail, Loader2, ShieldCheck, Send, Activity, Trash2 } from 'lucide-react'
+import { Users, Mail, Loader2, ShieldCheck, Send, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { it } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
@@ -18,6 +18,7 @@ import {
 export default function UtentiPage() {
   const [profiles, setProfiles] = useState([])
   const [activityCounts, setActivityCounts] = useState({})
+  const [authData, setAuthData] = useState({}) // { userId: { last_sign_in_at, email_confirmed_at } }
   const [loading, setLoading] = useState(true)
   const [currentUserId, setCurrentUserId] = useState(null)
   const [isAdmin, setIsAdmin] = useState(false)
@@ -37,6 +38,24 @@ export default function UtentiPage() {
   // Store current user's name for invite emails
   const [myName, setMyName] = useState(null)
 
+  async function fetchUsers(supabase, token) {
+    const [{ data: allProfiles }, { data: movLogs }, authUsersRes] = await Promise.all([
+      supabase.from('profiles').select('*').order('created_at'),
+      supabase.from('movement_log').select('user_id'),
+      fetch('/api/admin/users', { headers: { Authorization: `Bearer ${token}` } }),
+    ])
+    setProfiles(allProfiles || [])
+    const counts = {}
+    ;(movLogs || []).forEach((m) => { if (m.user_id) counts[m.user_id] = (counts[m.user_id] || 0) + 1 })
+    setActivityCounts(counts)
+    if (authUsersRes.ok) {
+      const authUsers = await authUsersRes.json()
+      const map = {}
+      authUsers.forEach((u) => { map[u.id] = u })
+      setAuthData(map)
+    }
+  }
+
   useEffect(() => {
     async function init() {
       const supabase = getSupabase()
@@ -49,14 +68,8 @@ export default function UtentiPage() {
       setIsAdmin(true)
       setMyName(profile?.full_name || null)
 
-      const [{ data: allProfiles }, { data: movLogs }] = await Promise.all([
-        supabase.from('profiles').select('*').order('created_at'),
-        supabase.from('movement_log').select('user_id'),
-      ])
-      setProfiles(allProfiles || [])
-      const counts = {}
-      ;(movLogs || []).forEach((m) => { if (m.user_id) counts[m.user_id] = (counts[m.user_id] || 0) + 1 })
-      setActivityCounts(counts)
+      const { data: { session } } = await supabase.auth.getSession()
+      await fetchUsers(supabase, session?.access_token || '')
       setLoading(false)
     }
     init()
@@ -99,6 +112,11 @@ export default function UtentiPage() {
     setInviteRole('operator')
     setShowInvite(false)
     setInviting(false)
+
+    // Reload user list so the new invite appears immediately
+    const supabase = getSupabase()
+    const { data: { session } } = await supabase.auth.getSession()
+    await fetchUsers(supabase, session?.access_token || '')
   }
 
   async function handleDelete() {
@@ -159,7 +177,7 @@ export default function UtentiPage() {
               <tr className="border-b border-border">
                 <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Utente</th>
                 <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell">Registrato il</th>
-                <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Attività</th>
+                <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Stato</th>
                 <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Ruolo</th>
                 <th className="w-10" />
               </tr>
@@ -187,14 +205,22 @@ export default function UtentiPage() {
                     {profile.created_at ? format(new Date(profile.created_at), 'd MMM yyyy', { locale: it }) : '—'}
                   </td>
                   <td className="px-5 py-4 hidden sm:table-cell">
-                    {activityCounts[profile.id] > 0 ? (
-                      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Activity className="w-3.5 h-3.5" />
-                        {activityCounts[profile.id]} mov.
-                      </span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground/40">—</span>
-                    )}
+                    {(() => {
+                      const auth = authData[profile.id]
+                      if (!auth) return <span className="text-xs text-muted-foreground/40">—</span>
+                      if (auth.last_sign_in_at) {
+                        return (
+                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                            Attivo
+                          </span>
+                        )
+                      }
+                      return (
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                          Invitato
+                        </span>
+                      )
+                    })()}
                   </td>
                   <td className="px-5 py-4">
                     {profile.id === currentUserId ? (
