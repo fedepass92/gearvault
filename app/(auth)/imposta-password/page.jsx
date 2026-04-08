@@ -71,9 +71,37 @@ export default function ImpostaPasswordPage() {
             setLoading(false)
           })
       } else {
-        // No session yet — wait for onAuthStateChange (token still being processed)
-        // Show loading for up to 5s then show error
-        setTimeout(() => setLoading(false), 5000)
+        // No session yet — try to extract tokens from URL hash manually
+        const hash = window.location.hash.substring(1)
+        const params = new URLSearchParams(hash)
+        const accessToken = params.get('access_token')
+        const refreshToken = params.get('refresh_token')
+
+        if (accessToken) {
+          supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken || '',
+          }).then(({ data, error: sessionErr }) => {
+            if (data?.session?.user) {
+              setAuthUser(data.session.user)
+              supabase
+                .from('profiles')
+                .select('full_name')
+                .eq('id', data.session.user.id)
+                .single()
+                .then(({ data: profile }) => {
+                  setFullName(profile?.full_name || '')
+                  setLoading(false)
+                })
+            } else {
+              console.warn('[imposta-password] setSession failed:', sessionErr)
+              setLoading(false)
+            }
+          })
+        } else {
+          // No token in hash either — wait for onAuthStateChange, then timeout
+          setTimeout(() => setLoading(false), 5000)
+        }
       }
     })
 
