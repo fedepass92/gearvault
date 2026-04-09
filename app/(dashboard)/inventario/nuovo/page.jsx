@@ -9,6 +9,9 @@ import {
   ArrowLeft, Camera, Upload, Image as ImageIcon, X, Check,
   ChevronRight, Loader2, SkipForward, Package, Sparkles,
 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -65,7 +68,7 @@ function useAutocomplete(items, field, query, filterField = null, filterValue = 
 function ProgressBar({ step, total }) {
   return (
     <div className="flex items-center gap-2 px-5 py-3">
-      <div className="flex-1 h-1 bg-slate-800 rounded-full overflow-hidden">
+      <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
         <div
           className="h-full bg-orange-500 rounded-full transition-all duration-300"
           style={{ width: `${(step / total) * 100}%` }}
@@ -93,9 +96,9 @@ function AutocompleteInput({ label, value, onChange, suggestions, placeholder, i
   }, [suggestions, value])
 
   return (
-    <div className="relative">
-      {label && <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{label}</label>}
-      <input
+    <div className="relative space-y-1.5">
+      {label && <Label>{label}</Label>}
+      <Input
         ref={ref}
         type="text"
         inputMode={inputMode}
@@ -103,15 +106,14 @@ function AutocompleteInput({ label, value, onChange, suggestions, placeholder, i
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
-        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3.5 text-base text-white placeholder:text-slate-500 focus:outline-none focus:border-orange-500 transition"
       />
       {open && (
-        <div className="absolute left-0 right-0 top-full mt-1 z-20 bg-slate-800 border border-slate-700 rounded-xl overflow-hidden shadow-2xl">
+        <div className="absolute left-0 right-0 top-full mt-1 z-20 bg-card border border-border rounded-xl overflow-hidden shadow-2xl">
           {suggestions.map((s, i) => (
             <button
               key={i}
               onMouseDown={(e) => { e.preventDefault(); onChange(s); setOpen(false) }}
-              className="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-700 transition border-b border-slate-700/50 last:border-0"
+              className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition border-b border-border/50 last:border-0"
             >
               {s}
             </button>
@@ -282,47 +284,46 @@ export default function NuovaAttrezzaturaPage() {
 
             {photoPreview ? (
               <div className="relative">
-                <img src={photoPreview} alt="preview" className="w-56 h-56 rounded-2xl object-cover border border-slate-700" />
+                <img src={photoPreview} alt="preview" className="w-56 h-56 rounded-2xl object-cover border border-border" />
                 <button
                   onClick={() => { setPhotoFile(null); setPhotoPreview(null) }}
-                  className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-slate-700 border border-slate-600 flex items-center justify-center"
+                  className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-card border border-border flex items-center justify-center hover:bg-muted transition"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
             ) : (
-              <div className="w-56 h-56 rounded-2xl border-2 border-dashed border-slate-700 flex items-center justify-center">
-                <ImageIcon className="w-12 h-12 text-slate-600" />
+              <div className="w-56 h-56 rounded-2xl border-2 border-dashed border-border flex items-center justify-center">
+                <ImageIcon className="w-12 h-12 text-muted-foreground/40" />
               </div>
             )}
 
             <div className="w-full space-y-3">
-              <button
+              <Button
+                variant="outline"
+                className="w-full py-6 text-base"
                 onClick={() => cameraInputRef.current?.click()}
-                className="w-full flex items-center justify-center gap-2.5 py-4 rounded-2xl bg-slate-800 border border-slate-700 hover:border-orange-500/50 hover:bg-slate-700 text-base font-medium transition"
               >
-                <Camera className="w-5 h-5 text-orange-400" />
+                <Camera className="w-5 h-5 text-primary" />
                 Scatta foto
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full py-6 text-base"
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full flex items-center justify-center gap-2.5 py-4 rounded-2xl bg-slate-800 border border-slate-700 hover:border-orange-500/50 hover:bg-slate-700 text-base font-medium transition"
               >
-                <Upload className="w-5 h-5 text-slate-400" />
+                <Upload className="w-5 h-5" />
                 Carica da libreria
-              </button>
+              </Button>
               {photoPreview && (
-                <button
-                  onClick={next}
-                  className="w-full flex items-center justify-center gap-2.5 py-4 rounded-2xl bg-orange-500 hover:bg-orange-400 text-base font-bold transition"
-                >
+                <Button className="w-full py-6 text-base font-bold" onClick={next}>
                   <ChevronRight className="w-5 h-5" />
                   Continua
-                </button>
+                </Button>
               )}
               <button
                 onClick={next}
-                className="w-full flex items-center justify-center gap-2 py-3 text-sm text-slate-500 hover:text-slate-300 transition"
+                className="w-full flex items-center justify-center gap-2 py-3 text-sm text-muted-foreground hover:text-foreground transition"
               >
                 <SkipForward className="w-4 h-4" />
                 Salta — aggiungi foto dopo
@@ -348,8 +349,8 @@ export default function NuovaAttrezzaturaPage() {
                   onClick={() => { setCategory(cat.value); next() }}
                   className={`flex flex-col items-center justify-center gap-2 py-5 rounded-2xl border text-base font-medium transition ${
                     category === cat.value
-                      ? 'border-orange-500 bg-orange-500/15 text-orange-300'
-                      : 'border-slate-700 bg-slate-800/60 hover:border-slate-600 text-slate-200'
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border bg-card hover:border-muted-foreground/50 text-foreground'
                   }`}
                 >
                   <span className="text-3xl">{cat.emoji}</span>
@@ -394,14 +395,14 @@ export default function NuovaAttrezzaturaPage() {
               suggestions={modelSuggestions}
               placeholder="es. A7 IV, EOS R5…"
             />
-            <button
+            <Button
+              className="w-full py-6 text-base font-bold mt-2"
               onClick={next}
               disabled={!name.trim()}
-              className="w-full flex items-center justify-center gap-2.5 py-4 rounded-2xl bg-orange-500 hover:bg-orange-400 disabled:opacity-40 text-base font-bold transition mt-2"
             >
               Continua
               <ChevronRight className="w-5 h-5" />
-            </button>
+            </Button>
           </div>
         )}
 
@@ -413,42 +414,39 @@ export default function NuovaAttrezzaturaPage() {
               <p className="text-sm text-slate-400">Opzionale — utile per report e ammortamento</p>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Prezzo di acquisto (€)</label>
-              <input
+            <div className="space-y-1.5">
+              <Label>Prezzo di acquisto (€)</Label>
+              <Input
                 type="text"
                 inputMode="decimal"
                 value={purchasePrice}
                 onChange={(e) => setPurchasePrice(e.target.value)}
                 placeholder="es. 2499.00"
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3.5 text-base text-white placeholder:text-slate-500 focus:outline-none focus:border-orange-500 transition"
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Data di acquisto</label>
-              <input
+            <div className="space-y-1.5">
+              <Label>Data di acquisto</Label>
+              <Input
                 type="date"
                 value={purchaseDate}
                 onChange={(e) => setPurchaseDate(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3.5 text-base text-white focus:outline-none focus:border-orange-500 transition"
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Valore assicurato (€) — opzionale</label>
-              <input
+            <div className="space-y-1.5">
+              <Label>Valore assicurato (€) — opzionale</Label>
+              <Input
                 type="text"
                 inputMode="decimal"
                 value={insuredValue}
                 onChange={(e) => setInsuredValue(e.target.value)}
                 placeholder="es. 2000.00"
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3.5 text-base text-white placeholder:text-slate-500 focus:outline-none focus:border-orange-500 transition"
               />
             </div>
 
             {/* Auto-estimate toggle */}
-            <label className="flex items-start gap-3 p-4 rounded-xl border border-slate-700 bg-slate-800/50 cursor-pointer">
+            <label className="flex items-start gap-3 p-4 rounded-xl border border-border bg-card cursor-pointer">
               <input
                 type="checkbox"
                 checked={autoEstimate}
@@ -477,19 +475,13 @@ export default function NuovaAttrezzaturaPage() {
             </label>
 
             <div className="flex gap-3 mt-2">
-              <button
-                onClick={next}
-                className="flex-1 flex items-center justify-center gap-2.5 py-4 rounded-2xl bg-orange-500 hover:bg-orange-400 text-base font-bold transition"
-              >
+              <Button className="flex-1 py-6 text-base font-bold" onClick={next}>
                 Continua
                 <ChevronRight className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => goTo(6)}
-                className="px-5 py-4 rounded-2xl border border-slate-700 text-sm text-slate-400 hover:text-white hover:border-slate-500 transition"
-              >
+              </Button>
+              <Button variant="outline" className="px-5 py-6 text-sm" onClick={() => goTo(6)}>
                 Salta
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -502,25 +494,24 @@ export default function NuovaAttrezzaturaPage() {
               <p className="text-sm text-slate-400">Tutti opzionali</p>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Numero seriale</label>
-              <input
+            <div className="space-y-1.5">
+              <Label>Numero seriale</Label>
+              <Input
                 type="text"
                 value={serialNumber}
                 onChange={(e) => setSerialNumber(e.target.value)}
                 placeholder="es. SN-1234567890"
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3.5 text-base text-white placeholder:text-slate-500 focus:outline-none focus:border-orange-500 transition"
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Condizione</label>
+            <div className="space-y-1.5">
+              <Label>Condizione</Label>
               <div className="space-y-2">
                 {CONDITIONS_SIMPLE.map((c) => (
                   <label key={c.value + c.label} className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition ${
                     condition === c.value
-                      ? 'border-orange-500/50 bg-orange-500/10'
-                      : 'border-slate-700 bg-slate-800/50'
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border bg-card'
                   }`}>
                     <input
                       type="radio"
@@ -528,7 +519,7 @@ export default function NuovaAttrezzaturaPage() {
                       value={c.value}
                       checked={condition === c.value}
                       onChange={() => setCondition(c.value)}
-                      className="accent-orange-500"
+                      className="accent-primary"
                     />
                     <span className="text-sm">{c.label}</span>
                   </label>
@@ -536,8 +527,8 @@ export default function NuovaAttrezzaturaPage() {
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Location</label>
+            <div className="space-y-1.5">
+              <Label>Location</Label>
               <div className="grid grid-cols-3 gap-2">
                 {LOCATIONS.map((l) => (
                   <button
@@ -545,8 +536,8 @@ export default function NuovaAttrezzaturaPage() {
                     onClick={() => setLocation(l.value)}
                     className={`py-3 rounded-xl border text-sm font-medium transition ${
                       location === l.value
-                        ? 'border-orange-500/50 bg-orange-500/10 text-orange-300'
-                        : 'border-slate-700 bg-slate-800/50 text-slate-300 hover:border-slate-600'
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border bg-card text-foreground hover:bg-muted'
                     }`}
                   >
                     {l.label}
@@ -555,31 +546,25 @@ export default function NuovaAttrezzaturaPage() {
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Note</label>
+            <div className="space-y-1.5">
+              <Label>Note</Label>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Note aggiuntive…"
                 rows={3}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3.5 text-base text-white placeholder:text-slate-500 focus:outline-none focus:border-orange-500 transition resize-none"
+                className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring transition resize-none"
               />
             </div>
 
             <div className="flex gap-3 mt-2">
-              <button
-                onClick={next}
-                className="flex-1 flex items-center justify-center gap-2.5 py-4 rounded-2xl bg-orange-500 hover:bg-orange-400 text-base font-bold transition"
-              >
+              <Button className="flex-1 py-6 text-base font-bold" onClick={next}>
                 Continua
                 <ChevronRight className="w-5 h-5" />
-              </button>
-              <button
-                onClick={next}
-                className="px-5 py-4 rounded-2xl border border-slate-700 text-sm text-slate-400 hover:text-white hover:border-slate-500 transition"
-              >
+              </Button>
+              <Button variant="outline" className="px-5 py-6 text-sm" onClick={next}>
                 Salta
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -590,11 +575,11 @@ export default function NuovaAttrezzaturaPage() {
             <p className="text-lg font-bold">Riepilogo</p>
 
             {/* Photo + name */}
-            <div className="rounded-2xl bg-slate-800/60 border border-slate-700 overflow-hidden">
+            <div className="rounded-2xl bg-card border border-border overflow-hidden">
               {photoPreview ? (
                 <img src={photoPreview} alt="" className="w-full h-40 object-cover" />
               ) : (
-                <div className="w-full h-32 flex items-center justify-center bg-slate-800">
+                <div className="w-full h-32 flex items-center justify-center bg-muted">
                   <Package className="w-12 h-12 text-slate-600" />
                 </div>
               )}
@@ -628,7 +613,7 @@ export default function NuovaAttrezzaturaPage() {
                   )}
                 </div>
                 {(purchasePrice || purchaseDate || insuredValue) && (
-                  <div className="pt-3 border-t border-slate-700 grid grid-cols-2 gap-3 text-sm">
+                  <div className="pt-3 border-t border-border grid grid-cols-2 gap-3 text-sm">
                     {purchasePrice && (
                       <div>
                         <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-0.5">Acquisto</p>
@@ -656,7 +641,7 @@ export default function NuovaAttrezzaturaPage() {
                   </div>
                 )}
                 {notes && (
-                  <div className="pt-3 border-t border-slate-700">
+                  <div className="pt-3 border-t border-border">
                     <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Note</p>
                     <p className="text-sm text-slate-400 whitespace-pre-wrap">{notes}</p>
                   </div>
@@ -664,14 +649,14 @@ export default function NuovaAttrezzaturaPage() {
               </div>
             </div>
 
-            <button
+            <Button
+              className="w-full py-6 text-base font-bold"
               onClick={handleSave}
               disabled={saving || !name.trim()}
-              className="w-full flex items-center justify-center gap-2.5 py-4 rounded-2xl bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-base font-bold transition"
             >
               {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
               {saving ? 'Salvataggio…' : 'Salva attrezzatura'}
-            </button>
+            </Button>
           </div>
         )}
 
@@ -683,30 +668,30 @@ export default function NuovaAttrezzaturaPage() {
             </div>
             <div>
               <p className="text-2xl font-bold mb-2">Aggiunto!</p>
-              <p className="text-slate-300 font-medium">{name}</p>
+              <p className="text-foreground font-medium">{name}</p>
               {brand && <p className="text-sm text-slate-400 mt-0.5">{[brand, model].filter(Boolean).join(' · ')}</p>}
             </div>
             <div className="w-full space-y-3">
-              <button
+              <Button
+                className="w-full py-6 text-base font-bold"
                 onClick={() => {
-                  // Reset all fields
                   setStep(1); setPhotoFile(null); setPhotoPreview(null)
                   setCategory(''); setName(''); setBrand(''); setModel('')
                   setPurchasePrice(''); setPurchaseDate(''); setInsuredValue('')
                   setSerialNumber(''); setCondition('active'); setLocation('studio')
                   setNotes(''); setAutoEstimate(true)
                 }}
-                className="w-full flex items-center justify-center gap-2.5 py-4 rounded-2xl bg-orange-500 hover:bg-orange-400 text-base font-bold transition"
               >
                 <Package className="w-5 h-5" />
                 Aggiungi un&apos;altra
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full py-6 text-base"
                 onClick={() => router.push('/inventario')}
-                className="w-full flex items-center justify-center gap-2.5 py-4 rounded-2xl bg-slate-800 border border-slate-700 hover:border-slate-500 text-base font-medium transition"
               >
                 Vai all&apos;inventario
-              </button>
+              </Button>
             </div>
           </div>
         )}
