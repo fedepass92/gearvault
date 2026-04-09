@@ -170,7 +170,7 @@ export default function CalendarioPage() {
                   key={day.toISOString()}
                   onClick={() => handleDayClick(day, daySets)}
                   className={`
-                    relative min-h-[100px] p-1.5 border-b border-r border-border/50 transition
+                    relative min-h-[100px] pt-1.5 pb-1.5 px-0 border-b border-r border-border/50 transition
                     ${!isLast && (i + 1) % 7 === 0 ? 'border-r-0' : ''}
                     ${i >= allDays.length - 7 ? 'border-b-0' : ''}
                     ${hasSets ? 'cursor-pointer hover:bg-muted/40' : ''}
@@ -186,7 +186,7 @@ export default function CalendarioPage() {
                     {format(day, 'd')}
                   </div>
 
-                  {/* Events */}
+                  {/* Events — pills flush to cell edges for seamless multi-day bars */}
                   <div className="space-y-0.5">
                     {daySets.slice(0, 3).map((s) => {
                       const cfg      = STATUS_CONFIG[s.status] || STATUS_CONFIG.planned
@@ -194,41 +194,42 @@ export default function CalendarioPage() {
                       const isEnd    = isRangeEnd(s, day)
                       const isSingle = !s.end_date || s.end_date === s.job_date
 
-                      const radius = isSingle || (isStart && isEnd)
-                        ? '5px'
-                        : isStart ? '5px 0 0 5px'
-                        : isEnd   ? '0 5px 5px 0'
-                        :           '0'
+                      // Rounded corners only at true start/end of range
+                      const borderRadius = isSingle
+                        ? '4px'
+                        : isStart && isEnd ? '4px'
+                        : isStart          ? '4px 0 0 4px'
+                        : isEnd            ? '0 4px 4px 0'
+                        :                    '0'
 
-                      // Start/single: 2px margin so rounded corners have space
-                      // Middle/end from right: flush to edge for seamless bar
-                      const marginLeft  = isSingle || isStart ? '2px' : '0px'
-                      const marginRight = isSingle || isEnd   ? '2px' : '0px'
+                      // Small inset for start/end so rounded corners aren't clipped
+                      const ml = isStart || isSingle ? '2px' : '0'
+                      const mr = isEnd   || isSingle ? '2px' : '0'
 
                       const tooltipText = s.end_date && s.end_date !== s.job_date
-                        ? `${s.name}\n${s.job_date} → ${s.end_date}`
-                        : `${s.name}\n${s.job_date}`
+                        ? `${s.name} · ${s.job_date} → ${s.end_date}`
+                        : `${s.name} · ${s.job_date}`
 
                       return (
                         <div
                           key={s.id}
                           title={tooltipText}
                           style={{
-                            borderRadius: radius,
-                            marginLeft,
-                            marginRight,
+                            borderRadius,
+                            marginLeft: ml,
+                            marginRight: mr,
                             backgroundColor: cfg.pill,
                           }}
-                          className="h-7 flex items-center px-1.5 overflow-hidden cursor-default hover:brightness-110 transition-all"
+                          className="h-8 flex items-center overflow-hidden cursor-default hover:brightness-110 transition-all"
                         >
                           {(isStart || isSingle) && (
-                            <span className="truncate text-xs font-semibold text-white leading-none pl-0.5">{s.name}</span>
+                            <span className="truncate text-xs font-semibold text-white leading-none pl-2">{s.name}</span>
                           )}
                         </div>
                       )
                     })}
                     {daySets.length > 3 && (
-                      <div className="text-[10px] text-muted-foreground text-center">
+                      <div className="text-[10px] text-muted-foreground px-1.5">
                         +{daySets.length - 3}
                       </div>
                     )}
