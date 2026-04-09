@@ -256,7 +256,7 @@ export default function NuovaAttrezzaturaPage() {
   const contentClass = `transition-opacity duration-120 ${sliding ? 'opacity-0' : 'opacity-100'}`
 
   return (
-    <div className="-m-4 lg:-m-6 min-h-screen bg-[#0f172a] text-white flex flex-col">
+    <div className="-m-4 lg:-m-6 min-h-screen bg-background text-foreground flex flex-col">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 pt-4 pb-1">
         <button

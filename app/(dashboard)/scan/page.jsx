@@ -140,7 +140,7 @@ export default function ScanPage() {
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div className="-m-4 lg:-m-6 min-h-screen bg-[#0f172a] text-white flex flex-col">
+    <div className="-m-4 lg:-m-6 min-h-screen bg-background text-foreground flex flex-col">
 
       {/* PWA banner — mobile only */}
       <div className="md:hidden flex items-center gap-2.5 px-4 py-2.5 bg-amber-500/15 border-b border-amber-500/20 text-amber-300 text-xs">
