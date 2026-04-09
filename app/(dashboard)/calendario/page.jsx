@@ -170,7 +170,7 @@ export default function CalendarioPage() {
                   key={day.toISOString()}
                   onClick={() => handleDayClick(day, daySets)}
                   className={`
-                    relative min-h-[90px] p-1.5 border-b border-r border-border/50 transition
+                    relative min-h-[100px] p-1.5 border-b border-r border-border/50 transition
                     ${!isLast && (i + 1) % 7 === 0 ? 'border-r-0' : ''}
                     ${i >= allDays.length - 7 ? 'border-b-0' : ''}
                     ${hasSets ? 'cursor-pointer hover:bg-muted/40' : ''}
@@ -200,34 +200,36 @@ export default function CalendarioPage() {
                         : isEnd   ? '0 5px 5px 0'
                         :           '0'
 
+                      // Start/single: 2px margin so rounded corners have space
+                      // Middle/end from right: flush to edge for seamless bar
                       const marginLeft  = isSingle || isStart ? '2px' : '0px'
                       const marginRight = isSingle || isEnd   ? '2px' : '0px'
-                      const paddingLeft  = isStart || isSingle ? '5px' : '0'
-                      const paddingRight = isEnd   || isSingle ? '5px' : '0'
+
+                      const tooltipText = s.end_date && s.end_date !== s.job_date
+                        ? `${s.name}\n${s.job_date} → ${s.end_date}`
+                        : `${s.name}\n${s.job_date}`
 
                       return (
                         <div
                           key={s.id}
-                          title={s.name}
+                          title={tooltipText}
                           style={{
                             borderRadius: radius,
                             marginLeft,
                             marginRight,
-                            paddingLeft,
-                            paddingRight,
                             backgroundColor: cfg.pill,
                           }}
-                          className="h-6 flex items-center overflow-hidden"
+                          className="h-7 flex items-center px-1.5 overflow-hidden cursor-default hover:brightness-110 transition-all"
                         >
                           {(isStart || isSingle) && (
-                            <span className="truncate text-[10px] font-medium text-white leading-none">{s.name}</span>
+                            <span className="truncate text-xs font-semibold text-white leading-none pl-0.5">{s.name}</span>
                           )}
                         </div>
                       )
                     })}
                     {daySets.length > 3 && (
                       <div className="text-[10px] text-muted-foreground text-center">
-                        +{daySets.length - 3} altri
+                        +{daySets.length - 3}
                       </div>
                     )}
                   </div>
