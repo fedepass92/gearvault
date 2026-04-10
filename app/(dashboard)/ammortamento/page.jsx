@@ -8,11 +8,81 @@ import { it } from 'date-fns/locale'
 import { TrendingDown, Loader2, Info } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Legend,
 } from 'recharts'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
+
+const LINE_COLORS = [
+  '#f97316', '#3b82f6', '#10b981', '#a855f7',
+  '#f43f5e', '#06b6d4', '#eab308', '#ec4899',
+  '#84cc16', '#14b8a6',
+]
+
+// Build portfolio-wide chart: semi-annual points from earliest purchase to end of last life
+function buildPortfolioData(itemsWithData) {
+  const valid = itemsWithData.filter((eq) => eq.purchase_price && eq.purchase_date && eq.dep)
+  if (valid.length === 0) return { points: [], items: [] }
+
+  const startDates = valid.map((eq) => parseISO(eq.purchase_date))
+  const earliest = startDates.reduce((min, d) => (d < min ? d : min), startDates[0])
+
+  const endDates = valid.map((eq) => {
+    const d = new Date(parseISO(eq.purchase_date))
+    d.setFullYear(d.getFullYear() + (eq.dep.yearsLife || 5))
+    return d
+  })
+  const latest = endDates.reduce((max, d) => (d > max ? d : max), new Date())
+
+  const cur = new Date(earliest)
+  cur.setDate(1)
+  const points = []
+
+  while (cur <= latest) {
+    const point = { label: format(cur, 'MMM yy', { locale: it }), timestamp: cur.getTime() }
+    let total = 0
+    for (const eq of valid) {
+      const mElapsed = Math.max(0, differenceInMonths(cur, parseISO(eq.purchase_date)))
+      const totalM = (eq.dep.yearsLife || 5) * 12
+      const val = Math.max(eq.purchase_price - (eq.purchase_price / totalM) * mElapsed, 0)
+      const rounded = Math.round(val)
+      point[eq.id] = rounded
+      total += rounded
+    }
+    point.total = Math.round(total)
+    points.push({ ...point })
+    cur.setMonth(cur.getMonth() + 6)
+  }
+
+  return { points, items: valid }
+}
+
+function makePortfolioTooltip(items) {
+  return function PortfolioTooltip({ active, payload, label }) {
+    if (!active || !payload?.length) return null
+    const data = payload[0]?.payload
+    if (!data) return null
+    return (
+      <div className="bg-card border border-border rounded-lg px-3 py-2.5 text-xs shadow-lg min-w-[180px]">
+        <div className="font-semibold text-muted-foreground mb-2">{label}</div>
+        {items.map((eq, i) => (
+          <div key={eq.id} className="flex items-center justify-between gap-3 mb-0.5">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: LINE_COLORS[i % LINE_COLORS.length] }} />
+              <span className="text-muted-foreground truncate max-w-[110px]">{eq.name}</span>
+            </div>
+            <span className="font-semibold text-foreground">€{(data[eq.id] ?? 0).toLocaleString('it-IT')}</span>
+          </div>
+        ))}
+        <div className="border-t border-border mt-2 pt-1.5 flex justify-between font-bold">
+          <span className="text-foreground">Totale</span>
+          <span className="text-foreground">€{(data.total ?? 0).toLocaleString('it-IT')}</span>
+        </div>
+      </div>
+    )
+  }
+}
 
 // Straight-line depreciation
 function calcDepreciation(purchasePrice, purchaseDate, yearsLife = 5) {
@@ -106,6 +176,14 @@ export default function AmmortamentoPage() {
   const totalCurrent  = itemsWithData.reduce((s, e) => s + (e.dep?.currentValue || 0), 0)
   const totalLoss     = totalPurchase - totalCurrent
 
+  const portfolioData = buildPortfolioData(itemsWithData)
+  const todayLabel = portfolioData.points.length > 0
+    ? portfolioData.points.reduce((c, p) =>
+        Math.abs(p.timestamp - Date.now()) < Math.abs(c.timestamp - Date.now()) ? p : c
+      ).label
+    : null
+  const PortfolioTooltip = makePortfolioTooltip(portfolioData.items)
+
   return (
     <div className="space-y-5">
 
@@ -136,6 +214,74 @@ export default function AmmortamentoPage() {
             <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Valore perso</div>
             <div className="text-2xl font-bold text-red-400">€{totalLoss.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</div>
             <div className="text-xs text-muted-foreground mt-0.5">ammortizzato</div>
+          </div>
+        </div>
+      )}
+
+      {/* Portfolio Depreciation Chart */}
+      {!loading && portfolioData.items.length >= 1 && (
+        <div className="bg-card border border-border rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingDown className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm font-semibold">Curva di deprezzamento portfolio</span>
+          </div>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={portfolioData.points} margin={{ top: 4, right: 16, bottom: 0, left: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                  tickLine={false}
+                  axisLine={false}
+                  interval={1}
+                />
+                <YAxis
+                  tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(v) => `€${v.toLocaleString('it-IT')}`}
+                  width={70}
+                />
+                <Tooltip content={<PortfolioTooltip />} />
+                <Legend
+                  iconType="line"
+                  iconSize={12}
+                  wrapperStyle={{ fontSize: '11px', color: 'hsl(var(--muted-foreground))', paddingTop: '12px' }}
+                  formatter={(value) => value.length > 22 ? value.slice(0, 20) + '…' : value}
+                />
+                {todayLabel && (
+                  <ReferenceLine
+                    x={todayLabel}
+                    stroke="hsl(var(--primary))"
+                    strokeDasharray="4 2"
+                    label={{ value: 'oggi', position: 'insideTopRight', fontSize: 9, fill: 'hsl(var(--primary))' }}
+                  />
+                )}
+                {portfolioData.items.map((eq, i) => (
+                  <Line
+                    key={eq.id}
+                    type="monotone"
+                    dataKey={eq.id}
+                    name={eq.name}
+                    stroke={LINE_COLORS[i % LINE_COLORS.length]}
+                    strokeWidth={1.5}
+                    dot={false}
+                    activeDot={{ r: 3 }}
+                    opacity={0.75}
+                  />
+                ))}
+                <Line
+                  type="monotone"
+                  dataKey="total"
+                  name="Totale"
+                  stroke="hsl(var(--foreground))"
+                  strokeWidth={2.5}
+                  dot={false}
+                  activeDot={{ r: 4 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
         </div>
       )}
