@@ -10,7 +10,7 @@ import {
   Camera, LayoutDashboard, Package, Tag, Briefcase, FileText,
   Users, LogOut, Menu, X, Box, History, Layers, Settings, Loader2,
   Search, Wrench, BarChart2, Moon, Sun, Plus, Upload, Eye, EyeOff,
-  Calendar, ChevronRight, TrendingDown, HandHelping, Receipt, LayoutTemplate, ScanLine,
+  Calendar, ChevronRight, TrendingDown, HandHelping, Receipt, LayoutTemplate, ScanLine, BookUser,
 } from 'lucide-react'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -57,9 +57,10 @@ const NAV_SECTIONS = [
     id: 'documenti',
     label: 'Documenti',
     items: [
-      { href: '/preventivi', icon: Receipt,  label: 'Preventivi' },
-      { href: '/etichette',  icon: Tag,      label: 'Etichette' },
-      { href: '/report',     icon: FileText, label: 'Report Assicurativo' },
+      { href: '/preventivi', icon: Receipt,   label: 'Preventivi' },
+      { href: '/rubrica',    icon: BookUser,  label: 'Rubrica' },
+      { href: '/etichette',  icon: Tag,       label: 'Etichette' },
+      { href: '/report',     icon: FileText,  label: 'Report Assicurativo' },
     ],
   },
   {
