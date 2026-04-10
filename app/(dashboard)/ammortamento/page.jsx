@@ -403,21 +403,21 @@ export default function AmmortamentoPage() {
               <div className="space-y-5">
                 {/* KPIs */}
                 <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-muted/40 rounded-lg p-3 text-center">
+                  <div className="bg-card border border-border rounded-lg p-3 text-center">
                     <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Acquisto</div>
-                    <div className="text-base font-bold">€{Number(selected.purchase_price).toLocaleString('it-IT')}</div>
+                    <div className="text-base font-bold text-foreground">€{Number(selected.purchase_price).toLocaleString('it-IT')}</div>
                     {selected.purchase_date && (
                       <div className="text-[10px] text-muted-foreground mt-0.5">
                         {format(parseISO(selected.purchase_date), 'd MMM yyyy', { locale: it })}
                       </div>
                     )}
                   </div>
-                  <div className="bg-muted/40 rounded-lg p-3 text-center">
+                  <div className="bg-card border border-border rounded-lg p-3 text-center">
                     <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Attuale</div>
                     <div className="text-base font-bold text-emerald-400">€{d?.currentValue.toLocaleString('it-IT')}</div>
                     <div className="text-[10px] text-muted-foreground mt-0.5">oggi</div>
                   </div>
-                  <div className="bg-muted/40 rounded-lg p-3 text-center">
+                  <div className="bg-card border border-border rounded-lg p-3 text-center">
                     <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Residuo</div>
                     <div className={`text-base font-bold ${getResidualColor(d?.residualPct || 0)}`}>{d?.residualPct}%</div>
                     <div className="text-[10px] text-muted-foreground mt-0.5">{d?.elapsed} mesi</div>
@@ -426,9 +426,9 @@ export default function AmmortamentoPage() {
 
                 {/* Progress bar */}
                 <div>
-                  <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
-                    <span>Ammortamento</span>
-                    <span>{d?.elapsed} / {d?.totalMonths} mesi</span>
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="text-foreground font-medium">Ammortamento</span>
+                    <span className="text-muted-foreground">{d?.elapsed} / {d?.totalMonths} mesi</span>
                   </div>
                   <div className="h-2 bg-muted rounded-full overflow-hidden">
                     <div
@@ -447,8 +447,8 @@ export default function AmmortamentoPage() {
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 8 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis dataKey="label" tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-                        <YAxis tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} tickFormatter={(v) => `€${v.toLocaleString('it-IT')}`} width={55} />
+                        <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+                        <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} tickFormatter={(v) => `€${v.toLocaleString('it-IT')}`} width={60} />
                         <Tooltip content={<CustomTooltip />} />
                         <ReferenceLine
                           x={chartData.find((p) => p.month >= nowMonths)?.label}
