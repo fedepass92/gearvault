@@ -5,7 +5,7 @@ import { getSupabase } from '@/lib/supabase'
 import {
   FileText, Plus, Search, X, Loader2, Copy, ChevronRight,
   Calendar, User, Mail, Package, Pencil, Trash2, Send,
-  CheckCircle2, Archive, FileDown, ArrowLeft, Hash, BookUser,
+  CheckCircle2, Archive, FileDown, ArrowLeft, Hash, BookUser, Building2,
 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { it } from 'date-fns/locale'
@@ -115,7 +115,7 @@ export default function PreventiviPage() {
       .eq('condition', 'active').order('name')
       .then(({ data }) => setEquipment(data || []))
     supabase.from('loan_contacts')
-      .select('id, name, email, phone')
+      .select('id, name, email, phone, contact_type, company_name, vat_number, fiscal_code, sdi_code, pec, address, city, zip, province')
       .order('name')
       .then(({ data }) => setContacts(data || []))
   }, [fetchQuotes])
@@ -333,7 +333,15 @@ export default function PreventiviPage() {
       const cs = settingsData
         ? Object.fromEntries(settingsData.map((s) => [s.key, s.value]))
         : {}
-      await exportQuotePDF(quote, items, cs)
+      // Enrich quote with contact data for PDF (company details)
+      const enriched = { ...quote }
+      const matchedContact = contacts.find(c =>
+        (c.email && c.email === quote.client_email) ||
+        (c.name && c.name === quote.client_name) ||
+        (c.company_name && c.company_name === quote.client_name)
+      )
+      if (matchedContact) enriched._contact = matchedContact
+      await exportQuotePDF(enriched, items, cs)
     } catch {
       toast.error('Errore nella generazione del PDF')
     }
@@ -354,10 +362,18 @@ export default function PreventiviPage() {
           .eq('quote_id', quote.id)
         items = data || []
       }
+      // Enrich quote with contact data for PDF (company details)
+      const enriched = { ...quote }
+      const matchedContact = contacts.find(c =>
+        (c.email && c.email === quote.client_email) ||
+        (c.name && c.name === quote.client_name) ||
+        (c.company_name && c.company_name === quote.client_name)
+      )
+      if (matchedContact) enriched._contact = matchedContact
       const res  = await fetch('/api/email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'quote', quote, items }),
+        body: JSON.stringify({ type: 'quote', quote: enriched, items }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Errore invio email')
@@ -991,24 +1007,42 @@ export default function PreventiviPage() {
             </div>
             <div className="max-h-64 overflow-y-auto divide-y divide-border/50 rounded-lg border border-border">
               {contacts
-                .filter((c) => !contactSearch || c.name.toLowerCase().includes(contactSearch.toLowerCase()))
-                .map((c) => (
-                  <button key={c.id}
-                    onClick={() => {
-                      setForm((f) => ({ ...f, client_name: c.name, client_email: c.email || f.client_email }))
-                      setShowContactPicker(false)
-                    }}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/40 transition text-left">
-                    <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <User className="w-3.5 h-3.5 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{c.name}</p>
-                      {c.email && <p className="text-xs text-muted-foreground truncate">{c.email}</p>}
-                    </div>
-                  </button>
-                ))}
-              {contacts.filter((c) => !contactSearch || c.name.toLowerCase().includes(contactSearch.toLowerCase())).length === 0 && (
+                .filter((c) => {
+                  if (!contactSearch) return true
+                  const s = contactSearch.toLowerCase()
+                  return c.name?.toLowerCase().includes(s) || c.company_name?.toLowerCase().includes(s) || c.email?.toLowerCase().includes(s)
+                })
+                .map((c) => {
+                  const isCompany = c.contact_type === 'company'
+                  const label = isCompany ? (c.company_name || c.name) : c.name
+                  return (
+                    <button key={c.id}
+                      onClick={() => {
+                        setForm((f) => ({
+                          ...f,
+                          client_name: label,
+                          client_email: c.email || f.client_email,
+                          _contact: c,
+                        }))
+                        setShowContactPicker(false)
+                      }}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/40 transition text-left">
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${isCompany ? 'bg-blue-500/10' : 'bg-primary/10'}`}>
+                        {isCompany ? <Building2 className="w-3.5 h-3.5 text-blue-400" /> : <User className="w-3.5 h-3.5 text-primary" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{label}</p>
+                        {isCompany && c.name && <p className="text-[11px] text-muted-foreground truncate">Ref. {c.name}</p>}
+                        {c.email && <p className="text-xs text-muted-foreground truncate">{c.email}</p>}
+                      </div>
+                    </button>
+                  )
+                })}
+              {contacts.filter((c) => {
+                if (!contactSearch) return true
+                const s = contactSearch.toLowerCase()
+                return c.name?.toLowerCase().includes(s) || c.company_name?.toLowerCase().includes(s) || c.email?.toLowerCase().includes(s)
+              }).length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-8">Nessun contatto trovato</p>
               )}
             </div>
