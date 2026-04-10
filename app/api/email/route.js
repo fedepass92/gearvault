@@ -68,7 +68,7 @@ export async function POST(request) {
 
       const clientHtml = `
         <div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
-          <div style="background:#1e3a5f;padding:24px;border-radius:8px 8px 0 0;">
+          <div style="background:#0f172a;padding:24px;border-radius:8px 8px 0 0;">
             ${logoHeaderHtml}
             <p style="color:#94a3b8;margin:4px 0 0;font-size:13px;">Preventivo attrezzatura</p>
           </div>
@@ -88,7 +88,7 @@ export async function POST(request) {
 
       const notifyHtml = `
         <div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
-          <div style="background:#1e3a5f;padding:24px;border-radius:8px 8px 0 0;">
+          <div style="background:#0f172a;padding:24px;border-radius:8px 8px 0 0;">
             <h1 style="color:white;margin:0;font-size:18px;">✅ Preventivo inviato</h1>
           </div>
           <div style="padding:24px;background:#f8fafc;border:1px solid #e2e8f0;border-top:none;">
