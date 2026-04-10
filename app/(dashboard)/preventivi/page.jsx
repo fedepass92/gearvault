@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
 import { exportQuotePDF } from '@/lib/pdf'
+import { getSuggestedRate, getDurationDiscount } from '@/lib/rental-rates'
 
 // ── Status config ──────────────────────────────────────────────────────────────
 const STATUS_CFG = {
@@ -73,6 +74,7 @@ export default function PreventiviPage() {
   // PDF export loading
   const [exportingId, setExportingId] = useState(null)
   const [sendingEmail, setSendingEmail] = useState(false)
+  const [discountPct, setDiscountPct] = useState(0)
   const [showItemPicker, setShowItemPicker] = useState(false)
   const [itemPickerSearch, setItemPickerSearch] = useState('')
 
@@ -90,7 +92,7 @@ export default function PreventiviPage() {
 
   useEffect(() => {
     fetchQuotes()
-    getSupabase().from('equipment').select('id, name, brand, model, category, market_value, photo_url')
+    getSupabase().from('equipment').select('id, name, brand, model, category, purchase_price, market_value, photo_url')
       .eq('condition', 'active').order('name')
       .then(({ data }) => setEquipment(data || []))
   }, [fetchQuotes])
@@ -113,6 +115,7 @@ export default function PreventiviPage() {
     setEditingQuote(null)
     setForm(EMPTY_QUOTE)
     setQuoteItems([])
+    setDiscountPct(0)
     setFormError('')
     setShowModal(true)
   }
@@ -131,8 +134,10 @@ export default function PreventiviPage() {
     const { data } = await supabase.from('quote_items').select('*').eq('quote_id', quote.id)
     setQuoteItems((data || []).map((i) => ({
       item_id: i.item_id, quantity: i.quantity ?? 1,
+      days: i.days ?? 1,
       daily_rate: i.daily_rate ?? '', notes: i.notes ?? '',
     })))
+    setDiscountPct(parseFloat(quote.discount_pct) || 0)
     setFormError('')
     setShowModal(true)
     setDetailQuote(null)
@@ -141,10 +146,14 @@ export default function PreventiviPage() {
   function addItem(itemId) {
     if (!itemId || quoteItems.find((i) => i.item_id === itemId)) return
     const eq = equipment.find((e) => e.id === itemId)
+    const suggested = eq?.purchase_price
+      ? getSuggestedRate(eq.category, parseFloat(eq.purchase_price))
+      : null
     setQuoteItems((prev) => [...prev, {
       item_id: itemId,
       quantity: 1,
-      daily_rate: eq?.market_value ? String(parseFloat(eq.market_value).toFixed(0)) : '',
+      days: 1,
+      daily_rate: suggested ? String(suggested.daily) : (eq?.market_value ? String(parseFloat(eq.market_value).toFixed(0)) : ''),
       notes: '',
     }])
   }
@@ -173,6 +182,7 @@ export default function PreventiviPage() {
         client_email: form.client_email || null,
         event_date: form.event_date || null,
         notes: form.notes || null,
+        discount_pct: discountPct || 0,
       }).eq('id', editingQuote.id)
       if (error) { setFormError(error.message); setSaving(false); return }
       quoteId = editingQuote.id
@@ -187,6 +197,7 @@ export default function PreventiviPage() {
         event_date: form.event_date || null,
         notes: form.notes || null,
         status: 'draft',
+        discount_pct: discountPct || 0,
       }).select().single()
       if (error || !newQ) { setFormError(error?.message || 'Errore'); setSaving(false); return }
       quoteId = newQ.id
@@ -198,6 +209,7 @@ export default function PreventiviPage() {
           quote_id: quoteId,
           item_id: i.item_id,
           quantity: parseInt(i.quantity) || 1,
+          days: parseInt(i.days) || 1,
           daily_rate: i.daily_rate !== '' ? parseFloat(i.daily_rate) : null,
           notes: i.notes || null,
         }))
@@ -325,7 +337,16 @@ export default function PreventiviPage() {
   })
 
   const totalValue = (items) =>
-    items.reduce((sum, i) => sum + (parseFloat(i.daily_rate || 0) * (parseInt(i.quantity) || 1)), 0)
+    items.reduce((sum, i) => sum + (parseFloat(i.daily_rate || 0) * (parseInt(i.quantity) || 1) * (parseInt(i.days) || 1)), 0)
+
+  function calcBreakdown(items, dPct) {
+    const subtotal = totalValue(items)
+    const pct = parseFloat(dPct) || 0
+    const discountAmt = subtotal * pct / 100
+    const net = subtotal - discountAmt
+    const iva = net * 0.22
+    return { subtotal, pct, discountAmt, net, iva, total: net + iva }
+  }
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
@@ -333,7 +354,7 @@ export default function PreventiviPage() {
   if (detailQuote) {
     const cfg = STATUS_CFG[detailQuote.status] || STATUS_CFG.draft
     const nextStatus = STATUS_FLOW[detailQuote.status]
-    const tv = totalValue(detailItems)
+    const breakdown = calcBreakdown(detailItems, detailQuote.discount_pct)
 
     return (
       <div className="space-y-5 max-w-3xl">
@@ -437,11 +458,6 @@ export default function PreventiviPage() {
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Attrezzatura — {detailItems.length} item
             </p>
-            {tv > 0 && (
-              <p className="text-sm font-bold text-foreground">
-                Totale: € {tv.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
-              </p>
-            )}
           </div>
           {detailLoading ? (
             <div className="flex justify-center py-10">
@@ -453,7 +469,9 @@ export default function PreventiviPage() {
             <div className="divide-y divide-border/50">
               {detailItems.map((qi) => {
                 const eq = qi.equipment
-                const lineTotal = parseFloat(qi.daily_rate || 0) * (parseInt(qi.quantity) || 1)
+                const qty = parseInt(qi.quantity) || 1
+                const days = parseInt(qi.days) || 1
+                const lineTotal = parseFloat(qi.daily_rate || 0) * qty * days
                 return (
                   <div key={qi.id} className="flex items-center gap-3 px-5 py-3.5">
                     {eq?.photo_url ? (
@@ -471,7 +489,7 @@ export default function PreventiviPage() {
                       {qi.notes && <p className="text-xs text-muted-foreground/60 mt-0.5 truncate">{qi.notes}</p>}
                     </div>
                     <div className="text-right flex-shrink-0 space-y-0.5">
-                      <p className="text-xs text-muted-foreground">Qt. {qi.quantity}</p>
+                      <p className="text-xs text-muted-foreground">Qt. {qty} × {days} gg</p>
                       {qi.daily_rate != null && (
                         <p className="text-xs font-medium">€ {parseFloat(qi.daily_rate).toLocaleString('it-IT')} / gg</p>
                       )}
@@ -483,6 +501,42 @@ export default function PreventiviPage() {
             </div>
           )}
         </div>
+
+        {/* Financial breakdown */}
+        {breakdown.subtotal > 0 && (
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-border">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Riepilogo economico</p>
+            </div>
+            <div className="px-5 py-4 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Subtotale</span>
+                <span className="font-medium">€ {breakdown.subtotal.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</span>
+              </div>
+              {breakdown.pct > 0 && (
+                <div className="flex justify-between text-sm text-emerald-400">
+                  <span>Sconto {breakdown.pct}%</span>
+                  <span>- € {breakdown.discountAmt.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</span>
+                </div>
+              )}
+              {breakdown.pct > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Totale netto</span>
+                  <span className="font-medium">€ {breakdown.net.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>IVA 22%</span>
+                <span>€ {breakdown.iva.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</span>
+              </div>
+              <Separator />
+              <div className="flex justify-between text-base font-bold">
+                <span>Totale ivato</span>
+                <span>€ {breakdown.total.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Delete dialog */}
         <Dialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null) }}>
@@ -690,54 +744,120 @@ export default function PreventiviPage() {
 
               {/* Items list */}
               {quoteItems.length > 0 && (
-                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                   {quoteItems.map((qi) => {
                     const eq = equipment.find((e) => e.id === qi.item_id)
+                    const suggested = eq?.purchase_price
+                      ? getSuggestedRate(eq.category, parseFloat(eq.purchase_price))
+                      : null
                     return (
-                      <div key={qi.item_id} className="flex items-center gap-2 bg-muted/40 rounded-lg px-3 py-2 border border-border/50">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold truncate">{eq?.name || qi.item_id}</p>
-                          {eq?.brand && <p className="text-[10px] text-muted-foreground">{eq.brand}</p>}
-                        </div>
-                        <div className="flex items-center gap-1.5 flex-shrink-0">
-                          <div className="flex items-center gap-1">
-                            <Hash className="w-3 h-3 text-muted-foreground" />
-                            <Input
-                              type="number" min="1"
-                              value={qi.quantity}
-                              onChange={(e) => updateItem(qi.item_id, 'quantity', e.target.value)}
-                              className="h-6 w-14 text-xs px-1.5"
-                            />
+                      <div key={qi.item_id} className="bg-muted/40 rounded-lg px-3 py-2 border border-border/50">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold truncate">{eq?.name || qi.item_id}</p>
+                            {eq?.brand && <p className="text-[10px] text-muted-foreground">{eq.brand}</p>}
                           </div>
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs text-muted-foreground">€</span>
-                            <Input
-                              type="number" min="0" step="0.01"
-                              value={qi.daily_rate}
-                              onChange={(e) => updateItem(qi.item_id, 'daily_rate', e.target.value)}
-                              className="h-6 w-20 text-xs px-1.5"
-                              placeholder="tariffa"
-                            />
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <div className="flex items-center gap-1" title="Quantità">
+                              <Hash className="w-3 h-3 text-muted-foreground" />
+                              <Input
+                                type="number" min="1"
+                                value={qi.quantity}
+                                onChange={(e) => updateItem(qi.item_id, 'quantity', e.target.value)}
+                                className="h-6 w-12 text-xs px-1.5"
+                              />
+                            </div>
+                            <div className="flex items-center gap-1" title="Giorni">
+                              <Calendar className="w-3 h-3 text-muted-foreground" />
+                              <Input
+                                type="number" min="1"
+                                value={qi.days}
+                                onChange={(e) => updateItem(qi.item_id, 'days', e.target.value)}
+                                className="h-6 w-12 text-xs px-1.5"
+                              />
+                            </div>
+                            <div className="flex items-center gap-1" title="Tariffa giornaliera">
+                              <span className="text-xs text-muted-foreground">€</span>
+                              <Input
+                                type="number" min="0" step="1"
+                                value={qi.daily_rate}
+                                onChange={(e) => updateItem(qi.item_id, 'daily_rate', e.target.value)}
+                                className="h-6 w-18 text-xs px-1.5"
+                                placeholder="tariffa"
+                              />
+                            </div>
+                            <button onClick={() => removeItem(qi.item_id)}
+                              className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition">
+                              <X className="w-3 h-3" />
+                            </button>
                           </div>
-                          <button onClick={() => removeItem(qi.item_id)}
-                            className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition">
-                            <X className="w-3 h-3" />
-                          </button>
                         </div>
+                        {suggested && eq?.purchase_price && (
+                          <p className="text-[10px] text-muted-foreground mt-1 pl-0.5">
+                            Suggerito: €{suggested.daily}/g ({suggested.label} di €{parseFloat(eq.purchase_price).toLocaleString('it-IT')})
+                          </p>
+                        )}
                       </div>
                     )
                   })}
                 </div>
               )}
 
-              {/* Total */}
-              {quoteItems.some((i) => parseFloat(i.daily_rate) > 0) && (
-                <div className="flex justify-end">
-                  <p className="text-sm font-bold">
-                    Totale: € {totalValue(quoteItems).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
-              )}
+              {/* Discount + summary */}
+              {quoteItems.some((i) => parseFloat(i.daily_rate) > 0) && (() => {
+                const maxDays = Math.max(...quoteItems.map((qi) => parseInt(qi.days) || 1))
+                const suggestedDisc = getDurationDiscount(maxDays)
+                const bd = calcBreakdown(quoteItems, discountPct)
+                return (
+                  <div className="space-y-3 pt-1">
+                    <Separator />
+                    <div className="flex items-center gap-3">
+                      <Label className="text-xs text-muted-foreground whitespace-nowrap">Sconto %</Label>
+                      <Input
+                        type="number" min="0" max="100" step="1"
+                        value={discountPct}
+                        onChange={(e) => setDiscountPct(parseFloat(e.target.value) || 0)}
+                        className="h-7 w-20 text-xs px-2"
+                      />
+                      {suggestedDisc > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setDiscountPct(suggestedDisc)}
+                          className="text-[10px] text-muted-foreground hover:text-primary transition"
+                        >
+                          Suggerito: -{suggestedDisc}% per {maxDays} giorni
+                        </button>
+                      )}
+                    </div>
+                    <div className="space-y-1 text-xs">
+                      <div className="flex justify-between text-muted-foreground">
+                        <span>Subtotale</span>
+                        <span>€ {bd.subtotal.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      {bd.pct > 0 && (
+                        <div className="flex justify-between text-emerald-400">
+                          <span>Sconto {bd.pct}%</span>
+                          <span>- € {bd.discountAmt.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      )}
+                      {bd.pct > 0 && (
+                        <div className="flex justify-between text-muted-foreground">
+                          <span>Totale netto</span>
+                          <span>€ {bd.net.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-muted-foreground">
+                        <span>IVA 22%</span>
+                        <span>€ {bd.iva.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="flex justify-between font-bold text-sm border-t border-border pt-1 mt-1">
+                        <span>Totale ivato</span>
+                        <span>€ {bd.total.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
           </div>
 

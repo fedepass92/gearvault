@@ -314,3 +314,9 @@ CREATE POLICY "Authenticated can delete equipment photos" ON storage.objects FOR
 --
 -- 6. Public read policy for equipment (required for /item/[id] public page)
 -- CREATE POLICY "Public can view equipment" ON equipment FOR SELECT TO anon USING (true);
+--
+-- ── v5 migrations ─────────────────────────────────────────────────────────────
+--
+-- 7. Rental rate algorithm: days per item + discount % on quote
+-- ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS days INTEGER DEFAULT 1;
+-- ALTER TABLE quotes ADD COLUMN IF NOT EXISTS discount_pct DECIMAL(5,2) DEFAULT 0;
