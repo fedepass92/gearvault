@@ -447,8 +447,27 @@ export default function AmmortamentoPage() {
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 8 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-                        <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} tickFormatter={(v) => `€${v.toLocaleString('it-IT')}`} width={60} />
+                        <XAxis
+                          dataKey="label"
+                          tickLine={false}
+                          axisLine={false}
+                          interval="preserveStartEnd"
+                          tick={({ x, y, payload }) => (
+                            <text x={x} y={y} dy={12} textAnchor="middle" style={{ fill: 'hsl(var(--muted-foreground))', fontSize: '10px' }}>
+                              {payload.value}
+                            </text>
+                          )}
+                        />
+                        <YAxis
+                          tickLine={false}
+                          axisLine={false}
+                          width={60}
+                          tick={({ x, y, payload }) => (
+                            <text x={x} y={y} dy={4} textAnchor="end" style={{ fill: 'hsl(var(--muted-foreground))', fontSize: '10px' }}>
+                              €{Number(payload.value).toLocaleString('it-IT')}
+                            </text>
+                          )}
+                        />
                         <Tooltip content={<CustomTooltip />} />
                         <ReferenceLine
                           x={chartData.find((p) => p.month >= nowMonths)?.label}
