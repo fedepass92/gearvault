@@ -40,6 +40,7 @@ export async function POST(request) {
       const companyName  = settings.company_name  || 'Brain Digital'
       const companyEmail = settings.company_email || 'info@braindigital.it'
       const notifyEmail  = settings.notification_email || companyEmail
+      const logoUrl      = settings.company_logo_light || ''
 
       // Generate PDF buffer
       console.log('[quote] generating PDF buffer...')
@@ -61,10 +62,14 @@ export async function POST(request) {
         ? `<p style="margin:0 0 8px;">📅 Data evento: <strong>${new Date(quote.event_date).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}</strong></p>`
         : ''
 
+      const logoHeaderHtml = logoUrl
+        ? `<img src="${logoUrl}" alt="${companyName}" height="40" style="height:40px;display:block;max-width:200px;object-fit:contain;margin-bottom:4px;">`
+        : `<h1 style="color:white;margin:0;font-size:20px;">${companyName}</h1>`
+
       const clientHtml = `
         <div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
           <div style="background:#1e3a5f;padding:24px;border-radius:8px 8px 0 0;">
-            <h1 style="color:white;margin:0;font-size:20px;">${companyName}</h1>
+            ${logoHeaderHtml}
             <p style="color:#94a3b8;margin:4px 0 0;font-size:13px;">Preventivo attrezzatura</p>
           </div>
           <div style="padding:24px;background:#f8fafc;border:1px solid #e2e8f0;border-top:none;">
@@ -169,8 +174,15 @@ export async function POST(request) {
       })
       const setupUrl = linkData?.properties?.action_link || `${origin}/imposta-password`
 
+      // Load logo for branding
+      let inviteLogoUrl = ''
+      try {
+        const { data: logoRow } = await admin.from('app_settings').select('value').eq('key', 'company_logo_light').single()
+        inviteLogoUrl = logoRow?.value || ''
+      } catch { /* fallback */ }
+
       // Send branded email with the setup link
-      ;({ subject, html } = inviteTemplate({ inviteeEmail: to, inviterName: data.inviterName || null, loginUrl: setupUrl }))
+      ;({ subject, html } = inviteTemplate({ inviteeEmail: to, inviterName: data.inviterName || null, loginUrl: setupUrl, logoUrl: inviteLogoUrl }))
 
       const { data: result, error } = await getResendClient().emails.send({
         from: `${FROM_NAME} <${FROM_EMAIL}>`,

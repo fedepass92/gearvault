@@ -315,6 +315,16 @@ CREATE POLICY "Authenticated can delete equipment photos" ON storage.objects FOR
 -- 6. Public read policy for equipment (required for /item/[id] public page)
 -- CREATE POLICY "Public can view equipment" ON equipment FOR SELECT TO anon USING (true);
 --
+-- ── v6 migrations ─────────────────────────────────────────────────────────────
+--
+-- Logo bucket (create manually in Supabase Dashboard → Storage → New bucket)
+--   Name: logos | Public: true | Allowed MIME types: image/png, image/svg+xml
+-- INSERT INTO storage.buckets (id, name, public) VALUES ('logos', 'logos', true) ON CONFLICT DO NOTHING;
+-- CREATE POLICY "Public read for logos" ON storage.objects FOR SELECT USING (bucket_id = 'logos');
+-- CREATE POLICY "Admin can upload logos" ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id = 'logos');
+-- CREATE POLICY "Admin can update logos" ON storage.objects FOR UPDATE TO authenticated USING (bucket_id = 'logos');
+-- CREATE POLICY "Admin can delete logos" ON storage.objects FOR DELETE TO authenticated USING (bucket_id = 'logos');
+--
 -- ── v5 migrations ─────────────────────────────────────────────────────────────
 --
 -- 7. Rental rate algorithm: days per item + discount % on quote + date range

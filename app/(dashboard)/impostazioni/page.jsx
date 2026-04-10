@@ -137,12 +137,66 @@ function PasswordInput({ value, onChange, placeholder, autoComplete }) {
   )
 }
 
+// ── Logo upload slot ──────────────────────────────────────────────────────────
+function LogoSlot({ title, hint, accept, uploading, url, onUpload, onRemove }) {
+  const inputRef = useRef(null)
+  return (
+    <div className="space-y-2">
+      <div className="flex items-start justify-between gap-1">
+        <div>
+          <p className="text-xs font-semibold">{title}</p>
+          <p className="text-[11px] text-muted-foreground leading-snug">{hint}</p>
+        </div>
+        {url && (
+          <button onClick={onRemove} className="p-0.5 text-muted-foreground hover:text-destructive transition flex-shrink-0 mt-0.5" title="Rimuovi">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+
+      <div
+        className={`border-2 border-dashed rounded-lg transition-colors ${url ? 'border-border bg-muted/20' : 'border-border hover:border-primary/40 cursor-pointer'}`}
+        style={{ minHeight: 68 }}
+        onClick={() => { if (!url && !uploading) inputRef.current?.click() }}
+      >
+        {url ? (
+          <div className="flex items-center justify-center p-3" style={{ minHeight: 68 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={url} alt={title} className="max-h-12 max-w-full object-contain" />
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center gap-1 p-3" style={{ minHeight: 68 }}>
+            {uploading
+              ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+              : <><Upload className="w-4 h-4 text-muted-foreground" /><span className="text-[11px] text-muted-foreground">Clicca per caricare</span></>
+            }
+          </div>
+        )}
+      </div>
+
+      {url && (
+        <button className="text-[11px] text-muted-foreground hover:text-foreground underline" onClick={() => inputRef.current?.click()} disabled={uploading}>
+          Sostituisci
+        </button>
+      )}
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f); e.target.value = '' }}
+      />
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function ImpostazioniPage() {
   const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [logoUploading, setLogoUploading] = useState(false)
+  const [logoUploading, setLogoUploading] = useState({})
   const [isAdmin, setIsAdmin] = useState(false)
   const [pwdLoading, setPwdLoading] = useState(false)
   const [currentEmail, setCurrentEmail] = useState('')
@@ -151,8 +205,6 @@ export default function ImpostazioniPage() {
   const [newPwd, setNewPwd] = useState('')
   const [confirmPwd, setConfirmPwd] = useState('')
   const [changePwdLoading, setChangePwdLoading] = useState(false)
-  const logoInputRef = useRef(null)
-
   useEffect(() => {
     async function init() {
       const supabase = getSupabase()
@@ -187,20 +239,34 @@ export default function ImpostazioniPage() {
     }
   }
 
-  async function handleLogoUpload(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setLogoUploading(true)
+  async function handleLogoUpload(slotKey, file) {
+    const isSvg = slotKey === 'svg'
+    const maxBytes = isSvg ? 1 * 1024 * 1024 : 2 * 1024 * 1024
+    if (file.size > maxBytes) { toast.error(`File troppo grande (max ${isSvg ? '1' : '2'}MB)`); return }
+    setLogoUploading((p) => ({ ...p, [slotKey]: true }))
     const supabase = getSupabase()
     const ext = file.name.split('.').pop()
-    const { error } = await supabase.storage.from('settings').upload(`logo.${ext}`, file, { upsert: true })
-    if (error) { toast.error('Errore upload logo'); setLogoUploading(false); return }
-    const { data: { publicUrl } } = supabase.storage.from('settings').getPublicUrl(`logo.${ext}`)
+    const path = `${slotKey}.${ext}`
+    const { error } = await supabase.storage.from('logos').upload(path, file, { upsert: true, contentType: file.type })
+    if (error) { toast.error(`Errore upload: ${error.message}`); setLogoUploading((p) => ({ ...p, [slotKey]: false })); return }
+    const { data: { publicUrl } } = supabase.storage.from('logos').getPublicUrl(path)
     const url = `${publicUrl}?t=${Date.now()}`
-    await saveSetting('logo_url', url)
-    set('logo_url', url)
-    setLogoUploading(false)
+    const settingKey = `company_logo_${slotKey}`
+    await saveSetting(settingKey, url)
+    set(settingKey, url)
+    setLogoUploading((p) => ({ ...p, [slotKey]: false }))
     toast.success('Logo aggiornato')
+  }
+
+  async function handleLogoRemove(slotKey) {
+    const supabase = getSupabase()
+    const { data: files } = await supabase.storage.from('logos').list()
+    const toDelete = (files || []).filter((f) => f.name.startsWith(`${slotKey}.`)).map((f) => f.name)
+    if (toDelete.length > 0) await supabase.storage.from('logos').remove(toDelete)
+    const settingKey = `company_logo_${slotKey}`
+    await saveSetting(settingKey, '')
+    set(settingKey, '')
+    toast.success('Logo rimosso')
   }
 
   async function handlePasswordReset() {
@@ -302,26 +368,53 @@ export default function ImpostazioniPage() {
         <TabsContent value="account" className="mt-6">
           <div className="bg-card border border-border rounded-xl p-6 space-y-6">
             <Section title="Account Brain Digital" description="Dati identificativi dell'organizzazione">
-              {/* Logo */}
-              <SettingRow label="Logo aziendale" hint="Usato nelle intestazioni PDF e nelle etichette">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3">
-                    <div className="w-14 h-14 rounded-lg border border-border bg-muted flex items-center justify-center overflow-hidden">
-                      {settings.logo_url ? (
-                        <Image src={settings.logo_url} alt="Logo" width={56} height={56} className="object-contain" />
-                      ) : (
-                        <ImageIcon className="w-5 h-5 text-muted-foreground" />
-                      )}
-                    </div>
-                    <Button size="sm" variant="outline" onClick={() => logoInputRef.current?.click()} disabled={logoUploading}>
-                      {logoUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-                      Carica logo
-                    </Button>
-                    <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">PNG o SVG con sfondo trasparente, min. 200×200px. Il logo viene salvato automaticamente al caricamento.</p>
+
+              {/* Logo slots */}
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm font-semibold">Logo aziendale</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Carica i loghi nei formati richiesti. Ogni slot viene salvato automaticamente al caricamento.</p>
                 </div>
-              </SettingRow>
+                <div className="grid grid-cols-2 gap-4">
+                  <LogoSlot
+                    title="Logo chiaro (PNG)"
+                    hint="Header PDF, email, app dark mode"
+                    accept="image/png"
+                    uploading={!!logoUploading.light}
+                    url={settings.company_logo_light || ''}
+                    onUpload={(f) => handleLogoUpload('light', f)}
+                    onRemove={() => handleLogoRemove('light')}
+                  />
+                  <LogoSlot
+                    title="Logo scuro (PNG)"
+                    hint="Body PDF e stampe su sfondo chiaro"
+                    accept="image/png"
+                    uploading={!!logoUploading.dark}
+                    url={settings.company_logo_dark || ''}
+                    onUpload={(f) => handleLogoUpload('dark', f)}
+                    onRemove={() => handleLogoRemove('dark')}
+                  />
+                  <LogoSlot
+                    title="Favicon (PNG)"
+                    hint="Icona browser e PWA (quadrata)"
+                    accept="image/png"
+                    uploading={!!logoUploading.favicon}
+                    url={settings.company_logo_favicon || ''}
+                    onUpload={(f) => handleLogoUpload('favicon', f)}
+                    onRemove={() => handleLogoRemove('favicon')}
+                  />
+                  <LogoSlot
+                    title="Logo SVG"
+                    hint="Qualità infinita, usato nell'app"
+                    accept=".svg,image/svg+xml"
+                    uploading={!!logoUploading.svg}
+                    url={settings.company_logo_svg || ''}
+                    onUpload={(f) => handleLogoUpload('svg', f)}
+                    onRemove={() => handleLogoRemove('svg')}
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground">PNG con sfondo trasparente, min. 400px larghezza. SVG max 1MB, tutti gli altri max 2MB.</p>
+              </div>
 
               <Separator />
 
