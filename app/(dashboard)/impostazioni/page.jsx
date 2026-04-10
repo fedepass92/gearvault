@@ -138,7 +138,7 @@ function PasswordInput({ value, onChange, placeholder, autoComplete }) {
 }
 
 // ── Logo upload slot ──────────────────────────────────────────────────────────
-function LogoSlot({ title, hint, accept, uploading, url, onUpload, onRemove }) {
+function LogoSlot({ title, hint, accept, uploading, url, onUpload, onRemove, sizeHint }) {
   const inputRef = useRef(null)
   return (
     <div className="space-y-2">
@@ -173,6 +173,8 @@ function LogoSlot({ title, hint, accept, uploading, url, onUpload, onRemove }) {
           </div>
         )}
       </div>
+
+      {sizeHint && <p className="text-xs text-muted-foreground">{sizeHint}</p>}
 
       {url && (
         <button className="text-[11px] text-muted-foreground hover:text-foreground underline" onClick={() => inputRef.current?.click()} disabled={uploading}>
@@ -384,6 +386,7 @@ export default function ImpostazioniPage() {
                     url={settings.company_logo_light || ''}
                     onUpload={(f) => handleLogoUpload('light', f)}
                     onRemove={() => handleLogoRemove('light')}
+                    sizeHint="Consigliato: 800×200px, sfondo trasparente, logo bianco"
                   />
                   <LogoSlot
                     title="Logo scuro (PNG)"
@@ -393,6 +396,7 @@ export default function ImpostazioniPage() {
                     url={settings.company_logo_dark || ''}
                     onUpload={(f) => handleLogoUpload('dark', f)}
                     onRemove={() => handleLogoRemove('dark')}
+                    sizeHint="Consigliato: 800×200px, sfondo trasparente, logo nero"
                   />
                   <LogoSlot
                     title="Favicon (PNG)"
@@ -402,6 +406,7 @@ export default function ImpostazioniPage() {
                     url={settings.company_logo_favicon || ''}
                     onUpload={(f) => handleLogoUpload('favicon', f)}
                     onRemove={() => handleLogoRemove('favicon')}
+                    sizeHint="Consigliato: 512×512px, quadrato"
                   />
                   <LogoSlot
                     title="Logo SVG"
@@ -411,6 +416,7 @@ export default function ImpostazioniPage() {
                     url={settings.company_logo_svg || ''}
                     onUpload={(f) => handleLogoUpload('svg', f)}
                     onRemove={() => handleLogoRemove('svg')}
+                    sizeHint="Nessun vincolo dimensionale, formato vettoriale"
                   />
                 </div>
                 <p className="text-[11px] text-muted-foreground">PNG con sfondo trasparente, min. 400px larghezza. SVG max 1MB, tutti gli altri max 2MB.</p>
