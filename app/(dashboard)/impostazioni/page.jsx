@@ -330,8 +330,40 @@ export default function ImpostazioniPage() {
               </SettingRow>
 
               <SettingRow label="Indirizzo" hint="Usato nei documenti ATA e report assicurativi">
-                <Input value={settings.company_address} onChange={(e) => set('company_address', e.target.value)} className="h-8 text-sm" placeholder="Via Roma 1, 00100 Roma" />
+                <Input value={settings.company_address} onChange={(e) => set('company_address', e.target.value)} className="h-8 text-sm" placeholder="Via Dietro Le Mura, 7" />
               </SettingRow>
+
+              <SettingRow label="Città / CAP">
+                <Input value={settings.company_city || ''} onChange={(e) => set('company_city', e.target.value)} className="h-8 text-sm" placeholder="83051 Nusco (AV)" />
+              </SettingRow>
+
+              <SettingRow label="Email aziendale" hint="Mostrata nei preventivi PDF">
+                <Input type="email" value={settings.company_email || ''} onChange={(e) => set('company_email', e.target.value)} className="h-8 text-sm" placeholder="info@braindigital.it" />
+              </SettingRow>
+
+              <SettingRow label="Telefono">
+                <Input value={settings.company_phone || ''} onChange={(e) => set('company_phone', e.target.value)} className="h-8 text-sm" placeholder="+39 0827 00000" />
+              </SettingRow>
+
+              <Separator />
+
+              <SettingRow label="P.IVA" hint="Stampata nei PDF preventivi e in footer">
+                <Input value={settings.company_vat || ''} onChange={(e) => set('company_vat', e.target.value)} className="h-8 text-sm" placeholder="02852040647" />
+              </SettingRow>
+
+              <SettingRow label="Codice Fiscale">
+                <Input value={settings.company_fiscal_code || ''} onChange={(e) => set('company_fiscal_code', e.target.value)} className="h-8 text-sm" placeholder="PSSFRC92S17A509F" />
+              </SettingRow>
+
+              <SettingRow label="Codice SDI" hint="Per fatturazione elettronica">
+                <Input value={settings.company_sdi || ''} onChange={(e) => set('company_sdi', e.target.value)} className="h-8 text-sm" placeholder="KRRH6B9" />
+              </SettingRow>
+
+              <SettingRow label="IBAN" hint="Mostrato in fondo ai preventivi PDF">
+                <Input value={settings.company_iban || ''} onChange={(e) => set('company_iban', e.target.value)} className="h-8 text-sm" placeholder="IT60 X054 2811 1010 0000 0123 456" />
+              </SettingRow>
+
+              <Separator />
 
               <SettingRow label="Email notifiche" hint="Indirizzo mittente per le notifiche automatiche">
                 <Input type="email" value={settings.notification_email} onChange={(e) => set('notification_email', e.target.value)} className="h-8 text-sm" placeholder="noreply@braindigital.it" />
@@ -351,7 +383,7 @@ export default function ImpostazioniPage() {
             </Section>
 
             <div className="flex justify-end pt-2">
-              <Button onClick={() => handleSave(['company_name', 'company_address', 'notification_email', 'currency'])} disabled={saving}>
+              <Button onClick={() => handleSave(['company_name', 'company_address', 'company_city', 'company_email', 'company_phone', 'company_vat', 'company_fiscal_code', 'company_sdi', 'company_iban', 'notification_email', 'currency'])} disabled={saving}>
                 {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                 Salva
               </Button>

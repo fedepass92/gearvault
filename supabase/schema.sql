@@ -317,6 +317,22 @@ CREATE POLICY "Authenticated can delete equipment photos" ON storage.objects FOR
 --
 -- ── v5 migrations ─────────────────────────────────────────────────────────────
 --
--- 7. Rental rate algorithm: days per item + discount % on quote
+-- 7. Rental rate algorithm: days per item + discount % on quote + date range
 -- ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS days INTEGER DEFAULT 1;
 -- ALTER TABLE quotes ADD COLUMN IF NOT EXISTS discount_pct DECIMAL(5,2) DEFAULT 0;
+-- ALTER TABLE quotes ADD COLUMN IF NOT EXISTS start_date DATE;
+-- ALTER TABLE quotes ADD COLUMN IF NOT EXISTS end_date DATE;
+--
+-- 8. Seed company settings for preventivi/PDF (run once — ON CONFLICT DO NOTHING)
+-- INSERT INTO app_settings (key, value) VALUES
+--   ('company_name',          'Brain Digital'),
+--   ('company_address',       'Via Dietro Le Mura, 7'),
+--   ('company_city',          '83051 Nusco (AV)'),
+--   ('company_email',         'info@braindigital.it'),
+--   ('company_phone',         ''),
+--   ('company_vat',           '02852040647'),
+--   ('company_fiscal_code',   'PSSFRC92S17A509F'),
+--   ('company_sdi',           'KRRH6B9'),
+--   ('company_iban',          ''),
+--   ('company_logo_url',      '')
+-- ON CONFLICT (key) DO NOTHING;
