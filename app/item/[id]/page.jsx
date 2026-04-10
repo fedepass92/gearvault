@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
-import { Package, AlertTriangle, Mail } from 'lucide-react'
+import { Package, Loader2 } from 'lucide-react'
 
 // ── Supabase anon client (no auth) ────────────────────────────────────────────
 function getAnonSupabase() {
@@ -14,10 +14,10 @@ function getAnonSupabase() {
 }
 
 // ── Brain Digital logo SVG ─────────────────────────────────────────────────────
-function BrainLogo({ width = 130 }) {
+function BrainLogo({ width = 120 }) {
   return (
-    <svg width={width} viewBox="0 0 723.29 271.79" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block' }}>
-      <g fill="#ffffff">
+    <svg width={width} viewBox="0 0 723.29 271.79" xmlns="http://www.w3.org/2000/svg" className="block">
+      <g fill="currentColor">
         <polygon points="16.75 238.09 16.75 256.69 33.22 256.69 35.34 254.61 35.34 240.22 33.22 238.09 16.75 238.09"/>
         <rect x="568.6" y="238.09" width="18.55" height="6.18"/>
         <path d="M0,223.49v48.3h723.29v-48.3H0ZM41.48,256.64l-6.18,6.18H10.56v-30.91h24.73l6.18,6.18v18.55ZM137.02,262.82h-6.18v-30.91h6.18v30.91ZM257.27,238.09h-24.73v18.55h18.55v-6.18h-12.36v-6.18h18.55v18.55h-30.91v-30.91h30.91v6.18ZM352.81,262.82h-6.18v-30.91h6.18v30.91ZM473.06,238.09h-12.36v24.73h-6.18v-24.73h-12.36v-6.18h30.91v6.18ZM593.33,262.82h-6.18v-12.36h-18.55v12.36h-6.18v-30.91h30.91v30.91ZM713.6,262.82h-30.91v-30.91h6.18v24.73h24.73v6.18Z"/>
@@ -31,11 +31,10 @@ function BrainLogo({ width = 130 }) {
   )
 }
 
-// Maps equipment.condition values
 const CONDITION_CONFIG = {
-  active:  { label: 'Attivo',        bg: '#10b98120', color: '#10b981', border: '#10b98140' },
-  repair:  { label: 'Manutenzione',  bg: '#f59e0b20', color: '#f59e0b', border: '#f59e0b40' },
-  retired: { label: 'Ritirato',      bg: '#64748b20', color: '#64748b', border: '#64748b40' },
+  active:  { label: 'Attivo',       className: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' },
+  repair:  { label: 'Manutenzione', className: 'bg-amber-500/15 text-amber-400 border border-amber-500/30' },
+  retired: { label: 'Ritirato',     className: 'bg-muted text-muted-foreground border border-border' },
 }
 
 const CATEGORY_LABELS = {
@@ -74,178 +73,12 @@ export default function PublicItemPage() {
     load()
   }, [id])
 
-  const s = {
-    page: {
-      minHeight: '100vh',
-      background: '#0f172a',
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-      color: '#f1f5f9',
-      padding: '24px 16px 48px',
-    },
-    maxW: {
-      maxWidth: 480,
-      margin: '0 auto',
-    },
-    logoBar: {
-      display: 'flex',
-      justifyContent: 'center',
-      marginBottom: 32,
-    },
-    card: {
-      background: '#1e293b',
-      border: '1px solid #334155',
-      borderRadius: 16,
-      overflow: 'hidden',
-      marginBottom: 16,
-    },
-    photoBox: {
-      width: '100%',
-      aspectRatio: '16/9',
-      background: '#0f172a',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      overflow: 'hidden',
-    },
-    body: {
-      padding: '20px 24px',
-    },
-    name: {
-      fontSize: 22,
-      fontWeight: 800,
-      color: '#ffffff',
-      margin: '0 0 4px',
-      lineHeight: 1.2,
-    },
-    sub: {
-      fontSize: 14,
-      color: '#94a3b8',
-      margin: '0 0 16px',
-    },
-    badgeRow: {
-      display: 'flex',
-      flexWrap: 'wrap',
-      gap: 8,
-      marginBottom: 20,
-    },
-    badge: (cfg) => ({
-      display: 'inline-block',
-      background: cfg.bg,
-      color: cfg.color,
-      border: `1px solid ${cfg.border}`,
-      borderRadius: 20,
-      fontSize: 11,
-      fontWeight: 700,
-      padding: '3px 10px',
-    }),
-    catBadge: {
-      display: 'inline-block',
-      background: '#2563eb20',
-      color: '#93c5fd',
-      border: '1px solid #2563eb40',
-      borderRadius: 20,
-      fontSize: 11,
-      fontWeight: 700,
-      padding: '3px 10px',
-    },
-    separator: {
-      height: 1,
-      background: '#334155',
-      margin: '16px 0',
-    },
-    fieldLabel: {
-      fontSize: 10,
-      fontWeight: 700,
-      color: '#64748b',
-      textTransform: 'uppercase',
-      letterSpacing: '0.08em',
-      marginBottom: 3,
-    },
-    fieldValue: {
-      fontSize: 14,
-      fontWeight: 600,
-      color: '#e2e8f0',
-    },
-    grid2: {
-      display: 'grid',
-      gridTemplateColumns: '1fr 1fr',
-      gap: 16,
-      marginBottom: 16,
-    },
-    notesBox: {
-      background: '#0f172a',
-      border: '1px solid #334155',
-      borderRadius: 10,
-      padding: '12px 16px',
-      fontSize: 13,
-      color: '#94a3b8',
-      lineHeight: 1.6,
-      whiteSpace: 'pre-wrap',
-    },
-    ownerCard: {
-      background: '#1e293b',
-      border: '1px solid #334155',
-      borderRadius: 16,
-      padding: '20px 24px',
-      marginBottom: 16,
-    },
-    ownerLabel: {
-      fontSize: 11,
-      fontWeight: 700,
-      color: '#64748b',
-      textTransform: 'uppercase',
-      letterSpacing: '0.08em',
-      marginBottom: 6,
-    },
-    ownerName: {
-      fontSize: 16,
-      fontWeight: 700,
-      color: '#ffffff',
-      margin: '0 0 2px',
-    },
-    returnBox: {
-      background: '#1e3a5f',
-      border: '1px solid #2563eb60',
-      borderRadius: 16,
-      padding: '20px 24px',
-      marginBottom: 16,
-    },
-    returnTitle: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: 10,
-      fontSize: 14,
-      fontWeight: 700,
-      color: '#93c5fd',
-      marginBottom: 10,
-    },
-    returnText: {
-      fontSize: 13,
-      color: '#cbd5e1',
-      lineHeight: 1.65,
-      margin: 0,
-    },
-    emailLink: {
-      color: '#60a5fa',
-      fontWeight: 600,
-      textDecoration: 'none',
-    },
-    disclaimer: {
-      textAlign: 'center',
-      fontSize: 10,
-      color: '#334155',
-      lineHeight: 1.6,
-      marginTop: 32,
-    },
-  }
-
   if (loading) {
     return (
-      <div style={{ ...s.page, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ width: 32, height: 32, border: '3px solid #334155', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
-          <p style={{ color: '#64748b', fontSize: 14 }}>Caricamento…</p>
-          <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      <div className="dark min-h-screen bg-background text-foreground flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">Caricamento…</p>
         </div>
       </div>
     )
@@ -253,11 +86,11 @@ export default function PublicItemPage() {
 
   if (notFound) {
     return (
-      <div style={{ ...s.page, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ textAlign: 'center', maxWidth: 320 }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
-          <p style={{ fontWeight: 700, fontSize: 18, color: '#f1f5f9', marginBottom: 8 }}>Oggetto non trovato</p>
-          <p style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
+      <div className="dark min-h-screen bg-background text-foreground flex items-center justify-center p-6">
+        <div className="text-center max-w-xs">
+          <div className="text-5xl mb-4">🔍</div>
+          <p className="text-lg font-bold mb-2">Oggetto non trovato</p>
+          <p className="text-sm text-muted-foreground leading-relaxed">
             Questo QR code non corrisponde a nessun oggetto registrato in GearVault.
           </p>
         </div>
@@ -270,71 +103,73 @@ export default function PublicItemPage() {
   const catIcon   = CATEGORY_ICONS[item.category] || '📦'
 
   return (
-    <div style={s.page}>
-      <div style={s.maxW}>
+    <div className="dark min-h-screen bg-background text-foreground px-4 py-6 pb-12">
+      <div className="max-w-sm mx-auto">
 
         {/* Logo */}
-        <div style={s.logoBar}>
+        <div className="flex justify-center mb-8 text-foreground">
           <BrainLogo width={120} />
         </div>
 
         {/* Main card */}
-        <div style={s.card}>
+        <div className="bg-card border border-border rounded-2xl overflow-hidden mb-4">
           {/* Photo */}
-          <div style={s.photoBox}>
+          <div className="w-full aspect-video bg-muted flex items-center justify-center overflow-hidden">
             {item.photo_url ? (
               <img
                 src={item.photo_url}
                 alt={item.name}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                className="w-full h-full object-cover"
               />
             ) : (
-              <div style={{ textAlign: 'center', opacity: 0.3 }}>
-                <div style={{ fontSize: 56, marginBottom: 8 }}>{catIcon}</div>
-                <p style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                  {catLabel}
-                </p>
+              <div className="text-center opacity-30">
+                <div className="text-5xl mb-2">{catIcon}</div>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{catLabel}</p>
               </div>
             )}
           </div>
 
           {/* Body */}
-          <div style={s.body}>
-            <h1 style={s.name}>{item.name}</h1>
-            {(item.brand || item.model) && (
-              <p style={s.sub}>{[item.brand, item.model].filter(Boolean).join(' · ')}</p>
-            )}
-
-            {/* Badges */}
-            <div style={s.badgeRow}>
-              {item.category && (
-                <span style={s.catBadge}>{catLabel}</span>
+          <div className="p-5 space-y-4">
+            <div>
+              <h1 className="text-xl font-extrabold leading-tight">{item.name}</h1>
+              {(item.brand || item.model) && (
+                <p className="text-sm text-muted-foreground mt-1">{[item.brand, item.model].filter(Boolean).join(' · ')}</p>
               )}
-              <span style={s.badge(statusCfg)}>{statusCfg?.label}</span>
             </div>
 
-            <div style={s.separator} />
+            {/* Badges */}
+            <div className="flex flex-wrap gap-2">
+              {item.category && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
+                  {catLabel}
+                </span>
+              )}
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusCfg.className}`}>
+                {statusCfg.label}
+              </span>
+            </div>
 
-            {/* Fields */}
-            <div style={s.grid2}>
+            <hr className="border-border" />
+
+            {/* Fields grid */}
+            <div className="grid grid-cols-2 gap-4 text-sm">
               {item.brand && (
                 <div>
-                  <p style={s.fieldLabel}>Brand</p>
-                  <p style={s.fieldValue}>{item.brand}</p>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-0.5">Brand</p>
+                  <p className="font-semibold">{item.brand}</p>
                 </div>
               )}
               {item.model && (
                 <div>
-                  <p style={s.fieldLabel}>Modello</p>
-                  <p style={s.fieldValue}>{item.model}</p>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-0.5">Modello</p>
+                  <p className="font-semibold">{item.model}</p>
                 </div>
               )}
               {item.serial_number && (
-                <div>
-                  <p style={s.fieldLabel}>Numero seriale</p>
-                  <p style={{ ...s.fieldValue, fontFamily: 'monospace', fontSize: 12, letterSpacing: '0.05em' }}>
-                    {item.serial_number}
-                  </p>
+                <div className="col-span-2">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-0.5">Numero seriale</p>
+                  <p className="font-mono text-xs font-semibold tracking-wide">{item.serial_number}</p>
                 </div>
               )}
             </div>
@@ -342,21 +177,22 @@ export default function PublicItemPage() {
             {/* Notes */}
             {item.notes && (
               <>
-                <div style={s.separator} />
-                <p style={s.fieldLabel}>Note</p>
-                <div style={s.notesBox}>{item.notes}</div>
+                <hr className="border-border" />
+                <div>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Note</p>
+                  <div className="bg-muted/50 border border-border rounded-xl px-4 py-3 text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                    {item.notes}
+                  </div>
+                </div>
               </>
             )}
           </div>
         </div>
 
-        {/* Return instructions box */}
-        <div style={s.returnBox}>
-          <div style={s.returnTitle}>
-            <span style={{ fontSize: 18 }}>📬</span>
-            Hai trovato questo oggetto?
-          </div>
-          <p style={s.returnText}>
+        {/* Return instructions */}
+        <div className="bg-primary/10 border border-primary/30 rounded-2xl p-5 mb-4">
+          <p className="text-sm font-bold text-primary mb-2">📬 Hai trovato questo oggetto?</p>
+          <p className="text-sm text-muted-foreground leading-relaxed">
             È attrezzatura professionale registrata su GearVault.
             Ti preghiamo di contattare il proprietario per organizzare la restituzione.
             Grazie per la tua collaborazione.
@@ -364,7 +200,7 @@ export default function PublicItemPage() {
         </div>
 
         {/* Disclaimer */}
-        <p style={s.disclaimer}>
+        <p className="text-center text-[10px] text-muted-foreground/40 leading-relaxed mt-6">
           Questa scheda è generata automaticamente da GearVault.<br />
           Le informazioni mostrate sono fornite dal proprietario dell&apos;attrezzatura.<br />
           Brain Digital non è responsabile per eventuali inesattezze.
