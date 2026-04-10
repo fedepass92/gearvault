@@ -228,34 +228,41 @@ export default function AmmortamentoPage() {
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={portfolioData.points} margin={{ top: 4, right: 16, bottom: 0, left: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis
                   dataKey="label"
-                  tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
                   tickLine={false}
                   axisLine={false}
                   interval={1}
+                  tick={({ x, y, payload }) => (
+                    <text x={x} y={y} dy={12} textAnchor="middle" style={{ fill: 'var(--muted-foreground)', fontSize: '10px' }}>
+                      {payload.value}
+                    </text>
+                  )}
                 />
                 <YAxis
-                  tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
                   tickLine={false}
                   axisLine={false}
-                  tickFormatter={(v) => `€${v.toLocaleString('it-IT')}`}
                   width={70}
+                  tick={({ x, y, payload }) => (
+                    <text x={x} y={y} dy={4} textAnchor="end" style={{ fill: 'var(--muted-foreground)', fontSize: '10px' }}>
+                      €{Number(payload.value).toLocaleString('it-IT')}
+                    </text>
+                  )}
                 />
                 <Tooltip content={<PortfolioTooltip />} />
                 <Legend
                   iconType="line"
                   iconSize={12}
-                  wrapperStyle={{ fontSize: '11px', color: 'hsl(var(--muted-foreground))', paddingTop: '12px' }}
+                  wrapperStyle={{ fontSize: '11px', color: 'var(--muted-foreground)', paddingTop: '12px' }}
                   formatter={(value) => value.length > 22 ? value.slice(0, 20) + '…' : value}
                 />
                 {todayLabel && (
                   <ReferenceLine
                     x={todayLabel}
-                    stroke="hsl(var(--primary))"
+                    stroke="var(--primary)"
                     strokeDasharray="4 2"
-                    label={{ value: 'oggi', position: 'insideTopRight', fontSize: 9, fill: 'hsl(var(--primary))' }}
+                    label={{ value: 'oggi', position: 'insideTopRight', fontSize: 9, fill: 'var(--primary)' }}
                   />
                 )}
                 {portfolioData.items.map((eq, i) => (
@@ -275,7 +282,7 @@ export default function AmmortamentoPage() {
                   type="monotone"
                   dataKey="total"
                   name="Totale"
-                  stroke="hsl(var(--foreground))"
+                  stroke="var(--foreground)"
                   strokeWidth={2.5}
                   dot={false}
                   activeDot={{ r: 4 }}
@@ -446,14 +453,14 @@ export default function AmmortamentoPage() {
                   <div className="h-44">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 8 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                         <XAxis
                           dataKey="label"
                           tickLine={false}
                           axisLine={false}
                           interval="preserveStartEnd"
                           tick={({ x, y, payload }) => (
-                            <text x={x} y={y} dy={12} textAnchor="middle" style={{ fill: 'hsl(var(--muted-foreground))', fontSize: '10px' }}>
+                            <text x={x} y={y} dy={12} textAnchor="middle" style={{ fill: 'var(--muted-foreground)', fontSize: '10px' }}>
                               {payload.value}
                             </text>
                           )}
@@ -463,7 +470,7 @@ export default function AmmortamentoPage() {
                           axisLine={false}
                           width={60}
                           tick={({ x, y, payload }) => (
-                            <text x={x} y={y} dy={4} textAnchor="end" style={{ fill: 'hsl(var(--muted-foreground))', fontSize: '10px' }}>
+                            <text x={x} y={y} dy={4} textAnchor="end" style={{ fill: 'var(--muted-foreground)', fontSize: '10px' }}>
                               €{Number(payload.value).toLocaleString('it-IT')}
                             </text>
                           )}
@@ -471,14 +478,14 @@ export default function AmmortamentoPage() {
                         <Tooltip content={<CustomTooltip />} />
                         <ReferenceLine
                           x={chartData.find((p) => p.month >= nowMonths)?.label}
-                          stroke="hsl(var(--primary))"
+                          stroke="var(--primary)"
                           strokeDasharray="4 2"
-                          label={{ value: 'oggi', position: 'top', fontSize: 9, fill: 'hsl(var(--primary))' }}
+                          label={{ value: 'oggi', position: 'top', fontSize: 9, fill: 'var(--primary)' }}
                         />
                         <Line
                           type="monotone"
                           dataKey="value"
-                          stroke="hsl(var(--primary))"
+                          stroke="var(--primary)"
                           strokeWidth={2}
                           dot={false}
                           activeDot={{ r: 4 }}
