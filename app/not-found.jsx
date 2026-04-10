@@ -2,7 +2,7 @@ import Link from 'next/link'
 
 function BrainLogoSVG() {
   return (
-    <svg width="120" viewBox="0 0 723.29 271.79" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block' }}>
+    <svg width="120" viewBox="0 0 723.29 271.79" xmlns="http://www.w3.org/2000/svg" className="block">
       <g fill="currentColor">
         <polygon points="16.75 238.09 16.75 256.69 33.22 256.69 35.34 254.61 35.34 240.22 33.22 238.09 16.75 238.09"/>
         <rect x="568.6" y="238.09" width="18.55" height="6.18"/>
@@ -19,8 +19,8 @@ function BrainLogoSVG() {
 
 export default function NotFound() {
   return (
-    <html lang="it" className="h-full">
-      <body className="h-full bg-[#F9F9FA] text-[#0f172a] antialiased" style={{ fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif" }}>
+    <html lang="it" className="h-full dark">
+      <body className="h-full bg-background text-foreground antialiased">
         <div className="min-h-full flex flex-col items-center justify-center px-6 py-16">
 
           {/* Logo */}
@@ -30,12 +30,11 @@ export default function NotFound() {
 
           {/* 404 */}
           <div className="text-center space-y-3 mb-10">
-            <p className="text-[120px] font-black leading-none tracking-tight text-[#0f172a] select-none"
-               style={{ fontFamily: "'Arial Black','Impact',sans-serif" }}>
+            <p className="text-[120px] font-black leading-none tracking-tight text-foreground select-none">
               404
             </p>
-            <p className="text-lg font-semibold text-[#0f172a]">Pagina non trovata</p>
-            <p className="text-sm text-[#64748b] max-w-xs mx-auto leading-relaxed">
+            <p className="text-lg font-semibold text-foreground">Pagina non trovata</p>
+            <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
               La pagina che stai cercando non esiste o è stata spostata.
             </p>
           </div>
@@ -44,30 +43,20 @@ export default function NotFound() {
           <div className="flex items-center gap-3">
             <Link
               href="/"
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: '8px',
-                background: '#0f172a', color: '#ffffff',
-                padding: '8px 20px', borderRadius: '8px',
-                fontSize: '14px', fontWeight: '600', textDecoration: 'none',
-              }}
+              className="inline-flex items-center gap-2 bg-foreground text-background px-5 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition"
             >
               ← Torna alla Dashboard
             </Link>
             <Link
               href="/inventario"
-              style={{
-                display: 'inline-flex', alignItems: 'center',
-                border: '1px solid #e2e8f0', background: '#ffffff',
-                color: '#0f172a', padding: '8px 20px', borderRadius: '8px',
-                fontSize: '14px', fontWeight: '500', textDecoration: 'none',
-              }}
+              className="inline-flex items-center border border-border bg-card text-foreground px-5 py-2 rounded-lg text-sm font-medium hover:bg-muted transition"
             >
               Inventario
             </Link>
           </div>
 
           {/* Footer */}
-          <p className="mt-16 text-xs text-[#94a3b8]">GearVault · Brain Digital</p>
+          <p className="mt-16 text-xs text-muted-foreground/50">GearVault · Brain Digital</p>
         </div>
       </body>
     </html>

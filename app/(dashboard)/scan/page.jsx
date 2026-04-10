@@ -171,7 +171,7 @@ export default function ScanPage() {
         {/* ── PHASE: scanning ── */}
         {phase === 'scanning' && (
           <div className="flex flex-col gap-4">
-            <div className="rounded-2xl overflow-hidden border border-slate-700 bg-slate-900">
+            <div className="rounded-2xl overflow-hidden border border-border bg-background">
               <QRScanner onScan={handleScan} />
             </div>
             <div className="text-center">
