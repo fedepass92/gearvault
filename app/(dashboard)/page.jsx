@@ -70,7 +70,7 @@ export default async function DashboardPage() {
       .order('job_date', { ascending: true }),
     // Recent activity feed
     supabase.from('movement_log')
-      .select('id, action, created_at, equipment(name), sets(name), profiles(full_name)')
+      .select('id, action, created_at, equipment(name), sets(name), profiles(full_name, email)')
       .order('created_at', { ascending: false })
       .limit(6),
     // Sets in the next 7 days — include sets that START before the window but END within it
@@ -107,17 +107,20 @@ export default async function DashboardPage() {
   }, {})
 
   // 7-day calendar strip: build days array
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(startOfDay(now), i + 1))
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(startOfDay(now), i))
 
-  // Left panel: upcoming if any, else recent
-  const leftSets = upcomingSets?.length > 0 ? upcomingSets : (recentSets || [])
+  // Left panel: upcoming if any, else recent — sorted by priority (out/planned first)
+  const leftSetsRaw = upcomingSets?.length > 0 ? upcomingSets : (recentSets || [])
+  const statusPriority = { out: 0, planned: 1, incomplete: 2, returned: 3 }
+  const leftSets = [...leftSetsRaw].sort((a, b) => (statusPriority[a.status] ?? 2) - (statusPriority[b.status] ?? 2))
   const leftTitle = upcomingSets?.length > 0 ? 'Prossimi lavori' : 'Ultimi set'
+  const allReturned = leftSets.length > 0 && leftSets.every((s) => s.status === 'returned')
 
   const stats = [
-    { label: 'Attrezzature totali', value: activeEquipment.length, icon: Package, color: 'blue' },
-    { label: 'Valore di mercato', value: `€ ${totalValue.toLocaleString('it-IT', { minimumFractionDigits: 0 })}`, icon: TrendingUp, color: 'emerald' },
-    { label: 'Item attualmente fuori', value: outCount, icon: ArrowUpRight, color: 'amber' },
-    { label: 'Set creati', value: setsTotal ?? 0, icon: Briefcase, color: 'purple' },
+    { label: 'Attrezzature totali', value: activeEquipment.length, icon: Package, color: 'blue', href: '/inventario' },
+    { label: 'Valore di mercato', value: `€ ${totalValue.toLocaleString('it-IT', { minimumFractionDigits: 0 })}`, icon: TrendingUp, color: 'emerald', href: '/ammortamento' },
+    { label: 'Attrezzature fuori', value: outCount, icon: ArrowUpRight, color: 'amber', href: '/prestiti' },
+    { label: 'Set totali', value: setsTotal ?? 0, icon: Briefcase, color: 'purple', href: '/set' },
   ]
 
   const colorMap = {
@@ -133,7 +136,7 @@ export default async function DashboardPage() {
       <div>
         <h1 className="text-xl font-bold">Dashboard</h1>
         <p className="text-muted-foreground text-sm mt-1">
-          {format(now, "EEEE d MMMM yyyy", { locale: it })}
+          {format(now, "EEEE d MMMM yyyy", { locale: it }).replace(/^./, (c) => c.toUpperCase())}
         </p>
       </div>
 
@@ -382,8 +385,12 @@ export default async function DashboardPage() {
                   <div className="text-[10px] text-muted-foreground uppercase tracking-wider px-1">
                     {format(day, 'EEE', { locale: it })}
                   </div>
-                  <div className={`text-sm font-semibold mt-0.5 px-1 ${daySets.length > 0 ? 'text-primary' : 'text-muted-foreground/50'}`}>
-                    {format(day, 'd')}
+                  <div className="mt-0.5 px-1 flex justify-center">
+                    {isSameDay(day, today) ? (
+                      <span className="bg-primary text-primary-foreground rounded-full w-7 h-7 flex items-center justify-center text-sm font-semibold">{format(day, 'd')}</span>
+                    ) : (
+                      <span className={`text-sm font-semibold ${daySets.length > 0 ? 'text-primary' : 'text-muted-foreground/50'}`}>{format(day, 'd')}</span>
+                    )}
                   </div>
                   {daySets.length > 0 && (
                     <div className="mt-1.5 space-y-0.5">
@@ -432,14 +439,41 @@ export default async function DashboardPage() {
       {/* Stats cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat) => (
-          <div key={stat.label} className="bg-card rounded-xl border border-border p-4">
+          <Link key={stat.label} href={stat.href} className="bg-card rounded-xl border border-border p-4 cursor-pointer hover:border-primary/50 transition">
             <div className={`inline-flex p-2 rounded-lg border ${colorMap[stat.color]} mb-3`}>
               <stat.icon className="w-4 h-4" />
             </div>
             <div className="text-xl font-bold">{stat.value}</div>
             <div className="text-xs text-muted-foreground mt-0.5">{stat.label}</div>
-          </div>
+          </Link>
         ))}
+      </div>
+
+      {/* Quick actions */}
+      <div>
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Azioni rapide</h2>
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          <Link href="/inventario" className="flex items-center gap-3 bg-card hover:bg-muted/30 border border-border rounded-xl p-4 transition group">
+            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400"><Plus className="w-4 h-4" /></div>
+            <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition">Nuova attrezzatura</span>
+          </Link>
+          <Link href="/set" className="flex items-center gap-3 bg-card hover:bg-muted/30 border border-border rounded-xl p-4 transition group">
+            <div className="p-2 rounded-lg bg-purple-500/10 text-purple-400"><Briefcase className="w-4 h-4" /></div>
+            <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition">Nuovo set</span>
+          </Link>
+          <Link href="/etichette" className="flex items-center gap-3 bg-card hover:bg-muted/30 border border-border rounded-xl p-4 transition group">
+            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400"><Tag className="w-4 h-4" /></div>
+            <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition">Stampa etichette</span>
+          </Link>
+          <Link href="/report" className="flex items-center gap-3 bg-card hover:bg-muted/30 border border-border rounded-xl p-4 transition group">
+            <div className="p-2 rounded-lg bg-muted text-muted-foreground"><FileText className="w-4 h-4" /></div>
+            <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition">Report assicurativo</span>
+          </Link>
+          <Link href="/manutenzione" className="flex items-center gap-3 bg-card hover:bg-muted/30 border border-border rounded-xl p-4 transition group">
+            <div className="p-2 rounded-lg bg-orange-500/10 text-orange-400"><AlertTriangle className="w-4 h-4" /></div>
+            <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition">Manutenzione</span>
+          </Link>
+        </div>
       </div>
 
       {/* Battery status breakdown */}
@@ -448,20 +482,21 @@ export default async function DashboardPage() {
           <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Stato batterie</h2>
           <div className="grid grid-cols-4 gap-3">
             {[
-              { key: 'charged', label: 'Cariche', color: 'text-emerald-400', bar: 'bg-emerald-400' },
-              { key: 'charging', label: 'In carica', color: 'text-primary', bar: 'bg-primary' },
-              { key: 'low', label: 'Scariche', color: 'text-red-400', bar: 'bg-red-400' },
-              { key: 'na', label: 'N/D', color: 'text-muted-foreground', bar: 'bg-muted-foreground/30' },
+              { key: 'charged', label: (c) => c === 1 ? 'Carica' : 'Cariche', color: 'text-emerald-400', bar: 'bg-emerald-400' },
+              { key: 'charging', label: () => 'In carica', color: 'text-primary', bar: 'bg-primary' },
+              { key: 'low', label: (c) => c === 1 ? 'Scarica' : 'Scariche', color: 'text-red-400', bar: 'bg-red-400' },
+              { key: 'na', label: () => 'Non rilevato', color: 'text-muted-foreground', bar: 'bg-muted-foreground/30' },
             ].map(({ key, label, color, bar }) => {
               const count = batteryBreakdown[key] || 0
               const total = Object.values(batteryBreakdown).reduce((s, v) => s + v, 0)
               return (
                 <div key={key} className="text-center">
                   <div className={`text-xl font-bold ${color}`}>{count}</div>
-                  <div className="text-xs text-muted-foreground mt-0.5 mb-1.5">{label}</div>
-                  <div className="h-1 bg-muted rounded-full overflow-hidden">
+                  <div className="text-xs text-muted-foreground mt-0.5 mb-1.5">{label(count)}</div>
+                  <div className="h-1 bg-muted rounded-full overflow-hidden relative">
                     <div className={`h-full ${bar} rounded-full`} style={{ width: total > 0 ? `${Math.round((count / total) * 100)}%` : '0%' }} />
                   </div>
+                  <div className="text-[10px] text-muted-foreground mt-1">{count}/{total}</div>
                 </div>
               )
             })}
@@ -485,6 +520,9 @@ export default async function DashboardPage() {
           <div className="divide-y divide-border/50">
             {leftSets.length === 0 && (
               <p className="text-sm text-muted-foreground px-5 py-6 text-center">Nessun set pianificato</p>
+            )}
+            {allReturned && (
+              <p className="text-xs text-muted-foreground px-5 pt-3 pb-1 text-center">Nessun set attivo al momento</p>
             )}
             {leftSets.map((set) => (
               <Link
@@ -529,9 +567,12 @@ export default async function DashboardPage() {
                     style={{ width: `${Math.round((count / (activeEquipment.length || 1)) * 100)}%` }}
                   />
                 </div>
-                <span className="text-xs font-medium w-6 text-right">{count}</span>
+                <span className="text-xs font-medium w-10 text-right tabular-nums">{count}/{activeEquipment.length}</span>
               </div>
             ))}
+            {(categoryCounts.altro || 0) > activeEquipment.length / 2 && (
+              <p className="text-xs text-muted-foreground/70 mt-2">Consiglio: categorizza meglio le attrezzature per una vista più utile</p>
+            )}
           </div>
         </div>
       </div>
@@ -556,7 +597,7 @@ export default async function DashboardPage() {
                     <p className="text-xs text-muted-foreground truncate">
                       {isOut ? 'Uscita' : 'Rientro'}
                       {m.sets?.name ? ` · ${m.sets.name}` : ''}
-                      {m.profiles?.full_name ? ` · ${m.profiles.full_name}` : ''}
+                      {(m.profiles?.full_name || m.profiles?.email) ? ` · ${m.profiles.full_name || m.profiles.email}` : ''}
                     </p>
                   </div>
                   <span className="text-xs text-muted-foreground flex-shrink-0">
@@ -569,32 +610,6 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {/* Quick actions */}
-      <div>
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Azioni rapide</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <Link href="/inventario" className="flex items-center gap-3 bg-card hover:bg-muted/30 border border-border rounded-xl p-4 transition group">
-            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400"><Plus className="w-4 h-4" /></div>
-            <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition">Nuova attrezzatura</span>
-          </Link>
-          <Link href="/set" className="flex items-center gap-3 bg-card hover:bg-muted/30 border border-border rounded-xl p-4 transition group">
-            <div className="p-2 rounded-lg bg-purple-500/10 text-purple-400"><Briefcase className="w-4 h-4" /></div>
-            <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition">Nuovo set</span>
-          </Link>
-          <Link href="/etichette" className="flex items-center gap-3 bg-card hover:bg-muted/30 border border-border rounded-xl p-4 transition group">
-            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400"><Tag className="w-4 h-4" /></div>
-            <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition">Stampa etichette</span>
-          </Link>
-          <Link href="/report" className="flex items-center gap-3 bg-card hover:bg-muted/30 border border-border rounded-xl p-4 transition group">
-            <div className="p-2 rounded-lg bg-muted text-muted-foreground"><FileText className="w-4 h-4" /></div>
-            <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition">Report assicurativo</span>
-          </Link>
-          <Link href="/manutenzione" className="flex items-center gap-3 bg-card hover:bg-muted/30 border border-border rounded-xl p-4 transition group">
-            <div className="p-2 rounded-lg bg-orange-500/10 text-orange-400"><AlertTriangle className="w-4 h-4" /></div>
-            <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition">Manutenzione</span>
-          </Link>
-        </div>
-      </div>
     </div>
   )
 }
