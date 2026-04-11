@@ -426,8 +426,8 @@ function ItemDetailModal({ item, onClose, onEdit, onDelete }) {
                     onClick={() => setActiveTab(value)}
                     className={`px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors duration-150 border-b-2 -mb-px ${
                       activeTab === value
-                        ? 'text-white border-blue-500'
-                        : 'text-slate-400 border-transparent hover:text-slate-200 hover:bg-white/5'
+                        ? 'text-foreground border-primary'
+                        : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted/50'
                     }`}
                   >
                     {label}
@@ -658,7 +658,7 @@ function ItemDetailModal({ item, onClose, onEdit, onDelete }) {
           </div>
         </ScrollArea>
 
-        <DialogFooter className="px-5 py-3 border-t border-border bg-muted/30 rounded-b-xl flex-row gap-2 justify-end">
+        <DialogFooter className="px-5 py-3 border-t border-border bg-card flex-row gap-2 justify-end">
           <Button variant="destructive" size="sm" onClick={onDelete}>
             <Trash2 className="w-3.5 h-3.5" />
             Elimina
@@ -992,7 +992,7 @@ function CSVImportModal({ open, onClose, onImported }) {
           )}
         </div>
 
-        <DialogFooter className="px-5 py-3 border-t border-border bg-muted/30 rounded-b-xl flex-row gap-2 justify-end">
+        <DialogFooter className="px-5 py-3 border-t border-border bg-card flex-row gap-2 justify-end">
           <Button variant="outline" onClick={handleClose}>Annulla</Button>
           <Button
             onClick={handleImport}

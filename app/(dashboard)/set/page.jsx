@@ -1134,7 +1134,7 @@ export default function SetPage() {
             </div>
           </div>
 
-          <DialogFooter className="px-5 py-3 border-t border-border bg-muted/20 gap-2">
+          <DialogFooter className="px-5 py-3 border-t border-border bg-card gap-2">
             <Button variant="outline" onClick={closeEditModal}>Annulla</Button>
             <Button onClick={handleEditSave} disabled={editSaving || !editForm.name.trim()}>
               {editSaving && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -1225,7 +1225,7 @@ export default function SetPage() {
                 )}
               </div>
             </div>
-            <DialogFooter className="px-5 py-3 border-t border-border bg-muted/20 gap-2">
+            <DialogFooter className="px-5 py-3 border-t border-border bg-card gap-2">
               <Button type="button" variant="outline" onClick={() => setShowNewTplModal(false)}>Annulla</Button>
               <Button type="submit" disabled={savingNewTpl || !newTplForm.name.trim()}>
                 {savingNewTpl && <Loader2 className="w-4 h-4 animate-spin" />}
