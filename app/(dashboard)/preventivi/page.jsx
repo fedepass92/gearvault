@@ -1283,7 +1283,7 @@ export default function PreventiviPage() {
 
       {/* ── DIALOG: Free Create / Edit ──────────────────────────────────────── */}
       <Dialog open={showFreeModal} onOpenChange={(o) => { if (!o) setShowFreeModal(false) }}>
-        <DialogContent className="max-w-4xl max-h-[92vh] flex flex-col gap-0 p-0">
+        <DialogContent className="max-w-5xl max-h-[92vh] flex flex-col gap-0 p-0">
           <DialogHeader className="px-6 pt-5 pb-4 border-b border-border flex-shrink-0">
             <DialogTitle>{editingFree ? 'Modifica preventivo libero' : 'Nuovo preventivo libero'}</DialogTitle>
           </DialogHeader>
