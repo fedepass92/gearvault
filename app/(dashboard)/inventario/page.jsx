@@ -1256,26 +1256,22 @@ export default function InventarioPage() {
             <Download className="w-4 h-4" />
             <span className="hidden sm:inline">Esporta CSV</span>
           </Button>
-          {isAdmin && (
-            <>
-              <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
-                <Upload className="w-4 h-4" />
-                <span className="hidden sm:inline">Importa CSV</span>
-              </Button>
-              {/* Mobile: wizard page */}
-              <Link
-                href="/inventario/nuovo"
-                className="sm:hidden inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition"
-              >
-                <Plus className="w-4 h-4" />
-              </Link>
-              {/* Desktop: modal */}
-              <Button size="sm" className="hidden sm:inline-flex" onClick={() => setEditModal('new')}>
-                <Plus className="w-4 h-4" />
-                Nuova
-              </Button>
-            </>
-          )}
+          <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+            <Upload className="w-4 h-4" />
+            <span className="hidden sm:inline">Importa CSV</span>
+          </Button>
+          {/* Mobile: wizard page */}
+          <Link
+            href="/inventario/nuovo"
+            className="sm:hidden inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition"
+          >
+            <Plus className="w-4 h-4" />
+          </Link>
+          {/* Desktop: modal */}
+          <Button size="sm" className="hidden sm:inline-flex" onClick={() => setEditModal('new')}>
+            <Plus className="w-4 h-4" />
+            Nuova
+          </Button>
         </div>
       </div>
 
@@ -1554,22 +1550,18 @@ export default function InventarioPage() {
                           >
                             <CheckCircle2 className="w-3.5 h-3.5" />
                           </button>
-                          {isAdmin && (
-                            <>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); setEditModal(item) }}
-                                className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); setDeleteConfirm(item) }}
-                                className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </>
-                          )}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setEditModal(item) }}
+                            className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setDeleteConfirm(item) }}
+                            className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </td>
                     </tr>

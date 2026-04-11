@@ -168,18 +168,14 @@ export default function ReportPage() {
             <Download className="w-4 h-4" />
             <span className="hidden sm:inline">CSV</span>
           </Button>
-          {isAdmin && (
-            <>
-              <Button size="sm" variant="outline" onClick={openCoverageSelect} disabled={equipment.length === 0}>
-                <CheckSquare className="w-4 h-4" />
-                <span className="hidden sm:inline">PDF copertura</span>
-              </Button>
-              <Button size="sm" onClick={handleExport} disabled={exportLoading || equipment.length === 0}>
-                {exportLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
-                <span className="hidden sm:inline">Esporta PDF</span>
-              </Button>
-            </>
-          )}
+          <Button size="sm" variant="outline" onClick={openCoverageSelect} disabled={equipment.length === 0}>
+            <CheckSquare className="w-4 h-4" />
+            <span className="hidden sm:inline">PDF copertura</span>
+          </Button>
+          <Button size="sm" onClick={handleExport} disabled={exportLoading || equipment.length === 0}>
+            {exportLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+            <span className="hidden sm:inline">Esporta PDF</span>
+          </Button>
         </div>
       </div>
 
