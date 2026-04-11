@@ -75,7 +75,7 @@ const VAT_OPTIONS = [
 ]
 
 const EMPTY_QUOTE = { title: '', client_name: '', client_email: '', start_date: '', end_date: '', notes: '' }
-const EMPTY_FREE_ITEM = { description: '', quantity: 1, unit_price: '' }
+const EMPTY_FREE_ITEM = { description: '', detail: '', quantity: 1, unit_price: '' }
 
 // ── Main page ──────────────────────────────────────────────────────────────────
 export default function PreventiviPage() {
@@ -236,6 +236,7 @@ export default function PreventiviPage() {
     const { data } = await getSupabase().from('quote_free_items').select('*').eq('quote_id', quote.id).order('created_at')
     setFreeItems((data || []).map((i) => ({
       description: i.description || '',
+      detail:      i.detail || '',
       quantity:    i.quantity ?? 1,
       unit_price:  i.unit_price != null ? String(i.unit_price) : '',
     })))
@@ -396,6 +397,7 @@ export default function PreventiviPage() {
       validItems.map((i) => ({
         quote_id:    quoteId,
         description: i.description.trim(),
+        detail:      i.detail?.trim() || null,
         quantity:    parseFloat(i.quantity) || 1,
         unit_price:  i.unit_price !== '' ? parseFloat(i.unit_price) : 0,
       }))
@@ -750,6 +752,7 @@ export default function PreventiviPage() {
                   <div key={item.id} className="flex items-center gap-3 px-5 py-3.5">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold">{item.description}</p>
+                      {item.detail && <p className="text-xs text-muted-foreground mt-0.5">{item.detail}</p>}
                     </div>
                     <div className="text-right flex-shrink-0 space-y-0.5">
                       <p className="text-xs text-muted-foreground">Qt. {qty} × {fmtEur(price)}</p>
@@ -1280,7 +1283,7 @@ export default function PreventiviPage() {
 
       {/* ── DIALOG: Free Create / Edit ──────────────────────────────────────── */}
       <Dialog open={showFreeModal} onOpenChange={(o) => { if (!o) setShowFreeModal(false) }}>
-        <DialogContent className="max-w-2xl max-h-[92vh] flex flex-col gap-0 p-0">
+        <DialogContent className="max-w-4xl max-h-[92vh] flex flex-col gap-0 p-0">
           <DialogHeader className="px-6 pt-5 pb-4 border-b border-border flex-shrink-0">
             <DialogTitle>{editingFree ? 'Modifica preventivo libero' : 'Nuovo preventivo libero'}</DialogTitle>
           </DialogHeader>
@@ -1356,20 +1359,32 @@ export default function PreventiviPage() {
                   const lineTotal = qty * price
                   return (
                     <div key={idx} className="bg-card border border-border rounded-lg p-4">
-                      <div className="flex items-start justify-between mb-3">
-                        <Input value={item.description}
+                      <div className="flex items-start justify-between mb-2">
+                        <textarea value={item.description}
+                          rows={1}
                           onChange={(e) => {
                             const next = [...freeItems]
                             next[idx] = { ...next[idx], description: e.target.value }
                             setFreeItems(next)
                           }}
+                          onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
                           placeholder="Descrizione voce (es. Riprese video 2 giorni, Post-produzione…)"
-                          className="flex-1 text-sm" />
+                          className="flex-1 text-sm rounded-md border border-border bg-background px-3 py-2 resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" />
                         <button onClick={() => setFreeItems(prev => prev.filter((_, i) => i !== idx))}
                           className="ml-3 p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition flex-shrink-0">
                           <X className="w-4 h-4" />
                         </button>
                       </div>
+                      <textarea value={item.detail || ''}
+                        rows={1}
+                        onChange={(e) => {
+                          const next = [...freeItems]
+                          next[idx] = { ...next[idx], detail: e.target.value }
+                          setFreeItems(next)
+                        }}
+                        onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
+                        placeholder="Dettaglio (es. Include operatore, attrezzatura, trasporto…)"
+                        className="w-full mb-3 text-xs text-muted-foreground rounded-md border border-border/50 bg-muted/30 px-3 py-1.5 resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" />
                       <div className="flex items-end gap-4">
                         <div className="space-y-1">
                           <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Qtà</p>
