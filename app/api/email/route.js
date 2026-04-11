@@ -79,7 +79,7 @@ export async function POST(request) {
             <p style="margin:0 0 8px;">In allegato trovi il PDF con il dettaglio dell&apos;attrezzatura.</p>
             <p style="margin:0 0 16px;">Per qualsiasi informazione siamo a disposizione.</p>
             <p style="margin:0;">${companyName}<br>
-            <a href="mailto:${companyEmail}" style="color:#1e3a5f;">${companyEmail}</a></p>
+            <a href="mailto:${companyEmail}" style="color:#0f172a;">${companyEmail}</a></p>
           </div>
           <div style="padding:12px 24px;background:#f1f5f9;border-radius:0 0 8px 8px;border:1px solid #e2e8f0;border-top:none;">
             <p style="color:#94a3b8;font-size:12px;margin:0;">Questo preventivo è stato generato automaticamente da GearVault.</p>
