@@ -103,23 +103,11 @@ export default function CalendarioPage() {
   const activeStatuses = statusCounts.filter((x) => x.count > 0)
   const isCurrentMonth = isSameMonth(currentMonth, new Date())
 
-  // Build header subtitle
+  // Build header subtitle (total count only — per-status breakdown is in the legend)
   const monthName = format(currentMonth, 'MMMM yyyy', { locale: it })
-  let headerSubtitle = ''
-  if (monthSets.length === 0) {
-    headerSubtitle = `Nessun set in ${monthName}`
-  } else if (activeStatuses.length === 1) {
-    const key = activeStatuses[0].key
-    const pluralLabels = { planned: 'pianificati', out: 'in uscita', returned: 'rientrati', incomplete: 'incompleti' }
-    const singularLabels = { planned: 'pianificato', out: 'in uscita', returned: 'rientrato', incomplete: 'incompleto' }
-    const label = monthSets.length === 1 ? singularLabels[key] : pluralLabels[key]
-    const tutti = monthSets.length === 1 ? 'tutto' : 'tutti'
-    headerSubtitle = `${monthSets.length} set in ${monthName} · ${tutti} ${label}`
-  } else {
-    const pluralLabels = { planned: 'pianificati', out: 'in uscita', returned: 'rientrati', incomplete: 'incompleti' }
-    const parts = activeStatuses.map((x) => `${x.count} ${pluralLabels[x.key] || x.cfg.label.toLowerCase()}`)
-    headerSubtitle = `${monthSets.length} set in ${monthName} · ${parts.join(' · ')}`
-  }
+  const headerSubtitle = monthSets.length === 0
+    ? `Nessun set in ${monthName}`
+    : `${monthSets.length} set in ${monthName}`
 
   return (
     <div className="space-y-5">
@@ -155,15 +143,19 @@ export default function CalendarioPage() {
         </div>
       </div>
 
-      {/* Legend — always show all statuses */}
+      {/* Legend — always show all statuses with plural labels */}
       <div className="flex items-center gap-3 flex-wrap">
-        {statusCounts.map(({ key, cfg, count }) => (
-          <div key={key} className={`flex items-center gap-1.5 ${count === 0 ? 'opacity-40' : ''}`}>
-            <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
-            <span className="text-xs text-muted-foreground">{cfg.label}</span>
-            <span className="text-xs font-semibold text-foreground">{count}</span>
-          </div>
-        ))}
+        {statusCounts.map(({ key, cfg, count }) => {
+          const pluralLabels = { planned: 'Pianificati', out: 'In uscita', returned: 'Rientrati', incomplete: 'Incompleti' }
+          const label = count === 1 ? cfg.label : (pluralLabels[key] || cfg.label)
+          return (
+            <div key={key} className={`flex items-center gap-1.5 ${count === 0 ? 'opacity-40' : ''}`}>
+              <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
+              <span className="text-xs text-muted-foreground">{label}</span>
+              <span className="text-xs font-semibold text-foreground">{count}</span>
+            </div>
+          )
+        })}
       </div>
 
       {/* Calendar grid */}
@@ -244,11 +236,10 @@ export default function CalendarioPage() {
                     key={day.toISOString()}
                     onClick={() => handleDayClick(day, daySets)}
                     className={`
-                      group relative min-h-[100px] pt-1.5 pb-1.5 px-0 border-b border-r border-border/50 transition
-                      ${!isLast && (i + 1) % 7 === 0 ? 'border-r-0' : ''}
+                      group relative min-h-[100px] pt-1.5 pb-1.5 px-0 border-b border-border/50 transition
                       ${i >= allDays.length - 7 ? 'border-b-0' : ''}
                       ${hasSets ? 'cursor-pointer hover:bg-muted/40' : 'hover:bg-muted/20'}
-                      ${!inMonth ? 'bg-muted/20' : ''}
+                      ${!inMonth ? 'bg-muted/30' : ''}
                     `}
                   >
                     {/* Day number */}
@@ -324,7 +315,7 @@ export default function CalendarioPage() {
                             {showName && (
                               <span
                                 className="absolute left-0 top-0 h-full flex items-center text-xs font-semibold text-white whitespace-nowrap overflow-hidden text-ellipsis pl-2 pointer-events-none z-10"
-                                style={{ width: `calc(${spanDays * 100}% - 4px)` }}
+                                style={{ width: `calc(${spanDays * 100}% - 4px)`, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
                               >{s.name}</span>
                             )}
                           </div>
