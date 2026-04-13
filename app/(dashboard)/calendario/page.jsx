@@ -9,7 +9,7 @@ import {
   startOfWeek, endOfWeek, parseISO, isWithinInterval,
 } from 'date-fns'
 import { it } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, Loader2, Briefcase, CalendarDays } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Briefcase, CalendarDays, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 import {
@@ -99,7 +99,23 @@ export default function CalendarioPage() {
   })
   const statusCounts = Object.entries(STATUS_CONFIG).map(([key, cfg]) => ({
     key, cfg, count: monthSets.filter((s) => s.status === key).length,
-  })).filter((x) => x.count > 0)
+  }))
+  const activeStatuses = statusCounts.filter((x) => x.count > 0)
+  const isCurrentMonth = isSameMonth(currentMonth, new Date())
+
+  // Build header subtitle
+  const monthName = format(currentMonth, 'MMMM yyyy', { locale: it })
+  let headerSubtitle = ''
+  if (monthSets.length === 0) {
+    headerSubtitle = `Nessun set in ${monthName}`
+  } else if (activeStatuses.length === 1) {
+    const statusLabel = activeStatuses[0].cfg.label.toLowerCase()
+    const plural = monthSets.length === 1 ? '' : 'i'
+    headerSubtitle = `${monthSets.length} set in ${monthName} · tutt${plural} ${statusLabel.endsWith('o') ? statusLabel.slice(0, -1) + 'i' : statusLabel}`
+  } else {
+    const parts = activeStatuses.map((x) => `${x.count} ${x.cfg.label.toLowerCase()}`)
+    headerSubtitle = `${monthSets.length} set in ${monthName} · ${parts.join(' · ')}`
+  }
 
   return (
     <div className="space-y-5">
@@ -109,7 +125,7 @@ export default function CalendarioPage() {
         <div>
           <h1 className="text-xl font-bold">Calendario</h1>
           <p className="text-muted-foreground text-sm mt-0.5">
-            {monthSets.length} set pianificati in {format(currentMonth, 'MMMM yyyy', { locale: it })}
+            {headerSubtitle}
           </p>
         </div>
 
@@ -118,6 +134,11 @@ export default function CalendarioPage() {
           <Button variant="outline" size="sm" onClick={() => setCurrentMonth((m) => subMonths(m, 1))}>
             <ChevronLeft className="w-4 h-4" />
           </Button>
+          {!isCurrentMonth && (
+            <Button variant="outline" size="sm" onClick={() => setCurrentMonth(new Date())}>
+              Oggi
+            </Button>
+          )}
           <button
             onClick={() => setCurrentMonth(new Date())}
             className="px-3 py-1.5 text-sm font-semibold text-foreground capitalize min-w-[140px] text-center hover:bg-muted rounded-md transition"
@@ -130,18 +151,16 @@ export default function CalendarioPage() {
         </div>
       </div>
 
-      {/* Legend */}
-      {statusCounts.length > 0 && (
-        <div className="flex items-center gap-3 flex-wrap">
-          {statusCounts.map(({ key, cfg, count }) => (
-            <div key={key} className="flex items-center gap-1.5">
-              <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
-              <span className="text-xs text-muted-foreground">{cfg.label}</span>
-              <span className="text-xs font-semibold text-foreground">{count}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Legend — always show all statuses */}
+      <div className="flex items-center gap-3 flex-wrap">
+        {statusCounts.map(({ key, cfg, count }) => (
+          <div key={key} className={`flex items-center gap-1.5 ${count === 0 ? 'opacity-40' : ''}`}>
+            <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
+            <span className="text-xs text-muted-foreground">{cfg.label}</span>
+            <span className="text-xs font-semibold text-foreground">{count}</span>
+          </div>
+        ))}
+      </div>
 
       {/* Calendar grid */}
       <div className="bg-card border border-border rounded-xl">
@@ -221,10 +240,10 @@ export default function CalendarioPage() {
                     key={day.toISOString()}
                     onClick={() => handleDayClick(day, daySets)}
                     className={`
-                      relative min-h-[100px] pt-1.5 pb-1.5 px-0 border-b border-r border-border/50 transition
+                      group relative min-h-[100px] pt-1.5 pb-1.5 px-0 border-b border-r border-border/50 transition
                       ${!isLast && (i + 1) % 7 === 0 ? 'border-r-0' : ''}
                       ${i >= allDays.length - 7 ? 'border-b-0' : ''}
-                      ${hasSets ? 'cursor-pointer hover:bg-muted/40' : ''}
+                      ${hasSets ? 'cursor-pointer hover:bg-muted/40' : 'hover:bg-muted/20'}
                       ${!inMonth ? 'bg-muted/20' : ''}
                     `}
                   >
@@ -236,6 +255,19 @@ export default function CalendarioPage() {
                     `}>
                       {format(day, 'd')}
                     </div>
+
+                    {/* Add set button on empty days */}
+                    {!hasSets && inMonth && (
+                      <Link
+                        href={`/set?new=${format(day, 'yyyy-MM-dd')}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <span className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs">
+                          <Plus className="w-3.5 h-3.5" />
+                        </span>
+                      </Link>
+                    )}
 
                     {/* Events — lane-based rendering */}
                     <div className="space-y-0.5">

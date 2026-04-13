@@ -179,6 +179,16 @@ export default function SetPage() {
     setTab(targetTab)
   }, [searchParams])
 
+  // Auto-open new set dialog with pre-filled date from ?new=YYYY-MM-DD
+  useEffect(() => {
+    const newDate = searchParams.get('new')
+    if (newDate) {
+      setForm({ ...EMPTY_SET, job_date: newDate })
+      setShowModal(true)
+      router.replace('/set', { scroll: false })
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Fetch templates when switching to template tab
   useEffect(() => {
     if (tab === 'templates' && templates.length === 0) fetchTemplates()
