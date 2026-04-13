@@ -411,7 +411,7 @@ export default async function DashboardPage() {
                 for (const s of daySets) slots[setLane[s.id]] = s
 
                 return (
-                  <div key={day.toISOString()} className={`py-2.5 text-center min-w-0 overflow-hidden ${daySets.length > 0 ? 'bg-primary/5' : ''}`}>
+                  <div key={day.toISOString()} className={`py-2.5 text-center min-w-0 ${daySets.length > 0 ? 'bg-primary/5' : ''}`}>
                     <div className="text-[10px] text-muted-foreground uppercase tracking-wider px-1">
                       {format(day, 'EEE', { locale: it })}
                     </div>
@@ -441,14 +441,29 @@ export default async function DashboardPage() {
                         const ml = showLeftEdge ? '2px' : '0'
                         const mr = isEnd || isSingle ? '2px' : '0'
 
+                        // Calculate how many visible days remain from this day to the end of the set
+                        let spanDays = 1
+                        if (showLeftEdge && !isSingle) {
+                          const sEnd = s.end_date ? parseISO(s.end_date) : parseISO(s.job_date)
+                          const lastVisible = weekDays[6]
+                          const clampedEnd = sEnd > lastVisible ? lastVisible : sEnd
+                          for (let d = 1; d < 7; d++) {
+                            if (addDays(day, d) <= clampedEnd) spanDays++
+                            else break
+                          }
+                        }
+
                         return (
                           <Link key={s.id} href={`/set/${s.id}`}>
                             <div
                               style={{ backgroundColor: color, borderRadius, marginLeft: ml, marginRight: mr }}
-                              className="h-6 flex items-center overflow-hidden"
+                              className="h-6 relative overflow-visible"
                             >
                               {showLeftEdge && (
-                                <span className="text-[10px] font-semibold text-white truncate leading-none pl-1.5">{s.name}</span>
+                                <span
+                                  className="absolute left-0 top-0 h-full flex items-center text-[10px] font-semibold text-white whitespace-nowrap overflow-hidden text-ellipsis pl-2 pointer-events-none z-10"
+                                  style={{ width: `calc(${spanDays * 100}% - 4px)` }}
+                                >{s.name}</span>
                               )}
                             </div>
                           </Link>
