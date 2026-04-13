@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { createServerSupabase } from '@/lib/supabase-server'
 import {
   Package, TrendingUp, ArrowUpRight, Briefcase, Plus, Tag, FileText,
-  AlertTriangle, Calendar, MapPin, Clock, LogOut, LogIn, Activity, QrCode, BatteryLow, Wrench,
+  AlertTriangle, Calendar, MapPin, Clock, LogOut, LogIn, Activity, QrCode, BatteryLow, Wrench, Battery,
 } from 'lucide-react'
 import { format, differenceInDays, isAfter, startOfDay, endOfDay, addDays, isSameDay, parseISO, isWithinInterval } from 'date-fns'
 import { it } from 'date-fns/locale'
@@ -46,6 +46,7 @@ export default async function DashboardPage() {
     { data: overdueSets },
     { data: recentActivity },
     { data: weekSets },
+    { data: userProfile },
   ] = await Promise.all([
     supabase.from('equipment').select('*'),
     // Sets currently out
@@ -79,7 +80,19 @@ export default async function DashboardPage() {
       .or(`job_date.lte.${endOfDay(addDays(now, 7)).toISOString()},end_date.gte.${todayEnd.toISOString()}`)
       .not('job_date', 'is', null)
       .order('job_date', { ascending: true }),
+    // Current user profile
+    supabase.from('profiles').select('full_name').eq('id', user.id).single(),
   ])
+
+  // Greeting
+  const hour = now.getHours()
+  const greeting = hour < 13 ? 'Buongiorno' : hour < 18 ? 'Buon pomeriggio' : 'Buonasera'
+  const userName = userProfile?.full_name?.split(' ')[0] || ''
+
+  function titleCase(str) { return str?.replace(/\b\w/g, (c) => c.toUpperCase()) || '' }
+
+  // Overdue set IDs for dedup with today/active
+  const overdueIds = new Set((overdueSets || []).map((s) => s.id))
 
   const activeEquipment = equipment?.filter((e) => e.condition !== 'sold') ?? []
   const totalValue = activeEquipment.reduce((s, e) => s + (parseFloat(e.market_value) || 0), 0)
@@ -137,11 +150,11 @@ export default async function DashboardPage() {
       <div>
         <h1 className="text-xl font-bold">Dashboard</h1>
         <p className="text-muted-foreground text-sm mt-1">
-          {format(now, "EEEE d MMMM yyyy", { locale: it }).replace(/^./, (c) => c.toUpperCase())}
+          {greeting}{userName ? `, ${userName}` : ''} · {format(now, "EEEE d MMM yyyy", { locale: it }).replace(/^./, (c) => c.toUpperCase())}
         </p>
       </div>
 
-      {/* Active sets alert */}
+      {/* Active sets alert (with overdue merged) */}
       {activeSets && activeSets.length > 0 && (
         <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-2.5 border-b border-amber-500/20">
@@ -151,33 +164,44 @@ export default async function DashboardPage() {
             </span>
           </div>
           <div className="divide-y divide-amber-500/10">
-            {activeSets.map((set) => (
-              <Link
-                key={set.id}
-                href={`/set/${set.id}`}
-                className="flex items-center justify-between px-4 py-3 hover:bg-amber-500/5 transition group"
-              >
-                <div className="min-w-0">
-                  <div className="text-sm font-medium group-hover:text-amber-300 transition truncate">{set.name}</div>
-                  <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
-                    {set.job_date && (
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3" />
-                        {format(new Date(set.job_date), 'd MMM', { locale: it })}
-                      </span>
-                    )}
-                    {set.location && (
-                      <span className="flex items-center gap-1">
-                        <MapPin className="w-3 h-3" />
-                        {set.location}
-                      </span>
-                    )}
-                    <span>{set.set_items?.[0]?.count ?? 0} item</span>
+            {activeSets.map((set) => {
+              const isOverdue = overdueIds.has(set.id)
+              const daysLate = isOverdue && set.job_date ? differenceInDays(now, new Date(set.job_date)) : 0
+              return (
+                <Link
+                  key={set.id}
+                  href={`/set/${set.id}`}
+                  className="flex items-center justify-between px-4 py-3 hover:bg-amber-500/5 transition group"
+                >
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium group-hover:text-amber-300 transition truncate">{set.name}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
+                      {set.job_date && (
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          Fuori dal {format(new Date(set.job_date), 'd MMM', { locale: it })}
+                        </span>
+                      )}
+                      {isOverdue && (
+                        <span className="text-red-400 font-medium">In ritardo di {daysLate} giorni</span>
+                      )}
+                      {set.location && (
+                        <span className="flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          {set.location}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-                <span className="text-xs text-amber-400 flex-shrink-0">Gestisci →</span>
-              </Link>
-            ))}
+                  <div className="flex items-center gap-1.5 flex-shrink-0 ml-3">
+                    {isOverdue && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-300 font-medium">In ritardo</span>
+                    )}
+                    <span className="text-xs text-amber-400">Gestisci →</span>
+                  </div>
+                </Link>
+              )
+            })}
           </div>
         </div>
       )}
@@ -193,44 +217,13 @@ export default async function DashboardPage() {
             <p className="text-sm font-semibold text-red-300">
               {incompleteSets.length} set con rientro incompleto
             </p>
-            <p className="text-xs text-red-400/70 mt-0.5 truncate">
+            <p className="text-xs text-muted-foreground mt-0.5 truncate">
               {incompleteSets.slice(0, 3).map((s) => s.name).join(', ')}
               {incompleteSets.length > 3 ? ` e altri ${incompleteSets.length - 3}…` : ''}
             </p>
           </div>
           <span className="text-xs text-red-400 flex-shrink-0">Vedi →</span>
         </Link>
-      )}
-
-      {/* Overdue sets alert */}
-      {overdueSets && overdueSets.length > 0 && (
-        <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-orange-500/20">
-            <Clock className="w-4 h-4 text-orange-400" />
-            <span className="text-xs font-semibold text-orange-300 uppercase tracking-wider">
-              {overdueSets.length} set in ritardo — non ancora rientrati
-            </span>
-          </div>
-          <div className="divide-y divide-orange-500/10">
-            {overdueSets.map((set) => (
-              <Link
-                key={set.id}
-                href={`/set/${set.id}`}
-                className="flex items-center justify-between px-4 py-3 hover:bg-orange-500/5 transition group"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium group-hover:text-orange-300 transition truncate">{set.name}</div>
-                  {set.job_date && (
-                    <div className="text-xs text-orange-400/70 mt-0.5">
-                      Previsto il {format(new Date(set.job_date), 'd MMM yyyy', { locale: it })} — {differenceInDays(now, new Date(set.job_date))} giorni fa
-                    </div>
-                  )}
-                </div>
-                <span className="text-xs text-orange-400 flex-shrink-0 ml-3">Gestisci →</span>
-              </Link>
-            ))}
-          </div>
-        </div>
       )}
 
       {/* Maintenance alert */}
@@ -244,7 +237,7 @@ export default async function DashboardPage() {
             <p className="text-sm font-semibold text-red-300">
               {maintenanceItems.length} attrezzatur{maintenanceItems.length === 1 ? 'a' : 'e'} da controllare
             </p>
-            <p className="text-xs text-red-400/70 mt-0.5 truncate">
+            <p className="text-xs text-red-400 mt-0.5 truncate">
               {maintenanceItems.slice(0, 3).map((e) => e.name).join(', ')}
               {maintenanceItems.length > 3 ? ` e altre ${maintenanceItems.length - 3}…` : ''}
             </p>
@@ -381,55 +374,51 @@ export default async function DashboardPage() {
       <div>
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Azioni rapide</h2>
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-          <Link href="/inventario" className="flex items-center gap-3 bg-card hover:bg-muted/30 border border-border rounded-xl p-4 transition group">
+          <Link href="/inventario" className="flex items-center gap-3 bg-card hover:bg-primary/5 border border-border hover:border-primary/50 rounded-xl p-4 transition-all duration-150 hover:scale-[1.02] group">
             <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400"><Plus className="w-4 h-4" /></div>
             <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition">Nuova attrezzatura</span>
           </Link>
-          <Link href="/set" className="flex items-center gap-3 bg-card hover:bg-muted/30 border border-border rounded-xl p-4 transition group">
+          <Link href="/set" className="flex items-center gap-3 bg-card hover:bg-primary/5 border border-border hover:border-primary/50 rounded-xl p-4 transition-all duration-150 hover:scale-[1.02] group">
             <div className="p-2 rounded-lg bg-purple-500/10 text-purple-400"><Briefcase className="w-4 h-4" /></div>
             <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition">Nuovo set</span>
           </Link>
-          <Link href="/etichette" className="flex items-center gap-3 bg-card hover:bg-muted/30 border border-border rounded-xl p-4 transition group">
+          <Link href="/etichette" className="flex items-center gap-3 bg-card hover:bg-primary/5 border border-border hover:border-primary/50 rounded-xl p-4 transition-all duration-150 hover:scale-[1.02] group">
             <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400"><Tag className="w-4 h-4" /></div>
             <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition">Stampa etichette</span>
           </Link>
-          <Link href="/report" className="flex items-center gap-3 bg-card hover:bg-muted/30 border border-border rounded-xl p-4 transition group">
+          <Link href="/report" className="flex items-center gap-3 bg-card hover:bg-primary/5 border border-border hover:border-primary/50 rounded-xl p-4 transition-all duration-150 hover:scale-[1.02] group">
             <div className="p-2 rounded-lg bg-muted text-muted-foreground"><FileText className="w-4 h-4" /></div>
             <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition">Report assicurativo</span>
           </Link>
-          <Link href="/manutenzione" className="flex items-center gap-3 bg-card hover:bg-muted/30 border border-border rounded-xl p-4 transition group">
+          <Link href="/manutenzione" className="flex items-center gap-3 bg-card hover:bg-primary/5 border border-border hover:border-primary/50 rounded-xl p-4 transition-all duration-150 hover:scale-[1.02] group">
             <div className="p-2 rounded-lg bg-orange-500/10 text-orange-400"><AlertTriangle className="w-4 h-4" /></div>
             <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition">Manutenzione</span>
           </Link>
         </div>
       </div>
 
-      {/* Battery status breakdown */}
+      {/* Battery status — compact card */}
       {hasBatteryData && (
-        <div className="bg-card rounded-xl border border-border px-5 py-4">
-          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Stato batterie</h2>
-          <div className="grid grid-cols-4 gap-3">
-            {[
-              { key: 'charged', label: (c) => c === 1 ? 'Carica' : 'Cariche', color: 'text-emerald-400', bar: 'bg-emerald-400' },
-              { key: 'charging', label: () => 'In carica', color: 'text-primary', bar: 'bg-primary' },
-              { key: 'low', label: (c) => c === 1 ? 'Scarica' : 'Scariche', color: 'text-red-400', bar: 'bg-red-400' },
-              { key: 'na', label: () => 'Non rilevato', color: 'text-muted-foreground', bar: 'bg-muted-foreground/30' },
-            ].map(({ key, label, color, bar }) => {
-              const count = batteryBreakdown[key] || 0
-              const total = Object.values(batteryBreakdown).reduce((s, v) => s + v, 0)
-              return (
-                <div key={key} className="text-center">
-                  <div className={`text-xl font-bold ${color}`}>{count}</div>
-                  <div className="text-xs text-muted-foreground mt-0.5 mb-1.5">{label(count)}</div>
-                  <div className="h-1 bg-muted rounded-full overflow-hidden relative">
-                    <div className={`h-full ${bar} rounded-full`} style={{ width: total > 0 ? `${Math.round((count / total) * 100)}%` : '0%' }} />
-                  </div>
-                  <div className="text-[10px] text-muted-foreground mt-1">{count}/{total}</div>
-                </div>
-              )
-            })}
+        <Link href="/manutenzione" className="block bg-card rounded-xl border border-border px-5 py-3 hover:border-primary/50 transition group">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <Battery className="w-4 h-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Stato batterie</h2>
+              <p className="text-sm font-medium mt-0.5">
+                <span className="text-emerald-400">{batteryBreakdown.charged || 0} OK</span>
+                {' · '}
+                <span className="text-primary">{batteryBreakdown.charging || 0} in carica</span>
+                {' · '}
+                <span className="text-red-400">{batteryBreakdown.low || 0} scariche</span>
+                {' · '}
+                <span className="text-muted-foreground">{batteryBreakdown.na || 0} N/R</span>
+              </p>
+            </div>
+            <span className="text-xs text-primary opacity-0 group-hover:opacity-100 transition flex-shrink-0">Dettagli →</span>
           </div>
-        </div>
+        </Link>
       )}
 
       <div className="grid lg:grid-cols-2 gap-6">
@@ -465,7 +454,7 @@ export default async function DashboardPage() {
                       ? <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{format(new Date(set.job_date), 'd MMM yyyy', { locale: it })}</span>
                       : <span>Data non impostata</span>
                     }
-                    {set.location && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{set.location}</span>}
+                    {set.location && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{titleCase(set.location)}</span>}
                   </div>
                 </div>
                 <span className={`text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 ml-3 ${STATUS_STYLES[set.status] || 'bg-muted text-muted-foreground'}`}>
@@ -499,7 +488,10 @@ export default async function DashboardPage() {
               </div>
             ))}
             {(categoryCounts.altro || 0) > activeEquipment.length / 2 && (
-              <p className="text-xs text-muted-foreground/70 mt-2">Consiglio: categorizza meglio le attrezzature per una vista più utile</p>
+              <p className="text-xs text-muted-foreground mt-2">
+                Consiglio: categorizza meglio le attrezzature per una vista più utile.{' '}
+                <Link href="/inventario" className="text-primary hover:underline">Categorizza ora →</Link>
+              </p>
             )}
           </div>
         </div>

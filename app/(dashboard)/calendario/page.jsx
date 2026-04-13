@@ -109,11 +109,15 @@ export default function CalendarioPage() {
   if (monthSets.length === 0) {
     headerSubtitle = `Nessun set in ${monthName}`
   } else if (activeStatuses.length === 1) {
-    const statusLabel = activeStatuses[0].cfg.label.toLowerCase()
-    const plural = monthSets.length === 1 ? '' : 'i'
-    headerSubtitle = `${monthSets.length} set in ${monthName} · tutt${plural} ${statusLabel.endsWith('o') ? statusLabel.slice(0, -1) + 'i' : statusLabel}`
+    const key = activeStatuses[0].key
+    const pluralLabels = { planned: 'pianificati', out: 'in uscita', returned: 'rientrati', incomplete: 'incompleti' }
+    const singularLabels = { planned: 'pianificato', out: 'in uscita', returned: 'rientrato', incomplete: 'incompleto' }
+    const label = monthSets.length === 1 ? singularLabels[key] : pluralLabels[key]
+    const tutti = monthSets.length === 1 ? 'tutto' : 'tutti'
+    headerSubtitle = `${monthSets.length} set in ${monthName} · ${tutti} ${label}`
   } else {
-    const parts = activeStatuses.map((x) => `${x.count} ${x.cfg.label.toLowerCase()}`)
+    const pluralLabels = { planned: 'pianificati', out: 'in uscita', returned: 'rientrati', incomplete: 'incompleti' }
+    const parts = activeStatuses.map((x) => `${x.count} ${pluralLabels[x.key] || x.cfg.label.toLowerCase()}`)
     headerSubtitle = `${monthSets.length} set in ${monthName} · ${parts.join(' · ')}`
   }
 

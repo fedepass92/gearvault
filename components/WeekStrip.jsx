@@ -107,10 +107,18 @@ export default function WeekStrip({ weekSets, weekDays: weekDaysISO, today: toda
                   }
 
                   const isHovered = hoveredSetId === s.id
+                  const statusLabels = { planned: 'Pianificato', out: 'In uscita', returned: 'Rientrato', incomplete: 'Incompleto' }
+                  const tooltipLines = [
+                    s.name,
+                    `Dal: ${format(parseISO(s.job_date), 'dd/MM/yyyy')}`,
+                    s.end_date && s.end_date !== s.job_date ? `Al: ${format(parseISO(s.end_date), 'dd/MM/yyyy')}` : null,
+                    `Stato: ${statusLabels[s.status] || s.status}`,
+                  ].filter(Boolean).join('\n')
 
                   return (
                     <Link key={s.id} href={`/set/${s.id}`}>
                       <div
+                        title={tooltipLines}
                         onMouseEnter={() => setHoveredSetId(s.id)}
                         onMouseLeave={() => setHoveredSetId(null)}
                         style={{ backgroundColor: color, borderRadius, marginLeft: ml, marginRight: mr }}

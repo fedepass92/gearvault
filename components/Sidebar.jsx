@@ -211,6 +211,11 @@ export default function Sidebar({ user, profile }) {
       active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
     }
     const badgeCount = item.badgeKey ? badges[item.badgeKey] : 0
+    const badgeTitles = {
+      overdueSets: `${badgeCount} set in ritardo`,
+      overdueLoans: `${badgeCount} prestiti scaduti`,
+      maintenance: `${badgeCount} da controllare`,
+    }
     const isAccent = item.accent && !active
     return (
       <Link
@@ -227,9 +232,12 @@ export default function Sidebar({ user, profile }) {
         <item.icon className={`w-4 h-4 flex-shrink-0 ${isAccent ? 'text-orange-400' : ''}`} />
         <span className="flex-1 truncate">{item.label}</span>
         {badgeCount > 0 && (
-          <span className={`flex-shrink-0 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold px-1 ${
-            active ? 'bg-white/20 text-white' : 'bg-destructive text-white'
-          }`}>
+          <span
+            title={item.badgeKey ? badgeTitles[item.badgeKey] : ''}
+            className={`flex-shrink-0 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold px-1 ${
+              active ? 'bg-white/20 text-white' : 'bg-destructive text-white'
+            }`}
+          >
             {badgeCount > 99 ? '99+' : badgeCount}
           </span>
         )}
