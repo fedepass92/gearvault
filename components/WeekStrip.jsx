@@ -107,7 +107,6 @@ export default function WeekStrip({ weekSets, weekDays: weekDaysISO, today: toda
                   }
 
                   const isHovered = hoveredSetId === s.id
-                  const isDimmed  = hoveredSetId !== null && hoveredSetId !== s.id
 
                   return (
                     <Link key={s.id} href={`/set/${s.id}`}>
@@ -115,7 +114,7 @@ export default function WeekStrip({ weekSets, weekDays: weekDaysISO, today: toda
                         onMouseEnter={() => setHoveredSetId(s.id)}
                         onMouseLeave={() => setHoveredSetId(null)}
                         style={{ backgroundColor: color, borderRadius, marginLeft: ml, marginRight: mr }}
-                        className={`h-6 relative overflow-visible cursor-pointer transition-all duration-150 ${isHovered ? 'brightness-125 ring-2 ring-white/30' : ''} ${isDimmed ? 'opacity-50' : ''}`}
+                        className={`h-6 relative overflow-visible cursor-pointer transition-all duration-150 ${isHovered ? 'brightness-125 ring-2 ring-white/30' : ''}`}
                       >
                         {showName && (
                           <span

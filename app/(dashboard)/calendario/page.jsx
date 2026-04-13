@@ -271,7 +271,6 @@ export default function CalendarioPage() {
                         }
 
                         const isHovered = hoveredSetId === s.id
-                        const isDimmed  = hoveredSetId !== null && hoveredSetId !== s.id
 
                         return (
                           <div
@@ -284,7 +283,7 @@ export default function CalendarioPage() {
                               marginRight: mr,
                               backgroundColor: color,
                             }}
-                            className={`h-8 relative overflow-visible cursor-pointer transition-all duration-150 ${isHovered ? 'brightness-125 ring-2 ring-white/30' : ''} ${isDimmed ? 'opacity-50' : ''}`}
+                            className={`h-8 relative overflow-visible cursor-pointer transition-all duration-150 ${isHovered ? 'brightness-125 ring-2 ring-white/30' : ''}`}
                           >
                             {showName && (
                               <span
