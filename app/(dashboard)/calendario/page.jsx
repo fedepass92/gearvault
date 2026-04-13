@@ -34,6 +34,7 @@ export default function CalendarioPage() {
   const [loading, setLoading] = useState(true)
   const [selectedDay, setSelectedDay] = useState(null) // Date
   const [selectedSets, setSelectedSets] = useState([]) // sets on selected day
+  const [hoveredSetId, setHoveredSetId] = useState(null)
   const [detailSet, setDetailSet] = useState(null)
 
   useEffect(() => {
@@ -269,16 +270,21 @@ export default function CalendarioPage() {
                           }
                         }
 
+                        const isHovered = hoveredSetId === s.id
+                        const isDimmed  = hoveredSetId !== null && hoveredSetId !== s.id
+
                         return (
                           <div
                             key={s.id}
+                            onMouseEnter={() => setHoveredSetId(s.id)}
+                            onMouseLeave={() => setHoveredSetId(null)}
                             style={{
                               borderRadius,
                               marginLeft: ml,
                               marginRight: mr,
                               backgroundColor: color,
                             }}
-                            className="h-8 relative overflow-visible cursor-default hover:brightness-110 transition-all"
+                            className={`h-8 relative overflow-visible cursor-pointer transition-all duration-150 ${isHovered ? 'brightness-125 ring-2 ring-white/30' : ''} ${isDimmed ? 'opacity-50' : ''}`}
                           >
                             {showName && (
                               <span
