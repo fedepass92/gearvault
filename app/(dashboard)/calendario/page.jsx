@@ -16,6 +16,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import Link from 'next/link'
+import { getSetColor } from '@/lib/set-colors'
 
 const STATUS_CONFIG = {
   planned:    { label: 'Pianificato', bg: 'bg-blue-600',    pill: '#2563eb', text: 'text-white', border: 'border-blue-500/30',    dot: 'bg-blue-400' },
@@ -23,8 +24,6 @@ const STATUS_CONFIG = {
   returned:   { label: 'Rientrato',   bg: 'bg-emerald-600', pill: '#059669', text: 'text-white', border: 'border-emerald-500/30', dot: 'bg-emerald-400' },
   incomplete: { label: 'Incompleto',  bg: 'bg-red-600',     pill: '#dc2626', text: 'text-white', border: 'border-red-500/30',     dot: 'bg-red-400' },
 }
-
-const SET_COLORS = ['#2563eb','#7c3aed','#059669','#f59e0b','#e11d48','#0891b2','#ea580c','#db2777','#0d9488','#4f46e5']
 
 const WEEKDAYS = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom']
 
@@ -241,8 +240,7 @@ export default function CalendarioPage() {
                     <div className="space-y-0.5">
                       {slots.map((s, laneIdx) => {
                         if (!s) return <div key={laneIdx} className="h-8" />
-                        const colorIdx  = sets.findIndex((vs) => vs.id === s.id)
-                        const color     = SET_COLORS[colorIdx % SET_COLORS.length]
+                        const color     = getSetColor(s.id, s.status)
                         const isStart   = isRangeStart(s, day)
                         const isEnd     = isRangeEnd(s, day)
                         const isSingle  = !s.end_date || s.end_date === s.job_date

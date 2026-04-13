@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { format, differenceInDays, isAfter, startOfDay, endOfDay, addDays, isSameDay, parseISO, isWithinInterval } from 'date-fns'
 import { it } from 'date-fns/locale'
+import { getSetColor } from '@/lib/set-colors'
 
 const CATEGORY_LABELS = {
   camera: 'Camera', lens: 'Obiettivo', drone: 'Drone', audio: 'Audio',
@@ -362,7 +363,6 @@ export default async function DashboardPage() {
 
       {/* 7-day ahead strip */}
       {(() => {
-        const SET_COLORS = ['#2563eb','#7c3aed','#059669','#f59e0b','#e11d48','#0891b2','#ea580c','#db2777','#0d9488','#4f46e5']
         // Filter sets that overlap the 7-day window
         const visibleSets = (weekSets || []).filter((s) => {
           if (!s.job_date) return false
@@ -425,8 +425,7 @@ export default async function DashboardPage() {
                     <div className="mt-1.5 flex flex-col gap-1">
                       {slots.map((s, laneIdx) => {
                         if (!s) return <div key={laneIdx} className="h-6" />
-                        const colorIdx = visibleSets.findIndex((vs) => vs.id === s.id)
-                        const color    = SET_COLORS[colorIdx % SET_COLORS.length]
+                        const color    = getSetColor(s.id, s.status)
                         const isStart = isSameDay(parseISO(s.job_date), day)
                         const isEnd   = s.end_date ? isSameDay(parseISO(s.end_date), day) : true
                         const isSingle = !s.end_date || s.end_date === s.job_date
