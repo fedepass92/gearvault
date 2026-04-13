@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { getSupabase } from '@/lib/supabase'
 import {
-  startOfMonth, endOfMonth, eachDayOfInterval, format,
+  startOfMonth, endOfMonth, eachDayOfInterval, format, addDays,
   addMonths, subMonths, isSameDay, isSameMonth, isToday,
   startOfWeek, endOfWeek, parseISO, isWithinInterval,
 } from 'date-fns'
@@ -156,89 +156,144 @@ export default function CalendarioPage() {
           <div className="flex items-center justify-center py-24">
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
           </div>
-        ) : (
-          <div className="grid grid-cols-7">
-            {allDays.map((day, i) => {
-              const inMonth  = isSameMonth(day, currentMonth)
-              const today    = isToday(day)
-              const daySets  = setsOnDay(day)
-              const hasSets  = daySets.length > 0
-              const isLast   = i === allDays.length - 1
+        ) : (() => {
+          // Group days into weeks (rows of 7)
+          const weeks = []
+          for (let w = 0; w < allDays.length; w += 7) {
+            weeks.push(allDays.slice(w, w + 7))
+          }
 
-              return (
-                <div
-                  key={day.toISOString()}
-                  onClick={() => handleDayClick(day, daySets)}
-                  className={`
-                    relative min-h-[100px] pt-1.5 pb-1.5 px-0 border-b border-r border-border/50 transition
-                    ${!isLast && (i + 1) % 7 === 0 ? 'border-r-0' : ''}
-                    ${i >= allDays.length - 7 ? 'border-b-0' : ''}
-                    ${hasSets ? 'cursor-pointer hover:bg-muted/40' : ''}
-                    ${!inMonth ? 'bg-muted/20' : ''}
-                  `}
-                >
-                  {/* Day number */}
-                  <div className={`
-                    w-7 h-7 flex items-center justify-center rounded-full text-sm font-medium mb-1 mx-auto
-                    ${today ? 'bg-primary text-primary-foreground font-bold' : ''}
-                    ${!inMonth ? 'text-muted-foreground/40' : today ? '' : 'text-foreground'}
-                  `}>
-                    {format(day, 'd')}
+          // Pre-compute lane assignments per week
+          const weekLanes = weeks.map((weekRow) => {
+            const weekStart = weekRow[0]
+            const weekEnd   = weekRow[weekRow.length - 1]
+            // Sets visible in this week
+            const weekSetsVisible = sets.filter((s) => {
+              if (!s.job_date) return false
+              const sStart = parseISO(s.job_date)
+              const sEnd   = s.end_date ? parseISO(s.end_date) : sStart
+              return sStart <= weekEnd && sEnd >= weekStart
+            })
+            // Assign lanes
+            const lanes = []
+            const setLane = {}
+            for (const s of weekSetsVisible) {
+              const sStart = parseISO(s.job_date)
+              const sEnd   = s.end_date ? parseISO(s.end_date) : sStart
+              let assigned = -1
+              for (let l = 0; l < lanes.length; l++) {
+                const conflict = lanes[l].some((other) => {
+                  const oStart = parseISO(other.job_date)
+                  const oEnd   = other.end_date ? parseISO(other.end_date) : oStart
+                  return sStart <= oEnd && sEnd >= oStart
+                })
+                if (!conflict) { assigned = l; break }
+              }
+              if (assigned === -1) { assigned = lanes.length; lanes.push([]) }
+              lanes[assigned].push(s)
+              setLane[s.id] = assigned
+            }
+            return { totalLanes: lanes.length, setLane }
+          })
+
+          return (
+            <div className="grid grid-cols-7">
+              {allDays.map((day, i) => {
+                const weekIdx   = Math.floor(i / 7)
+                const { totalLanes, setLane } = weekLanes[weekIdx]
+                const weekRow   = weeks[weekIdx]
+                const inMonth   = isSameMonth(day, currentMonth)
+                const today     = isToday(day)
+                const daySets   = setsOnDay(day)
+                const hasSets   = daySets.length > 0
+                const isLast    = i === allDays.length - 1
+
+                // Build slot array: one entry per lane
+                const slots = Array.from({ length: totalLanes }, () => null)
+                for (const s of daySets) {
+                  if (setLane[s.id] !== undefined) slots[setLane[s.id]] = s
+                }
+
+                return (
+                  <div
+                    key={day.toISOString()}
+                    onClick={() => handleDayClick(day, daySets)}
+                    className={`
+                      relative min-h-[100px] pt-1.5 pb-1.5 px-0 border-b border-r border-border/50 transition
+                      ${!isLast && (i + 1) % 7 === 0 ? 'border-r-0' : ''}
+                      ${i >= allDays.length - 7 ? 'border-b-0' : ''}
+                      ${hasSets ? 'cursor-pointer hover:bg-muted/40' : ''}
+                      ${!inMonth ? 'bg-muted/20' : ''}
+                    `}
+                  >
+                    {/* Day number */}
+                    <div className={`
+                      w-7 h-7 flex items-center justify-center rounded-full text-sm font-medium mb-1 mx-auto
+                      ${today ? 'bg-primary text-primary-foreground font-bold' : ''}
+                      ${!inMonth ? 'text-muted-foreground/40' : today ? '' : 'text-foreground'}
+                    `}>
+                      {format(day, 'd')}
+                    </div>
+
+                    {/* Events — lane-based rendering */}
+                    <div className="space-y-0.5">
+                      {slots.map((s, laneIdx) => {
+                        if (!s) return <div key={laneIdx} className="h-8" />
+                        const cfg      = STATUS_CONFIG[s.status] || STATUS_CONFIG.planned
+                        const isStart  = isRangeStart(s, day)
+                        const isEnd    = isRangeEnd(s, day)
+                        const isSingle = !s.end_date || s.end_date === s.job_date
+                        // Show name on first visible day in this week row
+                        const isFirstVisibleInWeek = !isStart && !isSingle && isSameDay(day, weekRow[0]) && parseISO(s.job_date) < weekRow[0]
+                        const showLeftEdge = isStart || isSingle || isFirstVisibleInWeek
+
+                        const borderRadius = isSingle
+                          ? '4px'
+                          : showLeftEdge && isEnd ? '4px'
+                          : showLeftEdge           ? '4px 0 0 4px'
+                          : isEnd                  ? '0 4px 4px 0'
+                          :                          '0'
+                        const ml = showLeftEdge ? '2px' : '0'
+                        const mr = isEnd || isSingle ? '2px' : '0'
+
+                        // Calculate how many visible days remain from this day to end of set (clamped to week row)
+                        let spanDays = 1
+                        if (showLeftEdge && !isSingle) {
+                          const sEnd = s.end_date ? parseISO(s.end_date) : parseISO(s.job_date)
+                          const clampedEnd = sEnd > weekRow[6] ? weekRow[6] : sEnd
+                          for (let d = 1; d <= 6; d++) {
+                            if (addDays(day, d) <= clampedEnd) spanDays++
+                            else break
+                          }
+                        }
+
+                        return (
+                          <div
+                            key={s.id}
+                            style={{
+                              borderRadius,
+                              marginLeft: ml,
+                              marginRight: mr,
+                              backgroundColor: cfg.pill,
+                            }}
+                            className="h-8 relative overflow-visible cursor-default hover:brightness-110 transition-all"
+                          >
+                            {showLeftEdge && (
+                              <span
+                                className="absolute left-0 top-0 h-full flex items-center text-xs font-semibold text-white whitespace-nowrap overflow-hidden text-ellipsis pl-2 pointer-events-none z-10"
+                                style={{ width: `calc(${spanDays * 100}% - 4px)` }}
+                              >{s.name}</span>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
                   </div>
-
-                  {/* Events — pills flush to cell edges for seamless multi-day bars */}
-                  <div className="space-y-0.5">
-                    {daySets.slice(0, 3).map((s) => {
-                      const cfg      = STATUS_CONFIG[s.status] || STATUS_CONFIG.planned
-                      const isStart  = isRangeStart(s, day)
-                      const isEnd    = isRangeEnd(s, day)
-                      const isSingle = !s.end_date || s.end_date === s.job_date
-
-                      // Rounded corners only at true start/end of range
-                      const borderRadius = isSingle
-                        ? '4px'
-                        : isStart && isEnd ? '4px'
-                        : isStart          ? '4px 0 0 4px'
-                        : isEnd            ? '0 4px 4px 0'
-                        :                    '0'
-
-                      // Small inset for start/end so rounded corners aren't clipped
-                      const ml = isStart || isSingle ? '2px' : '0'
-                      const mr = isEnd   || isSingle ? '2px' : '0'
-
-                      const tooltipText = s.end_date && s.end_date !== s.job_date
-                        ? `${s.name} · ${s.job_date} → ${s.end_date}`
-                        : `${s.name} · ${s.job_date}`
-
-                      return (
-                        <div
-                          key={s.id}
-                          title={tooltipText}
-                          style={{
-                            borderRadius,
-                            marginLeft: ml,
-                            marginRight: mr,
-                            backgroundColor: cfg.pill,
-                          }}
-                          className="h-8 flex items-center overflow-hidden cursor-default hover:brightness-110 transition-all"
-                        >
-                          {(isStart || isSingle) && (
-                            <span className="truncate text-xs font-semibold text-white leading-none pl-2">{s.name}</span>
-                          )}
-                        </div>
-                      )
-                    })}
-                    {daySets.length > 3 && (
-                      <div className="text-[10px] text-muted-foreground px-1.5">
-                        +{daySets.length - 3}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
+                )
+              })}
+            </div>
+          )
+        })()}
       </div>
 
       {/* Day detail dialog */}
