@@ -385,7 +385,7 @@ export default async function DashboardPage() {
                   <div className="text-[10px] text-muted-foreground uppercase tracking-wider px-1">
                     {format(day, 'EEE', { locale: it })}
                   </div>
-                  <div className="mt-0.5 px-1 flex justify-center">
+                  <div className="mt-0.5 px-1 flex justify-center h-8 items-center">
                     {isSameDay(day, today) ? (
                       <span className="bg-primary text-primary-foreground rounded-full w-7 h-7 flex items-center justify-center text-sm font-semibold">{format(day, 'd')}</span>
                     ) : (
@@ -400,15 +400,18 @@ export default async function DashboardPage() {
                         const isStart = isSameDay(parseISO(s.job_date), day)
                         const isEnd   = s.end_date ? isSameDay(parseISO(s.end_date), day) : true
                         const isSingle = !s.end_date || s.end_date === s.job_date
+                        // Show name on first VISIBLE day (set may start before the widget range)
+                        const isFirstVisible = !isStart && !isSingle && isSameDay(day, weekDays[0]) && parseISO(s.job_date) < weekDays[0]
+                        const showLeftEdge = isStart || isSingle || isFirstVisible
 
                         const borderRadius = isSingle
                           ? '4px'
-                          : isStart && isEnd ? '4px'
-                          : isStart          ? '4px 0 0 4px'
-                          : isEnd            ? '0 4px 4px 0'
-                          :                    '0'
-                        const ml = isStart || isSingle ? '2px' : '0'
-                        const mr = isEnd   || isSingle ? '2px' : '0'
+                          : showLeftEdge && isEnd ? '4px'
+                          : showLeftEdge           ? '4px 0 0 4px'
+                          : isEnd                  ? '0 4px 4px 0'
+                          :                          '0'
+                        const ml = showLeftEdge ? '2px' : '0'
+                        const mr = isEnd || isSingle ? '2px' : '0'
 
                         return (
                           <Link key={s.id} href={`/set/${s.id}`} title={s.name}>
@@ -416,7 +419,7 @@ export default async function DashboardPage() {
                               style={{ backgroundColor: color, borderRadius, marginLeft: ml, marginRight: mr }}
                               className="h-6 flex items-center overflow-hidden"
                             >
-                              {(isStart || isSingle) && (
+                              {showLeftEdge && (
                                 <span className="text-[10px] font-semibold text-white truncate leading-none pl-1.5">{s.name}</span>
                               )}
                             </div>
