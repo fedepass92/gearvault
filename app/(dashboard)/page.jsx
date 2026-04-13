@@ -394,7 +394,7 @@ export default async function DashboardPage() {
                   </div>
                   {daySets.length > 0 && (
                     <div className="mt-1.5 space-y-0.5">
-                      {daySets.slice(0, 2).map((s) => {
+                      {daySets.map((s) => {
                         const STATUS_PILL = { planned: '#2563eb', out: '#f59e0b', returned: '#059669', incomplete: '#dc2626' }
                         const color   = STATUS_PILL[s.status] || '#2563eb'
                         const isStart = !s.job_date ? false : isSameDay(parseISO(s.job_date), day)
@@ -408,25 +408,20 @@ export default async function DashboardPage() {
                           :           '0'
                         const ml = isSingle || isStart ? '2px' : '0'
                         const mr = isSingle || isEnd   ? '2px' : '0'
-                        const pl = isStart || isSingle ? '5px' : '0'
-                        const pr = isEnd   || isSingle ? '5px' : '0'
 
                         return (
                           <Link key={s.id} href={`/set/${s.id}`} title={s.name}>
                             <div
-                              style={{ backgroundColor: color, borderRadius: radius, marginLeft: ml, marginRight: mr, paddingLeft: pl, paddingRight: pr }}
-                              className="h-5 flex items-center overflow-hidden"
+                              style={{ backgroundColor: color, borderRadius: radius, marginLeft: ml, marginRight: mr }}
+                              className="h-6 flex items-center overflow-hidden"
                             >
                               {(isStart || isSingle) && (
-                                <span className="text-[9px] font-medium text-white truncate leading-none">{s.name}</span>
+                                <span className="text-xs font-semibold text-white truncate leading-none pl-1.5">{s.name}</span>
                               )}
                             </div>
                           </Link>
                         )
                       })}
-                      {daySets.length > 2 && (
-                        <div className="text-[9px] text-muted-foreground px-1">+{daySets.length - 2}</div>
-                      )}
                     </div>
                   )}
                 </div>
