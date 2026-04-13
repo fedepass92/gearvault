@@ -393,18 +393,32 @@ export default async function DashboardPage() {
                     )}
                   </div>
                   {daySets.length > 0 && (
-                    <div className="mt-1.5 flex flex-col gap-1.5 px-0.5">
+                    <div className="mt-1.5 flex flex-col gap-1">
                       {daySets.map((s) => {
                         const STATUS_PILL = { planned: '#2563eb', out: '#f59e0b', returned: '#059669', incomplete: '#dc2626' }
                         const color   = STATUS_PILL[s.status] || '#2563eb'
+                        const isStart = isSameDay(parseISO(s.job_date), day)
+                        const isEnd   = s.end_date ? isSameDay(parseISO(s.end_date), day) : true
+                        const isSingle = !s.end_date || s.end_date === s.job_date
+
+                        const borderRadius = isSingle
+                          ? '4px'
+                          : isStart && isEnd ? '4px'
+                          : isStart          ? '4px 0 0 4px'
+                          : isEnd            ? '0 4px 4px 0'
+                          :                    '0'
+                        const ml = isStart || isSingle ? '2px' : '0'
+                        const mr = isEnd   || isSingle ? '2px' : '0'
 
                         return (
                           <Link key={s.id} href={`/set/${s.id}`} title={s.name}>
                             <div
-                              style={{ backgroundColor: color }}
-                              className="h-6 flex items-center overflow-hidden rounded px-1"
+                              style={{ backgroundColor: color, borderRadius, marginLeft: ml, marginRight: mr }}
+                              className="h-6 flex items-center overflow-hidden"
                             >
-                              <span className="text-[10px] font-semibold text-white truncate leading-none">{s.name}</span>
+                              {(isStart || isSingle) && (
+                                <span className="text-[10px] font-semibold text-white truncate leading-none pl-1.5">{s.name}</span>
+                              )}
                             </div>
                           </Link>
                         )
