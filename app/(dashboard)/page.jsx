@@ -362,7 +362,7 @@ export default async function DashboardPage() {
 
       {/* 7-day ahead strip */}
       {(() => {
-        const STATUS_PILL = { planned: '#2563eb', out: '#f59e0b', returned: '#059669', incomplete: '#dc2626' }
+        const SET_COLORS = ['#2563eb','#7c3aed','#059669','#f59e0b','#e11d48','#0891b2','#ea580c','#db2777','#0d9488','#4f46e5']
         // Filter sets that overlap the 7-day window
         const visibleSets = (weekSets || []).filter((s) => {
           if (!s.job_date) return false
@@ -425,25 +425,28 @@ export default async function DashboardPage() {
                     <div className="mt-1.5 flex flex-col gap-1">
                       {slots.map((s, laneIdx) => {
                         if (!s) return <div key={laneIdx} className="h-6" />
-                        const color   = STATUS_PILL[s.status] || '#2563eb'
+                        const colorIdx = visibleSets.findIndex((vs) => vs.id === s.id)
+                        const color    = SET_COLORS[colorIdx % SET_COLORS.length]
                         const isStart = isSameDay(parseISO(s.job_date), day)
                         const isEnd   = s.end_date ? isSameDay(parseISO(s.end_date), day) : true
                         const isSingle = !s.end_date || s.end_date === s.job_date
                         const isFirstVisible = !isStart && !isSingle && isSameDay(day, weekDays[0]) && parseISO(s.job_date) < weekDays[0]
-                        const showLeftEdge = isStart || isSingle || isFirstVisible
+                        const showName = isStart || isSingle || isFirstVisible
+                        // Rounded left only on real start, not on continuation
+                        const roundLeft = isStart || isSingle
+                        const roundRight = isEnd || isSingle
 
-                        const borderRadius = isSingle
+                        const borderRadius = roundLeft && roundRight
                           ? '4px'
-                          : showLeftEdge && isEnd ? '4px'
-                          : showLeftEdge           ? '4px 0 0 4px'
-                          : isEnd                  ? '0 4px 4px 0'
-                          :                          '0'
-                        const ml = showLeftEdge ? '2px' : '0'
-                        const mr = isEnd || isSingle ? '2px' : '0'
+                          : roundLeft  ? '4px 0 0 4px'
+                          : roundRight ? '0 4px 4px 0'
+                          :              '0'
+                        const ml = roundLeft  ? '2px' : '0'
+                        const mr = roundRight ? '2px' : '0'
 
                         // Calculate how many visible days remain from this day to the end of the set
                         let spanDays = 1
-                        if (showLeftEdge && !isSingle) {
+                        if (showName && !isSingle) {
                           const sEnd = s.end_date ? parseISO(s.end_date) : parseISO(s.job_date)
                           const lastVisible = weekDays[6]
                           const clampedEnd = sEnd > lastVisible ? lastVisible : sEnd
@@ -459,7 +462,7 @@ export default async function DashboardPage() {
                               style={{ backgroundColor: color, borderRadius, marginLeft: ml, marginRight: mr }}
                               className="h-6 relative overflow-visible"
                             >
-                              {showLeftEdge && (
+                              {showName && (
                                 <span
                                   className="absolute left-0 top-0 h-full flex items-center text-[10px] font-semibold text-white whitespace-nowrap overflow-hidden text-ellipsis pl-2 pointer-events-none z-10"
                                   style={{ width: `calc(${spanDays * 100}% - 4px)` }}

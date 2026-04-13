@@ -24,6 +24,8 @@ const STATUS_CONFIG = {
   incomplete: { label: 'Incompleto',  bg: 'bg-red-600',     pill: '#dc2626', text: 'text-white', border: 'border-red-500/30',     dot: 'bg-red-400' },
 }
 
+const SET_COLORS = ['#2563eb','#7c3aed','#059669','#f59e0b','#e11d48','#0891b2','#ea580c','#db2777','#0d9488','#4f46e5']
+
 const WEEKDAYS = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom']
 
 export default function CalendarioPage() {
@@ -239,26 +241,28 @@ export default function CalendarioPage() {
                     <div className="space-y-0.5">
                       {slots.map((s, laneIdx) => {
                         if (!s) return <div key={laneIdx} className="h-8" />
-                        const cfg      = STATUS_CONFIG[s.status] || STATUS_CONFIG.planned
-                        const isStart  = isRangeStart(s, day)
-                        const isEnd    = isRangeEnd(s, day)
-                        const isSingle = !s.end_date || s.end_date === s.job_date
-                        // Show name on first visible day in this week row
+                        const colorIdx  = sets.findIndex((vs) => vs.id === s.id)
+                        const color     = SET_COLORS[colorIdx % SET_COLORS.length]
+                        const isStart   = isRangeStart(s, day)
+                        const isEnd     = isRangeEnd(s, day)
+                        const isSingle  = !s.end_date || s.end_date === s.job_date
                         const isFirstVisibleInWeek = !isStart && !isSingle && isSameDay(day, weekRow[0]) && parseISO(s.job_date) < weekRow[0]
-                        const showLeftEdge = isStart || isSingle || isFirstVisibleInWeek
+                        const showName  = isStart || isSingle || isFirstVisibleInWeek
+                        // Rounded left only on real start, not on continuation
+                        const roundLeft  = isStart || isSingle
+                        const roundRight = isEnd || isSingle
 
-                        const borderRadius = isSingle
+                        const borderRadius = roundLeft && roundRight
                           ? '4px'
-                          : showLeftEdge && isEnd ? '4px'
-                          : showLeftEdge           ? '4px 0 0 4px'
-                          : isEnd                  ? '0 4px 4px 0'
-                          :                          '0'
-                        const ml = showLeftEdge ? '2px' : '0'
-                        const mr = isEnd || isSingle ? '2px' : '0'
+                          : roundLeft  ? '4px 0 0 4px'
+                          : roundRight ? '0 4px 4px 0'
+                          :              '0'
+                        const ml = roundLeft  ? '2px' : '0'
+                        const mr = roundRight ? '2px' : '0'
 
                         // Calculate how many visible days remain from this day to end of set (clamped to week row)
                         let spanDays = 1
-                        if (showLeftEdge && !isSingle) {
+                        if (showName && !isSingle) {
                           const sEnd = s.end_date ? parseISO(s.end_date) : parseISO(s.job_date)
                           const clampedEnd = sEnd > weekRow[6] ? weekRow[6] : sEnd
                           for (let d = 1; d <= 6; d++) {
@@ -274,11 +278,11 @@ export default function CalendarioPage() {
                               borderRadius,
                               marginLeft: ml,
                               marginRight: mr,
-                              backgroundColor: cfg.pill,
+                              backgroundColor: color,
                             }}
                             className="h-8 relative overflow-visible cursor-default hover:brightness-110 transition-all"
                           >
-                            {showLeftEdge && (
+                            {showName && (
                               <span
                                 className="absolute left-0 top-0 h-full flex items-center text-xs font-semibold text-white whitespace-nowrap overflow-hidden text-ellipsis pl-2 pointer-events-none z-10"
                                 style={{ width: `calc(${spanDays * 100}% - 4px)` }}
