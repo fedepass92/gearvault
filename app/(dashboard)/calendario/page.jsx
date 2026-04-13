@@ -236,7 +236,7 @@ export default function CalendarioPage() {
                     key={day.toISOString()}
                     onClick={() => handleDayClick(day, daySets)}
                     className={`
-                      group relative min-h-[100px] pt-1.5 pb-1.5 px-0 border-b border-r border-border/50 transition
+                      group relative overflow-visible min-h-[100px] pt-1.5 pb-1.5 px-0 border-b border-r border-border/50 transition
                       ${(i + 1) % 7 === 0 ? 'border-r-0' : ''}
                       ${i >= allDays.length - 7 ? 'border-b-0' : ''}
                       ${hasSets ? 'cursor-pointer hover:bg-muted/40' : 'hover:bg-muted/20'}
@@ -266,7 +266,7 @@ export default function CalendarioPage() {
                     )}
 
                     {/* Events — lane-based rendering */}
-                    <div className="space-y-0.5">
+                    <div className="space-y-0.5 relative z-[5]">
                       {slots.map((s, laneIdx) => {
                         if (!s) return <div key={laneIdx} className="h-8" />
                         const color     = getSetColor(s.id, s.status)
@@ -284,8 +284,9 @@ export default function CalendarioPage() {
                           : roundLeft  ? '4px 0 0 4px'
                           : roundRight ? '0 4px 4px 0'
                           :              '0'
+                        const isLastCol = (i + 1) % 7 === 0
                         const ml = roundLeft  ? '2px' : '0'
-                        const mr = roundRight ? '2px' : '0'
+                        const mr = roundRight ? '2px' : isLastCol ? '0' : '-1px'
 
                         // Calculate how many visible days remain from this day to end of set (clamped to week row)
                         let spanDays = 1
