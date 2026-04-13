@@ -114,7 +114,7 @@ export default function WeekStrip({ weekSets, weekDays: weekDaysISO, today: toda
                         onMouseEnter={() => setHoveredSetId(s.id)}
                         onMouseLeave={() => setHoveredSetId(null)}
                         style={{ backgroundColor: color, borderRadius, marginLeft: ml, marginRight: mr }}
-                        className={`h-6 relative overflow-visible cursor-pointer transition-all duration-150 ${isHovered ? 'brightness-125 ring-2 ring-white/30' : ''}`}
+                        className={`h-6 relative overflow-visible cursor-pointer transition-all duration-150 ${isHovered ? 'brightness-125' : ''}`}
                       >
                         {showName && (
                           <span

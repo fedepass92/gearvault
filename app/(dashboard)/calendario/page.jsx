@@ -283,7 +283,7 @@ export default function CalendarioPage() {
                               marginRight: mr,
                               backgroundColor: color,
                             }}
-                            className={`h-8 relative overflow-visible cursor-pointer transition-all duration-150 ${isHovered ? 'brightness-125 ring-2 ring-white/30' : ''}`}
+                            className={`h-8 relative overflow-visible cursor-pointer transition-all duration-150 ${isHovered ? 'brightness-125' : ''}`}
                           >
                             {showName && (
                               <span
