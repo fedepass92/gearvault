@@ -48,7 +48,7 @@ export default function WeekStrip({ weekSets, weekDays: weekDaysISO, today: toda
   if (visibleSets.length === 0) return null
 
   return (
-    <div className="bg-card rounded-xl border border-border overflow-hidden">
+    <div className="bg-card rounded-xl border border-border">
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border">
         <Calendar className="w-4 h-4 text-muted-foreground" />
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Prossimi 7 giorni</span>
@@ -63,8 +63,16 @@ export default function WeekStrip({ weekSets, weekDays: weekDaysISO, today: toda
           const slots = Array.from({ length: totalLanes }, () => null)
           for (const s of daySets) slots[setLane[s.id]] = s
 
+          // Cell with a label needs higher z-index so overflow text paints above adjacent cells
+          const hasLabel = daySets.some((s) => {
+            const _isStart = isSameDay(parseISO(s.job_date), day)
+            const _isSingle = !s.end_date || s.end_date === s.job_date
+            const _isFirstVis = !_isStart && !_isSingle && isSameDay(day, weekDays[0]) && parseISO(s.job_date) < weekDays[0]
+            return _isStart || _isSingle || _isFirstVis
+          })
+
           return (
-            <div key={day.toISOString()} className={`py-2.5 text-center min-w-0 overflow-visible ${daySets.length > 0 ? 'bg-primary/5' : ''}`}>
+            <div key={day.toISOString()} className={`py-2.5 text-center min-w-0 relative overflow-visible ${hasLabel ? 'z-[2]' : 'z-[1]'} ${daySets.length > 0 ? 'bg-primary/5' : ''}`}>
               <div className="text-[10px] text-muted-foreground uppercase tracking-wider px-1">
                 {format(day, 'EEE', { locale: it })}
               </div>
@@ -75,7 +83,7 @@ export default function WeekStrip({ weekSets, weekDays: weekDaysISO, today: toda
                   <span className={`text-sm font-semibold ${daySets.length > 0 ? 'text-primary' : 'text-muted-foreground/50'}`}>{format(day, 'd')}</span>
                 )}
               </div>
-              <div className="mt-1.5 flex flex-col gap-1 relative z-[5] overflow-visible">
+              <div className="mt-1.5 flex flex-col gap-1 overflow-visible">
                 {slots.map((s, laneIdx) => {
                   if (!s) return <div key={laneIdx} className="h-6" />
                   const color    = getSetColor(s.id, s.status)

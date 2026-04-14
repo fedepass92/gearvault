@@ -231,6 +231,14 @@ export default function CalendarioPage() {
                   if (setLane[s.id] !== undefined) slots[setLane[s.id]] = s
                 }
 
+                // Cell with a label needs higher z-index so overflow text paints above adjacent cells
+                const hasLabel = daySets.some((s) => {
+                  const _isStart = isRangeStart(s, day)
+                  const _isSingle = !s.end_date || s.end_date === s.job_date
+                  const _isFirstVis = !_isStart && !_isSingle && isSameDay(day, weekRow[0]) && parseISO(s.job_date) < weekRow[0]
+                  return _isStart || _isSingle || _isFirstVis
+                })
+
                 return (
                   <div
                     key={day.toISOString()}
@@ -239,6 +247,7 @@ export default function CalendarioPage() {
                       group relative overflow-visible min-h-[100px] pt-1.5 pb-1.5 px-0 border-b border-r border-border/50 transition
                       ${(i + 1) % 7 === 0 ? 'border-r-0' : ''}
                       ${i >= allDays.length - 7 ? 'border-b-0' : ''}
+                      ${hasLabel ? 'z-[2]' : 'z-[1]'}
                       ${hasSets ? 'cursor-pointer hover:bg-muted/40' : 'hover:bg-muted/20'}
                       ${!inMonth ? 'bg-muted/30' : ''}
                     `}
@@ -266,7 +275,7 @@ export default function CalendarioPage() {
                     )}
 
                     {/* Events — lane-based rendering */}
-                    <div className="space-y-0.5 relative z-[5] overflow-visible">
+                    <div className="space-y-0.5 overflow-visible">
                       {slots.map((s, laneIdx) => {
                         if (!s) return <div key={laneIdx} className="h-8" />
                         const color     = getSetColor(s.id, s.status)
@@ -312,7 +321,7 @@ export default function CalendarioPage() {
                               marginRight: mr,
                               backgroundColor: color,
                             }}
-                            className={`h-8 relative z-[5] overflow-visible cursor-pointer transition-all duration-150 ${isHovered ? 'brightness-125' : ''}`}
+                            className={`h-8 relative overflow-visible cursor-pointer transition-all duration-150 ${isHovered ? 'brightness-125' : ''}`}
                           >
                             {showName && (
                               <span
