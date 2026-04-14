@@ -289,9 +289,9 @@ export default function CalendarioPage() {
                         const roundRight = isEnd || isSingle || isLastVisibleInWeek
 
                         const borderRadius = roundLeft && roundRight
-                          ? '4px'
-                          : roundLeft  ? '4px 0 0 4px'
-                          : roundRight ? '0 4px 4px 0'
+                          ? '6px'
+                          : roundLeft  ? '6px 0 0 6px'
+                          : roundRight ? '0 6px 6px 0'
                           :              '0'
                         const isLastCol = (i + 1) % 7 === 0
                         const ml = roundLeft  ? '2px' : '0'

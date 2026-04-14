@@ -1,13 +1,14 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { format, isSameDay, parseISO, isWithinInterval, addDays } from 'date-fns'
 import { it } from 'date-fns/locale'
 import { Calendar } from 'lucide-react'
 import { getSetColor } from '@/lib/set-colors'
 
 export default function WeekStrip({ weekSets, weekDays: weekDaysISO, today: todayISO }) {
+  const router = useRouter()
   const [hoveredSetId, setHoveredSetId] = useState(null)
 
   // Parse ISO strings from server component
@@ -53,8 +54,8 @@ export default function WeekStrip({ weekSets, weekDays: weekDaysISO, today: toda
         <Calendar className="w-4 h-4 text-muted-foreground" />
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Prossimi 7 giorni</span>
       </div>
-      <div className="grid grid-cols-7 divide-x divide-border/50">
-        {weekDays.map((day) => {
+      <div className="grid grid-cols-7">
+        {weekDays.map((day, dayIdx) => {
           const daySets = visibleSets.filter((s) => {
             const start = parseISO(s.job_date)
             const end   = s.end_date ? parseISO(s.end_date) : start
@@ -71,8 +72,19 @@ export default function WeekStrip({ weekSets, weekDays: weekDaysISO, today: toda
             return _isStart || _isSingle || _isFirstVis
           })
 
+          const isLastCol = dayIdx === 6
+
           return (
-            <div key={day.toISOString()} className={`py-2.5 text-center min-w-0 relative overflow-visible ${hasLabel ? 'z-[2]' : 'z-[1]'} ${daySets.length > 0 ? 'bg-primary/5' : ''}`}>
+            <div
+              key={day.toISOString()}
+              className={`
+                py-2.5 text-center min-w-0 relative overflow-visible
+                border-r border-border/50
+                ${isLastCol ? 'border-r-0' : ''}
+                ${hasLabel ? 'z-[2]' : 'z-[1]'}
+                ${daySets.length > 0 ? 'bg-primary/5' : ''}
+              `}
+            >
               <div className="text-[10px] text-muted-foreground uppercase tracking-wider px-1">
                 {format(day, 'EEE', { locale: it })}
               </div>
@@ -83,7 +95,7 @@ export default function WeekStrip({ weekSets, weekDays: weekDaysISO, today: toda
                   <span className={`text-sm font-semibold ${daySets.length > 0 ? 'text-primary' : 'text-muted-foreground/50'}`}>{format(day, 'd')}</span>
                 )}
               </div>
-              <div className="mt-1.5 flex flex-col gap-1 overflow-visible">
+              <div className="mt-1.5 space-y-1 overflow-visible">
                 {slots.map((s, laneIdx) => {
                   if (!s) return <div key={laneIdx} className="h-6" />
                   const color    = getSetColor(s.id, s.status)
@@ -91,18 +103,16 @@ export default function WeekStrip({ weekSets, weekDays: weekDaysISO, today: toda
                   const isEnd    = s.end_date ? isSameDay(parseISO(s.end_date), day) : true
                   const isSingle = !s.end_date || s.end_date === s.job_date
                   const isFirstVisible = !isStart && !isSingle && isSameDay(day, weekDays[0]) && parseISO(s.job_date) < weekDays[0]
-                  const isLastVisible = !isEnd && !isSingle && isSameDay(day, weekDays[6]) && parseISO(s.end_date) > weekDays[6]
+                  const isLastVisible = !isEnd && !isSingle && isLastCol && s.end_date && parseISO(s.end_date) > weekDays[6]
                   const showName   = isStart || isSingle || isFirstVisible
                   const roundLeft  = isStart || isSingle || isFirstVisible
                   const roundRight = isEnd || isSingle || isLastVisible
 
                   const borderRadius = roundLeft && roundRight
-                    ? '4px'
-                    : roundLeft  ? '4px 0 0 4px'
-                    : roundRight ? '0 4px 4px 0'
+                    ? '6px'
+                    : roundLeft  ? '6px 0 0 6px'
+                    : roundRight ? '0 6px 6px 0'
                     :              '0'
-                  const dayIdx = weekDays.indexOf(day)
-                  const isLastCol = dayIdx === 6
                   const ml = roundLeft  ? '2px' : '0'
                   const mr = roundRight ? '2px' : isLastCol ? '0' : '-1px'
 
@@ -127,22 +137,22 @@ export default function WeekStrip({ weekSets, weekDays: weekDaysISO, today: toda
                   ].filter(Boolean).join('\n')
 
                   return (
-                    <Link key={s.id} href={`/set/${s.id}`}>
-                      <div
-                        title={tooltipLines}
-                        onMouseEnter={() => setHoveredSetId(s.id)}
-                        onMouseLeave={() => setHoveredSetId(null)}
-                        style={{ backgroundColor: color, borderRadius, marginLeft: ml, marginRight: mr }}
-                        className={`h-6 relative overflow-visible cursor-pointer transition-all duration-150 ${isHovered ? 'brightness-125' : ''}`}
-                      >
-                        {showName && (
-                          <span
-                            className="absolute left-0 top-0 h-full flex items-center text-[10px] font-semibold text-white whitespace-nowrap overflow-hidden text-ellipsis pl-2 pointer-events-none z-20"
-                            style={{ width: `calc(${spanDays} * 100% - 8px)`, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
-                          >{s.name}</span>
-                        )}
-                      </div>
-                    </Link>
+                    <div
+                      key={s.id}
+                      title={tooltipLines}
+                      onClick={() => router.push(`/set/${s.id}`)}
+                      onMouseEnter={() => setHoveredSetId(s.id)}
+                      onMouseLeave={() => setHoveredSetId(null)}
+                      style={{ backgroundColor: color, borderRadius, marginLeft: ml, marginRight: mr }}
+                      className={`h-6 relative overflow-visible cursor-pointer transition-all duration-150 ${isHovered ? 'brightness-125' : ''}`}
+                    >
+                      {showName && (
+                        <span
+                          className="absolute left-0 top-0 h-full flex items-center text-[10px] font-semibold text-white whitespace-nowrap overflow-hidden text-ellipsis pl-2 pointer-events-none z-20"
+                          style={{ width: `calc(${spanDays} * 100% - 8px)`, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
+                        >{s.name}</span>
+                      )}
+                    </div>
                   )
                 })}
               </div>
