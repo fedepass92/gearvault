@@ -283,10 +283,10 @@ export default function CalendarioPage() {
                         const isEnd     = isRangeEnd(s, day)
                         const isSingle  = !s.end_date || s.end_date === s.job_date
                         const isFirstVisibleInWeek = !isStart && !isSingle && isSameDay(day, weekRow[0]) && parseISO(s.job_date) < weekRow[0]
+                        const isLastVisibleInWeek = !isEnd && !isSingle && isSameDay(day, weekRow[6]) && s.end_date && parseISO(s.end_date) > weekRow[6]
                         const showName  = isStart || isSingle || isFirstVisibleInWeek
-                        // Rounded left only on real start, not on continuation
-                        const roundLeft  = isStart || isSingle
-                        const roundRight = isEnd || isSingle
+                        const roundLeft  = isStart || isSingle || isFirstVisibleInWeek
+                        const roundRight = isEnd || isSingle || isLastVisibleInWeek
 
                         const borderRadius = roundLeft && roundRight
                           ? '4px'

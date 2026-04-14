@@ -91,9 +91,10 @@ export default function WeekStrip({ weekSets, weekDays: weekDaysISO, today: toda
                   const isEnd    = s.end_date ? isSameDay(parseISO(s.end_date), day) : true
                   const isSingle = !s.end_date || s.end_date === s.job_date
                   const isFirstVisible = !isStart && !isSingle && isSameDay(day, weekDays[0]) && parseISO(s.job_date) < weekDays[0]
+                  const isLastVisible = !isEnd && !isSingle && isSameDay(day, weekDays[6]) && parseISO(s.end_date) > weekDays[6]
                   const showName   = isStart || isSingle || isFirstVisible
-                  const roundLeft  = isStart || isSingle
-                  const roundRight = isEnd || isSingle
+                  const roundLeft  = isStart || isSingle || isFirstVisible
+                  const roundRight = isEnd || isSingle || isLastVisible
 
                   const borderRadius = roundLeft && roundRight
                     ? '4px'
