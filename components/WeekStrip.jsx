@@ -64,7 +64,7 @@ export default function WeekStrip({ weekSets, weekDays: weekDaysISO, today: toda
           for (const s of daySets) slots[setLane[s.id]] = s
 
           return (
-            <div key={day.toISOString()} className={`py-2.5 text-center min-w-0 ${daySets.length > 0 ? 'bg-primary/5' : ''}`}>
+            <div key={day.toISOString()} className={`py-2.5 text-center min-w-0 overflow-visible ${daySets.length > 0 ? 'bg-primary/5' : ''}`}>
               <div className="text-[10px] text-muted-foreground uppercase tracking-wider px-1">
                 {format(day, 'EEE', { locale: it })}
               </div>
@@ -75,7 +75,7 @@ export default function WeekStrip({ weekSets, weekDays: weekDaysISO, today: toda
                   <span className={`text-sm font-semibold ${daySets.length > 0 ? 'text-primary' : 'text-muted-foreground/50'}`}>{format(day, 'd')}</span>
                 )}
               </div>
-              <div className="mt-1.5 flex flex-col gap-1">
+              <div className="mt-1.5 flex flex-col gap-1 relative z-[5] overflow-visible">
                 {slots.map((s, laneIdx) => {
                   if (!s) return <div key={laneIdx} className="h-6" />
                   const color    = getSetColor(s.id, s.status)
@@ -92,8 +92,10 @@ export default function WeekStrip({ weekSets, weekDays: weekDaysISO, today: toda
                     : roundLeft  ? '4px 0 0 4px'
                     : roundRight ? '0 4px 4px 0'
                     :              '0'
+                  const dayIdx = weekDays.indexOf(day)
+                  const isLastCol = dayIdx === 6
                   const ml = roundLeft  ? '2px' : '0'
-                  const mr = roundRight ? '2px' : '0'
+                  const mr = roundRight ? '2px' : isLastCol ? '0' : '-1px'
 
                   let spanDays = 1
                   if (showName && !isSingle) {
@@ -126,8 +128,8 @@ export default function WeekStrip({ weekSets, weekDays: weekDaysISO, today: toda
                       >
                         {showName && (
                           <span
-                            className="absolute left-0 top-0 h-full flex items-center text-[10px] font-semibold text-white whitespace-nowrap overflow-hidden text-ellipsis pl-2 pointer-events-none z-10"
-                            style={{ width: `calc(${spanDays * 100}% - 4px)` }}
+                            className="absolute left-0 top-0 h-full flex items-center text-[10px] font-semibold text-white whitespace-nowrap overflow-hidden text-ellipsis pl-2 pointer-events-none z-20"
+                            style={{ width: `calc(${spanDays} * 100% - 8px)`, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
                           >{s.name}</span>
                         )}
                       </div>
