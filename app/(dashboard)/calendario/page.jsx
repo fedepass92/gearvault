@@ -266,7 +266,7 @@ export default function CalendarioPage() {
                     )}
 
                     {/* Events — lane-based rendering */}
-                    <div className="space-y-0.5 relative z-[5]">
+                    <div className="space-y-0.5 relative z-[5] overflow-visible">
                       {slots.map((s, laneIdx) => {
                         if (!s) return <div key={laneIdx} className="h-8" />
                         const color     = getSetColor(s.id, s.status)
@@ -316,8 +316,8 @@ export default function CalendarioPage() {
                           >
                             {showName && (
                               <span
-                                className="absolute left-0 top-0 h-full flex items-center text-xs font-semibold text-white whitespace-nowrap overflow-hidden text-ellipsis pl-2 pointer-events-none z-10"
-                                style={{ width: `calc(${spanDays * 100}% - 4px)`, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
+                                className="absolute left-0 top-0 h-full flex items-center text-xs font-semibold text-white whitespace-nowrap overflow-hidden text-ellipsis pl-2 pointer-events-none z-20"
+                                style={{ width: `calc(${spanDays} * 100% - 8px)`, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
                               >{s.name}</span>
                             )}
                           </div>
