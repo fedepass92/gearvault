@@ -326,7 +326,7 @@ export default function CalendarioPage() {
                             {showName && (
                               <span
                                 className="absolute left-0 top-0 h-full flex items-center text-xs font-semibold text-white whitespace-nowrap overflow-hidden text-ellipsis pl-2 pointer-events-none z-20"
-                                style={{ width: `calc(${spanDays} * 100% - 8px)`, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
+                                style={{ width: `calc(${spanDays * 100}% - 8px)`, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
                               >{s.name}</span>
                             )}
                           </div>
